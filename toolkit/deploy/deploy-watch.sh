@@ -36,7 +36,7 @@ deploy_watch_write_manifest() {
   rp="$(remote_path_for_service "$s")"
   cname="$(container_name_for "$s")"
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)"
-  ssh -n "$SERVER" "cat > '$rp/.geostat-deploy.json'" <<JSON
+  ssh "$SERVER" "cat > '$rp/.geostat-deploy.json'" <<JSON
 {"version":1,"module":"backend","service":"${cname}","deployMode":"deploy-watch","kind":"runtime","environment":"${ENVIRONMENT}","deployPath":"${rp}","updatedAt":"${ts}"}
 JSON
 }

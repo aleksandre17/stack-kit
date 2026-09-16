@@ -39,22 +39,81 @@ function Get-DevRsyncExcludeArgs {
     if ($script:OpsDevSyncExcludes) {
         $excludes += @($script:OpsDevSyncExcludes)
     }
+    if (Test-DevComposeRootDeclared) {
+        # Rendered compose files are published separately; keep rsync --delete off them.
+        $excludes += @(Get-DevComposeFileNames -Environment "dev") + @(Get-DevComposeFileNames -Environment "prod")
+    }
     foreach ($e in $excludes) {
         $x = $e.Trim().TrimEnd('/')
         if ($x) { "--exclude=$x" }
     }
 }
 
-function Get-DevComposeFileArgs {
+function Get-DevComposeFileNames {
     param([ValidateSet("dev", "prod")][string]$Environment = "dev")
     if ($script:OpsDevComposeDevFiles -and $Environment -eq "dev") {
-        $files = @("docker-compose.yml") + @($script:OpsDevComposeDevFiles)
-        return ($files | ForEach-Object { "-f $_" }) -join " "
+        return @("docker-compose.yml") + @($script:OpsDevComposeDevFiles)
     }
-    if ($Environment -eq "dev") {
-        return "-f docker-compose.yml -f docker-compose.override.yml"
+    if ($Environment -eq "dev") { return @("docker-compose.yml", "docker-compose.override.yml") }
+    return @("docker-compose.yml", "docker-compose.prod.yml")
+}
+
+function Get-DevComposeFileArgs {
+    param([ValidateSet("dev", "prod")][string]$Environment = "dev")
+    return ((Get-DevComposeFileNames -Environment $Environment) | ForEach-Object { "-f $_" }) -join " "
+}
+
+function Get-RelativePathPosix {
+    param([Parameter(Mandatory = $true)][string]$From, [Parameter(Mandatory = $true)][string]$To)
+    $sep = [System.IO.Path]::DirectorySeparatorChar
+    $f = [System.IO.Path]::GetFullPath($From).TrimEnd([char]92, [char]47) + $sep
+    $t = [System.IO.Path]::GetFullPath($To).TrimEnd([char]92, [char]47) + $sep
+    $rel = [Uri]::UnescapeDataString(([Uri]$f).MakeRelativeUri([Uri]$t).ToString()).TrimEnd('/')
+    if (-not $rel) { return "." }
+    return $rel
+}
+
+# Rewrite host paths that point from the compose authority to the module source so
+# the file resolves inside the synced workspace (module root == compose dir on server).
+function ConvertTo-WorkspaceComposeText {
+    param([Parameter(Mandatory = $true)][string]$Text, [Parameter(Mandatory = $true)][string]$RelativeModulePath)
+    if ($RelativeModulePath -eq ".") { return $Text }
+    $pattern = '(?<![\w.\-/])' + [regex]::Escape($RelativeModulePath) + '(?=[/:"''\s]|$)'
+    return [regex]::Replace($Text, $pattern, ".", [System.Text.RegularExpressions.RegexOptions]::Multiline)
+}
+
+function Test-DevComposeRootDeclared {
+    if (-not $script:OpsComposeRoot -or -not $script:BUILD_CONTEXT) { return $false }
+    $a = [System.IO.Path]::GetFullPath($script:OpsComposeRoot).TrimEnd([char]92, [char]47)
+    $b = [System.IO.Path]::GetFullPath($script:BUILD_CONTEXT).TrimEnd([char]92, [char]47)
+    return ($a -ne $b)
+}
+
+function Publish-DevComposeFiles {
+    param([ValidateSet("dev", "prod")][string]$Environment = "dev")
+    if (-not (Test-DevComposeRootDeclared)) { return 0 }
+    $composeRoot = $script:OpsComposeRoot
+    $rel = Get-RelativePathPosix -From $composeRoot -To $script:BUILD_CONTEXT
+    $stage = Join-Path ([System.IO.Path]::GetTempPath()) ("geostat-compose-" + [guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $stage | Out-Null
+    try {
+        foreach ($name in (Get-DevComposeFileNames -Environment $Environment)) {
+            $src = Join-Path $composeRoot $name
+            if (-not (Test-Path $src)) {
+                Log "compose file missing: $src" "ERROR"
+                return 1
+            }
+            $text = ConvertTo-WorkspaceComposeText -Text ([System.IO.File]::ReadAllText($src)) -RelativeModulePath $rel
+            $out = Join-Path $stage $name
+            [System.IO.File]::WriteAllText($out, ($text -replace "`r`n", "`n"), (New-Object System.Text.UTF8Encoding($false)))
+            $rc = Invoke-SCP -Source $out -Dest "$($script:DEPLOY_PATH)/$name"
+            if ($rc -ne 0) { Log "compose publish FAILED: $name" "ERROR"; return 1 }
+        }
+        Log "compose files rendered from $composeRoot" "OK"
+        return 0
+    } finally {
+        Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
     }
-    return "-f docker-compose.yml -f docker-compose.prod.yml"
 }
 
 function Invoke-DevRsyncToRemote {
@@ -94,6 +153,13 @@ function Invoke-DevRsyncToRemote {
     if ($DryRun) { Log "(dry-run)" "INFO" }
 
     $dryFlag = if ($DryRun) { @("--dry-run") } else { @() }
+    # Carry declared DEPLOY_SSH_* settings into rsync's transport (Invoke-SSH/SCP already honour them).
+    $sshExtra = @()
+    if (Get-Command Get-GeostatSshExtraArgs -ErrorAction SilentlyContinue) { $sshExtra = @(Get-GeostatSshExtraArgs) }
+    if ($sshExtra.Count -gt 0) {
+        $rsh = "ssh " + (($sshExtra | ForEach-Object { $_.Replace([string][char]92, "/") }) -join " ")
+        $dryFlag = @("-e", $rsh) + $dryFlag
+    }
 
     if ($rsync -eq "wsl") {
         $wslSrc = $src
@@ -131,6 +197,7 @@ function Invoke-DevRemoteComposeUp {
         [switch]$Recreate
     )
     $remoteEnvName = Publish-RemoteEnvFiles -Environment $Environment
+    if ((Publish-DevComposeFiles -Environment $Environment) -ne 0) { return 1 }
     $composeArgs = Get-DevComposeFileArgs -Environment $Environment
     $buildFlag = if ($Build) { "--build" } else { "" }
     $recreateFlag = if ($Recreate) { "--force-recreate" } else { "" }

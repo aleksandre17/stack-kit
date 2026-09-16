@@ -36,7 +36,7 @@ Test-Check "docker compose v2" {
 Test-Check "secrets dir" { Test-Path $SECRETS_DIR }
 Test-Check ".env.dev" { Test-Path (Join-Path $SECRETS_DIR ".env.dev") }
 Test-Check ".env.prod" { Test-Path (Join-Path $SECRETS_DIR ".env.prod") }
-Test-Check "docker-compose.yml" { Test-Path (Join-Path $ROOT $OpsComposeFile) }
+Test-Check "docker-compose.yml" { Test-Path (Join-Path (Get-OpsComposeRoot) $OpsComposeFile) }
 Test-Check "nginx.conf.template" { Test-Path (Join-Path $ROOT "nginx.conf.template") }
 Test-Check "nginx.conf" { Test-Path (Join-Path $ROOT "nginx.conf") }
 $nginxEnv = Join-Path $SECRETS_DIR "nginx.env"

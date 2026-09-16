@@ -119,3 +119,16 @@ def test_workspace_manifest_marker_uses_module_id() -> None:
     text = (PKG / "toolkit" / "deploy" / "dev-remote.sh").read_text(encoding="utf-8")
     assert '"module":"backend"' not in text
     assert '"module":"${GEOSTAT_MODULE_ID:-}"' in text
+
+
+def test_heredoc_uploads_keep_stdin() -> None:
+    """`ssh -n` detaches stdin, so a heredoc piped to `cat >` would write an empty file."""
+    for script in (PKG / "toolkit" / "deploy").glob("*.sh"):
+        assert 'ssh -n "$SERVER" "cat >' not in script.read_text(encoding="utf-8"), script.name
+
+
+def test_sync_preserves_bootstrap_generated_files() -> None:
+    text = (PKG / "toolkit" / "deploy" / "dev-remote.sh").read_text(encoding="utf-8")
+    block = text.split("DEV_RSYNC_EXCLUDES=(", 1)[1].split(")", 1)[0]
+    for generated in (".env.dev", "docker-compose.workspace.yml", ".geostat-deploy.json"):
+        assert f'"{generated}"' in block

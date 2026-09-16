@@ -21,6 +21,10 @@ $OpsModuleRoot = $modPath
 $OpsScriptRoot = $OpsModuleRoot
 $OpsSecretsModule = if ($entry.secretsModule) { $entry.secretsModule } else { $env:GEOSTAT_MODULE_ID }
 $OpsComposeFile = "docker-compose.yml"
+# modules.<id>.composeDir: compose authority outside the source tree (default: module path)
+$OpsComposeRoot = if ($entry.composeDir) {
+    Join-Path $env:GEOSTAT_PROJECT_ROOT ($entry.composeDir -replace '[\\/]', [System.IO.Path]::DirectorySeparatorChar)
+} else { $OpsModuleRoot }
 
 if (Test-Path (Join-Path $OpsModuleRoot "ops.config.ps1")) {
     . (Join-Path $OpsModuleRoot "ops.config.ps1")

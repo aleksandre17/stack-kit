@@ -222,16 +222,18 @@ function Publish-RemoteEnvFiles {
     foreach ($f in (Get-SecretsEnvFiles -Module $OpsSecretsModule -Profile $Environment)) {
         [void]$lines.Add("")
         [void]$lines.Add("# from $f")
-        Get-Content $f | ForEach-Object { [void]$lines.Add($_) }
+        Get-Content $f | Where-Object { $_ -notmatch '^\s*DEPLOY_SSH_' } | ForEach-Object { [void]$lines.Add($_) }
     }
     $root = Get-MonorepoRoot
     $deployEnv = Join-Path (Get-SecretsRoot) "deploy.env"
     if (Test-Path $deployEnv) {
         [void]$lines.Add("")
         [void]$lines.Add("# from deploy.env")
-        Get-Content $deployEnv | ForEach-Object { [void]$lines.Add($_) }
+        # DEPLOY_SSH_* describe the workstation transport; they are not remote runtime config.
+        Get-Content $deployEnv | Where-Object { $_ -notmatch '^\s*DEPLOY_SSH_' } | ForEach-Object { [void]$lines.Add($_) }
     }
-    $lines | Set-Content -Path $bundle -Encoding UTF8
+    # The bundle is sourced by bash and read by docker --env-file on Linux: LF, no BOM.
+    [System.IO.File]::WriteAllText($bundle, (($lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
     $remoteName = ".env.$Environment"
     $rc = Invoke-SCP -Source $bundle -Dest "$($script:DEPLOY_PATH)/$remoteName"
     Remove-Item $bundle -ErrorAction SilentlyContinue

@@ -34,7 +34,7 @@ dev_write_workspace_compose() {
   net="${DOCKER_NETWORK:-${PROJECT}-net}"
   run_script="${NODE_RUN_SCRIPT:-dev}"
 
-  ssh -n "$SERVER" "cat > '$rp/docker-compose.workspace.yml'" <<YML
+  ssh "$SERVER" "cat > '$rp/docker-compose.workspace.yml'" <<YML
 services:
   ${s}:
     image: ${cname}-workspace

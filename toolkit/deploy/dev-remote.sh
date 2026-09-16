@@ -15,6 +15,10 @@ DEV_RSYNC_EXCLUDES=(
   "deploy-staging/"
   ".cache/"
   "node_modules/"
+  # Generated on the server by bootstrap; rsync --delete must not remove them.
+  ".env.dev"
+  "docker-compose.workspace.yml"
+  ".geostat-deploy.json"
 )
 
 dev_rsync_executable() {
@@ -71,6 +75,10 @@ dev_rsync_to_workspace() {
   ssh -n "$SERVER" "mkdir -p '$rp'" || return 1
 
   local -a args=(-avz --delete)
+  # Carry declared DEPLOY_SSH_* settings into rsync's transport (ssh/scp already honour them).
+  local ssh_extra
+  ssh_extra="$(geostat_ssh_extra_args 2>/dev/null | tr '\n' ' ')"
+  [[ -n "${ssh_extra// /}" ]] && args+=(-e "ssh ${ssh_extra% }")
   for exclude in "${DEV_RSYNC_EXCLUDES[@]}"; do
     args+=(--exclude="$exclude")
   done
@@ -201,7 +209,7 @@ dev_write_workspace_compose() {
   def_port="$(dev_default_port_for "$s")"
   net="${DOCKER_NETWORK:-${PROJECT}-net}"
 
-  ssh -n "$SERVER" "cat > '$rp/docker-compose.workspace.yml'" <<YML
+  ssh "$SERVER" "cat > '$rp/docker-compose.workspace.yml'" <<YML
 services:
   ${s}:
     image: ${cname}-workspace
@@ -273,7 +281,7 @@ dev_write_workspace_manifest() {
   cname="$(container_name_for "$s")"
   local ts
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)"
-  ssh -n "$SERVER" "cat > '$rp/.geostat-deploy.json'" <<JSON
+  ssh "$SERVER" "cat > '$rp/.geostat-deploy.json'" <<JSON
 {"version":1,"module":"${GEOSTAT_MODULE_ID:-}","service":"${cname}","deployMode":"dev-bootstrap","kind":"workspace","environment":"dev","deployPath":"${rp}","updatedAt":"${ts}"}
 JSON
 }

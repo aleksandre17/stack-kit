@@ -108,7 +108,9 @@ function Show-Help {
 
 
 
-$bash = "${env:ProgramFiles}\Git\bin\bash.exe"
+# GEOSTAT_BASH selects the workstation bash runtime (e.g. one that ships rsync);
+# default is Git for Windows.
+$bash = if ($env:GEOSTAT_BASH) { $env:GEOSTAT_BASH } else { "${env:ProgramFiles}\Git\bin\bash.exe" }
 
 if (-not (Test-Path $bash)) { $bash = "${env:ProgramFiles}\Git\usr\bin\bash.exe" }
 

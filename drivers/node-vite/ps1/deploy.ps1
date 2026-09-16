@@ -84,7 +84,7 @@ elseif ($Arg1 -in $_validModes) { $Mode = $Arg1 }
 elseif ($Arg1) { $ServiceName = $Arg1 }
 
 $extraCompose = if ($Environment -eq "dev") { @("docker-compose.override.yml") } else { @("docker-compose.prod.yml") }
-$_services = @(Get-ComposeServicesFromFile -ModuleRoot $ROOT -ComposeFile "docker-compose.yml" -ExtraComposeFiles $extraCompose)
+$_services = @(Get-ComposeServicesFromFile -ModuleRoot (Get-OpsComposeRoot) -ComposeFile "docker-compose.yml" -ExtraComposeFiles $extraCompose)
 $_serviceNames = @($_services | ForEach-Object { $_.Name })
 
 if ($ServiceName) {

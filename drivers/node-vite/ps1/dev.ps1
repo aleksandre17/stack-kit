@@ -63,7 +63,7 @@ if ($SubCommand -notin $validSubs) {
 if ($DebounceMs -lt 400) { $DebounceMs = 400 }
 
 $extraCompose = if ($Environment -eq "dev") { @("docker-compose.override.yml") } else { @("docker-compose.prod.yml") }
-$_services = @(Get-ComposeServicesFromFile -ModuleRoot $ROOT -ComposeFile "docker-compose.yml" -ExtraComposeFiles $extraCompose)
+$_services = @(Get-ComposeServicesFromFile -ModuleRoot (Get-OpsComposeRoot) -ComposeFile "docker-compose.yml" -ExtraComposeFiles $extraCompose)
 $_serviceNames = @($_services | ForEach-Object { $_.Name })
 
 if ($_services.Count -eq 1) {

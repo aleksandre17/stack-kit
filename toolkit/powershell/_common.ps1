@@ -59,10 +59,15 @@ if (-not $DEPLOY_PATH -and $SERVER_BASE) {
     $DEPLOY_PATH = "$SERVER_BASE/$ProjectSlug/$APP_NAME"
 }
 
+function Get-OpsComposeRoot {
+    if ($script:OpsComposeRoot) { return $script:OpsComposeRoot }
+    return $ROOT
+}
+
 function Get-DockerServices {
-    $composeFile = Join-Path $ROOT $OpsComposeFile
+    $composeFile = Join-Path (Get-OpsComposeRoot) $OpsComposeFile
     if (-not (Test-Path $composeFile)) {
-        Write-Host "  [ERROR] $OpsComposeFile not found in $ROOT" -ForegroundColor Red
+        Write-Host "  [ERROR] $OpsComposeFile not found in $(Get-OpsComposeRoot)" -ForegroundColor Red
         return @()
     }
 
@@ -148,18 +153,21 @@ function Set-Service {
 
     $script:APP_NAME = $Svc.ContainerName
 
+    # Compose semantics: build.context is relative to the compose file's directory,
+    # build.dockerfile is relative to the build context.
+    $composeRoot = Get-OpsComposeRoot
     if ($Svc.Context -eq '.' -or $Svc.Context -eq './') {
-        $script:BUILD_CONTEXT = $ROOT
+        $script:BUILD_CONTEXT = $composeRoot
     } elseif ([IO.Path]::IsPathRooted($Svc.Context)) {
         $script:BUILD_CONTEXT = $Svc.Context
     } else {
-        $script:BUILD_CONTEXT = Join-Path $ROOT $Svc.Context
+        $script:BUILD_CONTEXT = [IO.Path]::GetFullPath((Join-Path $composeRoot $Svc.Context))
     }
 
     if ([IO.Path]::IsPathRooted($Svc.Dockerfile)) {
         $script:DOCKERFILE_PATH = $Svc.Dockerfile
     } else {
-        $script:DOCKERFILE_PATH = Join-Path $ROOT $Svc.Dockerfile
+        $script:DOCKERFILE_PATH = [IO.Path]::GetFullPath((Join-Path $script:BUILD_CONTEXT $Svc.Dockerfile))
     }
 
     # DEPLOY_PATH set by Set-DeployPathForMode (Deploy-Path.ps1) after deploy mode is known
@@ -211,10 +219,20 @@ function LogDone {
     Log "=======================================================" "INFO"
 }
 
+# Windows PowerShell re-terminates piped native stdin with CRLF, which leaks `r into
+# remote paths and arguments. Ship the LF-normalised script byte-exact as base64 instead.
+function ConvertTo-RemoteBashCommand {
+    param([string]$Script)
+    $lf = ($Script -replace "`r", "")
+    if (-not $lf.EndsWith("`n")) { $lf += "`n" }
+    $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($lf))
+    return "echo $b64 | base64 -d | bash"
+}
+
 function Invoke-SSH {
     param([string]$Script)
     $sshExtra = @(Get-GeostatSshExtraArgs)
-    ($Script -replace "`r", "") | & ssh @sshExtra $SERVER bash 2>&1 | ForEach-Object {
+    & ssh @sshExtra $SERVER (ConvertTo-RemoteBashCommand $Script) 2>&1 | ForEach-Object {
         if ($LOG_FILE) { Add-Content -Path $LOG_FILE -Value "[ssh] $_" -Encoding UTF8 }
         Write-Host "[ssh] $_" -ForegroundColor DarkGray
     }
@@ -224,7 +242,7 @@ function Invoke-SSH {
 function Invoke-SSHCapture {
     param([string]$Script)
     $sshExtra = @(Get-GeostatSshExtraArgs)
-    ($Script -replace "`r", "") | & ssh @sshExtra $SERVER bash 2>&1
+    & ssh @sshExtra $SERVER (ConvertTo-RemoteBashCommand $Script) 2>&1
 }
 
 function Invoke-SCP {

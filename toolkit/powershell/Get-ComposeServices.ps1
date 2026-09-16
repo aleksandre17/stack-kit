@@ -14,16 +14,18 @@ function Get-ComposeServicesFromFile {
         try {
             $args = @("compose", "-f", $ComposeFile)
             foreach ($f in $ExtraComposeFiles) { $args += @("-f", $f) }
-            $args += @("config", "--services")
-            $names = & docker @args 2>$null
-            if ($LASTEXITCODE -eq 0 -and $names) {
-                return @($names | ForEach-Object {
-                    $n = $_.Trim()
+            $args += @("config", "--format", "json")
+            $json = & docker @args 2>$null
+            if ($LASTEXITCODE -eq 0 -and $json) {
+                # Resolved model keeps container_name, build.context (absolute) and build.dockerfile.
+                $model = ($json -join "`n") | ConvertFrom-Json
+                return @($model.services.PSObject.Properties | ForEach-Object {
+                    $svc = $_.Value
                     [PSCustomObject]@{
-                        Name          = $n
-                        ContainerName = $n
-                        Context       = '.'
-                        Dockerfile    = 'Dockerfile'
+                        Name          = $_.Name
+                        ContainerName = if ($svc.container_name) { $svc.container_name } else { $_.Name }
+                        Context       = if ($svc.build -and $svc.build.context) { $svc.build.context } else { '.' }
+                        Dockerfile    = if ($svc.build -and $svc.build.dockerfile) { $svc.build.dockerfile } else { 'Dockerfile' }
                     }
                 })
             }
@@ -33,5 +35,16 @@ function Get-ComposeServicesFromFile {
     # Fallback: legacy parser from ops toolkit
     $prev = $OpsComposeFile
     $script:OpsComposeFile = $ComposeFile
-    try { return @(Get-DockerServices) } finally { $script:OpsComposeFile = $prev }
+    try { $services = @(Get-DockerServices) } finally { $script:OpsComposeFile = $prev }
+    # Overlays may override container_name (e.g. a dev overlay isolating from a running prod container).
+    foreach ($extra in $ExtraComposeFiles) {
+        if (-not (Test-Path (Join-Path $ModuleRoot $extra))) { continue }
+        $script:OpsComposeFile = $extra
+        try { $overrides = @(Get-DockerServices) } finally { $script:OpsComposeFile = $prev }
+        foreach ($o in $overrides) {
+            $target = $services | Where-Object { $_.Name -eq $o.Name } | Select-Object -First 1
+            if ($target -and $o.ContainerName -ne $o.Name) { $target.ContainerName = $o.ContainerName }
+        }
+    }
+    return $services
 }

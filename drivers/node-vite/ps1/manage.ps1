@@ -88,7 +88,7 @@ elseif ($Arg1 -in $_validCommands) { $Command = (Normalize-Command $Arg1) }
 elseif ($Arg1) { $ServiceName = $Arg1 }
 
 # --- Package selection --------------------------------------------
-$_services     = @(Get-ComposeServicesFromFile -ModuleRoot $ROOT -ComposeFile "docker-compose.yml")
+$_services     = @(Get-ComposeServicesFromFile -ModuleRoot (Get-OpsComposeRoot) -ComposeFile "docker-compose.yml")
 $_serviceNames = @($_services | ForEach-Object { $_.Name })
 
 if ($ServiceName) {
