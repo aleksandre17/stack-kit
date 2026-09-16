@@ -15,14 +15,17 @@ geostat_module_config() {
   geostat_python -c "
 import json, os, sys
 root = os.environ.get('GEOSTAT_PROJECT_ROOT', '')
-mf = os.path.join(root, 'geostat.ops.json')
+decl = os.path.join(os.path.dirname(os.path.abspath(sys.argv[4])), 'identity.json')
+d = json.load(open(decl, encoding='utf-8'))
+names = [d['manifestFilename'], *d.get('legacyManifestFilenames', [])]
+mf = next((p for p in (os.path.join(root, n) for n in names) if os.path.isfile(p)), '')
 m = {}
-if os.path.isfile(mf):
+if mf:
     data = json.load(open(mf, encoding='utf-8'))
     m = data.get('modules', {}).get(sys.argv[1], {})
 v = m.get(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else '')
 print(v if v is not None else '')
-" "$id" "$key" "$default"
+" "$id" "$key" "$default" "${BASH_SOURCE[0]}"
 }
 
 geostat_module_type() {

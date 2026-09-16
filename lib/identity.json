@@ -1,0 +1,7 @@
+{
+  "$comment": "THE kit's identity. Declared here, projected into Python (lib/identity.py), bash (lib/project.sh) and PowerShell (lib/project.ps1). A declaration carries no behaviour, so no language owns it and all three read the same bytes. Renaming the kit is a change to THIS FILE. legacyManifestFilenames is read-with-notice, never written.",
+  "kitName": "geostat",
+  "manifestFilename": "geostat.ops.json",
+  "legacyManifestFilenames": [],
+  "envPrefix": "GEOSTAT"
+}

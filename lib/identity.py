@@ -15,22 +15,30 @@ permanent second home.
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
-#: What the kit calls itself. The CLI, the manifest and the env prefix all derive
-#: from this one word.
-KIT_NAME = "geostat"
+#: The ONE declaration, shared byte-for-byte with bash and PowerShell. Python does
+#: not own the kit's name; it PROJECTS it, exactly as the other two runtimes do.
+_DECLARATION = json.loads(
+    (Path(__file__).resolve().parent / "identity.json").read_text(encoding="utf-8")
+)
+
+#: What the kit calls itself.
+KIT_NAME: str = _DECLARATION["kitName"]
 
 #: The manifest a consumer declares its project in.
-MANIFEST_FILENAME = f"{KIT_NAME}.ops.json"
+MANIFEST_FILENAME: str = _DECLARATION["manifestFilename"]
 
 #: Names accepted for backward compatibility, most recent first. Reading one of
 #: these is legal and warned about; writing one is not done.
-LEGACY_MANIFEST_FILENAMES: tuple[str, ...] = ()
+LEGACY_MANIFEST_FILENAMES: tuple[str, ...] = tuple(
+    _DECLARATION.get("legacyManifestFilenames") or ()
+)
 
 #: Environment variables the kit reads are prefixed with this.
-ENV_PREFIX = KIT_NAME.upper()
+ENV_PREFIX: str = _DECLARATION["envPrefix"]
 
 
 def manifest_filenames() -> tuple[str, ...]:

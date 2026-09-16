@@ -31,7 +31,7 @@ function Get-ModuleType {
     param([string]$ModuleId)
     $m = Get-ModuleManifestEntry $ModuleId
     if (-not $m) {
-        throw "Unknown module '$ModuleId' - add modules.$ModuleId in geostat.ops.json"
+        throw "Unknown module '$ModuleId' - add modules.$ModuleId in $((Get-KitIdentity).manifestFilename)"
     }
     if (-not $m.type) {
         throw "modules.$ModuleId.type is required (driver id from drivers/registry.json)"

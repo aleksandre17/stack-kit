@@ -1,14 +1,44 @@
-# Project manifest (geostat.ops.json) — package boundary resolution
+# Project manifest resolution — package boundary.
+#
+# The manifest's NAME is not spelled here. It is declared once in lib/identity.json
+# and projected into every runtime, so a rename is one edit and never an archaeology.
+
+$script:GeostatIdentity = $null
+
+function Get-KitIdentity {
+    if ($null -ne $script:GeostatIdentity) { return $script:GeostatIdentity }
+    $decl = Join-Path $PSScriptRoot 'identity.json'
+    # No guessed default: a missing declaration is a broken kit, and a fallback
+    # spelling here would be exactly the second home this file exists to remove.
+    if (-not (Test-Path $decl)) { throw "kit identity declaration missing: $decl" }
+    $script:GeostatIdentity = Get-Content -Raw -Encoding UTF8 $decl | ConvertFrom-Json
+    return $script:GeostatIdentity
+}
+
+function Get-ManifestFileNames {
+    # Accepted manifest filenames, canonical first.
+    $id = Get-KitIdentity
+    @($id.manifestFilename) + @($id.legacyManifestFilenames | Where-Object { $_ })
+}
+
+function Get-ManifestInDirectory {
+    param([string]$Directory)
+    foreach ($name in Get-ManifestFileNames) {
+        $candidate = Join-Path $Directory $name
+        if (Test-Path $candidate) { return $candidate }
+    }
+    return $null
+}
 
 function Get-ProjectManifestPath {
     if ($env:GEOSTAT_PROJECT_ROOT) {
-        $mf = Join-Path $env:GEOSTAT_PROJECT_ROOT "geostat.ops.json"
-        if (Test-Path $mf) { return $mf }
+        $mf = Get-ManifestInDirectory $env:GEOSTAT_PROJECT_ROOT
+        if ($mf) { return $mf }
     }
     $dir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
     while ($dir) {
-        $mf = Join-Path $dir "geostat.ops.json"
-        if (Test-Path $mf) { return $mf }
+        $mf = Get-ManifestInDirectory $dir
+        if ($mf) { return $mf }
         $parent = Split-Path $dir -Parent
         if ($parent -eq $dir) { break }
         $dir = $parent
@@ -33,10 +63,11 @@ function Get-ProjectRootFromManifest {
 }
 
 function Get-ScaffoldManifestPath {
+    $name = (Get-KitIdentity).manifestFilename
     if ($env:GEOSTAT_KIT_ROOT) {
-        return Join-Path $env:GEOSTAT_KIT_ROOT "scaffold\geostat.ops.json"
+        return Join-Path $env:GEOSTAT_KIT_ROOT (Join-Path 'scaffold' $name)
     }
-    Join-Path (Get-OpsPackageRoot) "scaffold\geostat.ops.json"
+    Join-Path (Get-OpsPackageRoot) (Join-Path 'scaffold' $name)
 }
 
 function Get-ScaffoldManifestField {
@@ -86,7 +117,7 @@ function Get-OpsToolkitPowerShellRoot {
 function Get-ManifestModulePath {
     param([Parameter(Mandatory = $true)][string]$ModuleId)
     $proj = Get-ProjectRootFromManifest
-    if (-not $proj) { throw "geostat.ops.json not found" }
+    if (-not $proj) { throw "$((Get-KitIdentity).manifestFilename) not found" }
     $rel = Get-ManifestField "modules.$ModuleId.path"
     if (-not $rel) { throw "manifest modules.$ModuleId.path missing" }
     Join-Path $proj ($rel -replace '/', '\')
@@ -156,14 +187,14 @@ function Get-ListedSecretsModuleFolders {
 
 function Get-StackComposeDirFromManifest {
     $proj = Get-ProjectRootFromManifest
-    if (-not $proj) { throw "geostat.ops.json not found" }
+    if (-not $proj) { throw "$((Get-KitIdentity).manifestFilename) not found" }
     $rel = Get-ManifestField "stack.composeDir"
     Join-Path $proj ($rel -replace '/', '\')
 }
 
 function Get-InfraComposeDirFromManifest {
     $proj = Get-ProjectRootFromManifest
-    if (-not $proj) { throw "geostat.ops.json not found" }
+    if (-not $proj) { throw "$((Get-KitIdentity).manifestFilename) not found" }
     $rel = Get-ManifestField "stack.infraComposeDir" "ops/compose/infra"
     Join-Path $proj ($rel -replace '/', '\')
 }
@@ -270,7 +301,7 @@ function Get-InfraMergedCatalogModules {
 function Get-InfraTunnelForwards {
     $services = Get-ManifestInfraServices
     if (-not $services -or $services.Count -eq 0) {
-        throw "stack.infra.services is empty - declare enabled stores in geostat.ops.json"
+        throw "stack.infra.services is empty - declare enabled stores in $((Get-KitIdentity).manifestFilename)"
     }
     $modules = Get-InfraMergedCatalogModules
     $seen = @{}

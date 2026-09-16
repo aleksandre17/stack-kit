@@ -17,7 +17,7 @@ function Get-MonorepoRoot {
     $dir = $PSScriptRoot
     if (-not $dir) { $dir = Split-Path -Parent $MyInvocation.MyCommand.Path }
     while ($dir) {
-        if (Test-Path (Join-Path $dir "geostat.ops.json")) { return $dir }
+        if (Get-ManifestInDirectory $dir) { return $dir }
         if ($env:GEOSTAT_LEGACY_ROOT_DISCOVERY -match '^(1|true|yes|on)$') {
             if (Test-Path (Join-Path $dir "secrets")) { return $dir }
             if (Test-Path (Join-Path $dir "ops/config")) { return $dir }
@@ -26,7 +26,7 @@ function Get-MonorepoRoot {
         if ($parent -eq $dir) { break }
         $dir = $parent
     }
-    throw "Project root not found (geostat.ops.json required; GEOSTAT_LEGACY_ROOT_DISCOVERY=1 for old trees)"
+    throw "Project root not found ($((Get-KitIdentity).manifestFilename) required; GEOSTAT_LEGACY_ROOT_DISCOVERY=1 for old trees)"
 }
 
 function Get-SecretsRoot {

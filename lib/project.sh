@@ -1,5 +1,29 @@
 #!/bin/bash
-# Project manifest (geostat.ops.json) — package boundary resolution
+# Project manifest resolution — package boundary.
+#
+# The manifest's NAME is not spelled here. It is declared once in lib/identity.json
+# and projected into every runtime, so a rename is one edit and never an archaeology.
+
+# Accepted manifest filenames, canonical first — read from the ONE declaration.
+# Pure text parsing on purpose: this must work before python is known to exist.
+_geostat_manifest_names() {
+  local decl="${BASH_SOURCE[0]%/*}/identity.json"
+  # No guessed default: a missing declaration is a broken kit, and a fallback
+  # spelling here would be exactly the second home this file exists to remove.
+  [[ -f "$decl" ]] || { echo "  ERROR: kit identity declaration missing: $decl" >&2; return 1; }
+  sed -n 's/.*"manifestFilename"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$decl"
+  sed -n '/"legacyManifestFilenames"[[:space:]]*:[[:space:]]*\[/,/\]/p' "$decl" \
+    | grep -o '"[^"]*\.json"' | tr -d '"'
+}
+
+# First accepted manifest inside $1, or non-zero when the directory holds none.
+_geostat_manifest_in() {
+  local dir="$1" name
+  while read -r name; do
+    [[ -n "$name" && -f "$dir/$name" ]] && { echo "$dir/$name"; return 0; }
+  done < <(_geostat_manifest_names)
+  return 1
+}
 
 geostat_python() {
   if command -v python3 &>/dev/null; then
@@ -23,15 +47,14 @@ _geostat_manifest_file() {
   if [[ -z "$root" ]]; then
     local dir="${1:-$(pwd)}"
     while [[ -n "$dir" && "$dir" != "/" ]]; do
-      if [[ -f "$dir/geostat.ops.json" ]]; then
-        echo "$dir/geostat.ops.json"
-        return 0
-      fi
+      _geostat_manifest_in "$dir" && return 0
       dir="$(dirname "$dir")"
     done
     return 1
   fi
-  echo "$root/geostat.ops.json"
+  _geostat_manifest_in "$root" && return 0
+  # Declared root with no manifest yet: name the canonical target, not a guess.
+  echo "$root/$(_geostat_manifest_names | head -1)"
 }
 
 _geostat_legacy_discovery() {
@@ -56,7 +79,7 @@ geostat_find_project_root() {
   fi
   local dir="${1:-$(pwd)}" mf
   while [[ -n "$dir" && "$dir" != "/" ]]; do
-    if [[ -f "$dir/geostat.ops.json" ]]; then
+    if _geostat_manifest_in "$dir" >/dev/null; then
       geostat_normalize_unix_path "$dir"
       return 0
     fi

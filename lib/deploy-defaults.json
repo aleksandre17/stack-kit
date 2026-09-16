@@ -1,5 +1,5 @@
 {
-  "description": "Deploy.env keys. Compose service names default from geostat.ops.json modules (compose_identity); COMPOSE_*_SERVICE optional legacy overrides.",
+  "description": "Deploy.env keys. Compose service names default from the project manifest's modules (compose_identity); COMPOSE_*_SERVICE optional legacy overrides.",
   "keys": {
     "DEPLOY_PROJECT": "from_repo_folder",
     "COMPOSE_PROJECT_NAME": "from_repo_folder",
