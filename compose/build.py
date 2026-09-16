@@ -107,6 +107,7 @@ def build_target(
             fmt_global=fmt_global,
             fmt_extra=spec.get("fmt", {}),
             features=features,
+            module_fmt=spec.get("moduleFmt", {}),
         )
     elif spec.get("manifestModule"):
         from manifest_compose import build_single_module_compose
@@ -129,6 +130,11 @@ def build_target(
     if comment:
         comment = comment.format(**fmt)
     out = HEADER + comment + body
+    if spec.get("extraServices"):
+        # Companion service(s) appended inside the `services:` block (e.g. a
+        # sidecar a module needs). The template is project-supplied; the engine
+        # stays brand-agnostic — it only knows the spec key.
+        out += templates[spec["extraServices"]].format(**fmt)
     if spec.get("networks"):
         out += "\n" + templates[spec["networks"]].format(**fmt)
     if spec.get("volumes"):

@@ -1,11 +1,12 @@
-# Resolves boot JAR and runs java -jar (Windows-safe vs Gradle includeBuild lock)
+# Resolves boot JAR path and runs java -jar (Windows-safe: avoids Gradle includeBuild file-lock).
+$PackageRoot = if ($env:GEOSTAT_KIT_ROOT) { $env:GEOSTAT_KIT_ROOT } else {
+    Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+}
+. (Join-Path $PackageRoot "lib\module-manifest.ps1")
+
 function Get-GeostatHybridBootJar {
-    param(
-        [string]$Root,
-        [string]$ModuleId,
-        [string]$ModPath
-    )
-    $explicit = Get-ManifestField "modules.$ModuleId.hybrid.bootJar"
+    param([string]$Root, [string]$ModuleId, [string]$ModPath)
+    $explicit = Get-ModuleBootJar $ModuleId
     if ($explicit) {
         return Join-Path $Root ($explicit -replace '/', '\')
     }
@@ -22,30 +23,28 @@ function Test-GeostatPreferHybridJar {
     param([string]$ModuleId)
     if ($env:GEOSTAT_HYBRID_GRADLE -eq '1') { return $false }
     if ($env:GEOSTAT_HYBRID_JAR -eq '1') { return $true }
-    $pref = Get-ManifestField "modules.$ModuleId.hybrid.preferJar"
+    $pref = Get-ModulePreferHybridJar $ModuleId
     if ($pref -eq 'true') { return $true }
     if ($pref -eq 'false') { return $false }
     return $IsWindows
 }
 
 function Invoke-GeostatHybridJarBoot {
-    param(
-        [string]$Root,
-        [string]$ModuleId,
-        [string]$ModPath
-    )
+    param([string]$Root, [string]$ModuleId, [string]$ModPath)
     $jar = Get-GeostatHybridBootJar -Root $Root -ModuleId $ModuleId -ModPath $ModPath
-    if (-not $jar -or -not (Test-Path $jar)) {
-        return
-    }
+    if (-not $jar -or -not (Test-Path $jar)) { return }
 
-    $profiles = Get-ManifestField "modules.$ModuleId.hybrid.springProfiles"
+    $profiles = Get-ModuleHybridProfiles $ModuleId
     if ($profiles) { $env:SPRING_PROFILES_ACTIVE = $profiles }
 
-    if ($ModuleId -eq 'chat-api') {
+    # Modules that do NOT own Flyway (datastores.postgres.flyway != true) must not run
+    # DB migrations on startup — exclude DataSource + Flyway auto-configuration entirely.
+    if (-not (Test-ModuleOwnsFlyway $ModuleId)) {
         $env:SPRING_FLYWAY_ENABLED = 'false'
-        $env:SPRING_AUTOCONFIGURE_EXCLUDE =
-            'org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration'
+        $env:SPRING_AUTOCONFIGURE_EXCLUDE = (
+            'org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,' +
+            'org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration'
+        )
     }
 
     Write-Host "[hybrid] jar boot $ModuleId -> $jar" -ForegroundColor Cyan

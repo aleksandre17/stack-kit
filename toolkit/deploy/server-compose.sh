@@ -17,6 +17,7 @@ deploy_step_server_compose() {
       --src /tmp/compose-src.yml \
       --service '$s' \
       --environment '${ENVIRONMENT}' \
+      --build-layout '${SERVER_BUILD_LAYOUT:-jar}' \
       --out '$rp/docker-compose.${ENVIRONMENT}.yml'" \
       2>&1 | ssh "$SERVER" "tee -a '$rp/logs/compose.log'" || true
   done

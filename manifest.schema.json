@@ -366,6 +366,30 @@
       },
       "additionalProperties": false
     },
+    "migration": {
+      "type": "object",
+      "description": "One-time layout migration inputs (P6-migrate); project-specific legacy server state, not kit machinery",
+      "properties": {
+        "legacyDirs": {
+          "type": "object",
+          "description": "Pre-migration flat folder names on the existing server, by role. Consumed by migrate-layout to build the old→new rename map. Omit for greenfield (no prior server).",
+          "properties": {
+            "api": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Legacy flat dir names that map to the primary api module's compose service"
+            },
+            "ui": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Legacy flat dir names that map to the primary ui module's compose service"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "features": {
       "type": "object",
       "description": "Optional project capabilities (package reads; defaults off in scaffold)",

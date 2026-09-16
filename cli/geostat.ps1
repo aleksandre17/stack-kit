@@ -54,9 +54,11 @@ function Show-Help {
 
   geostat — manifest-driven ops CLI (geostat-kit)
 
-    init | validate | migrate | vscode-gen | config-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout | hybrid
+    init | validate | migrate | vscode-gen | config-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout | hybrid | dev
 
     mod <moduleId> deploy|manage|compose|check|modules|run  ...
+
+    dev up <alias|moduleId|all> [--mode hybrid|local|docker] [--no-infra] [--no-tunnel]
 
     hybrid boot <alias|moduleId>   Local app run (host + ops/config .env.dev)
 
@@ -412,6 +414,18 @@ $globalCommands = @{
             exit 1
         }
         Invoke-ModuleDriver -ModuleId $target -DriverArgs @("run")
+    }
+
+    "dev" = {
+        $devSub  = if ($CliRest.Count -gt 0) { [string]$CliRest[0] } else { "help" }
+        $devArgs = if ($CliRest.Count -gt 1) { [string[]]@($CliRest[1..($CliRest.Count - 1)]) } else { @() }
+        $devScript = Join-Path $PackageRoot "toolkit\dev\Invoke-DevUp.ps1"
+        if (-not (Test-Path $devScript)) {
+            Write-Host "  [dev] toolkit/dev/Invoke-DevUp.ps1 not found" -ForegroundColor Red
+            exit 1
+        }
+        & $devScript -SubCommand $devSub -DevArgs $devArgs
+        exit $LASTEXITCODE
     }
 
 }

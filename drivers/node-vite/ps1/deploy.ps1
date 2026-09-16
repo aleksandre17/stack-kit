@@ -18,6 +18,37 @@ param(
 $GetComposeServices = Join-Path $env:GEOSTAT_KIT_ROOT "toolkit\powershell\Get-ComposeServices.ps1"
 . $GetComposeServices
 
+# Resolve the pnpm workspace root for the remote build context — mirror of node-api's
+# _init.sh NODE_WORKSPACE_DIR derivation: walk up from the module dir to the directory
+# holding pnpm-workspace.yaml, bounded by the project root; fall back to the module dir.
+function Get-NodeWorkspaceDir {
+    param([Parameter(Mandatory = $true)][string]$StartDir)
+    $projRoot = $env:GEOSTAT_PROJECT_ROOT
+    $ws = (Resolve-Path $StartDir).Path
+    while ($true) {
+        if (Test-Path (Join-Path $ws "pnpm-workspace.yaml")) { return $ws }
+        if ($projRoot -and ($ws -eq (Resolve-Path $projRoot).Path)) { break }
+        $parent = Split-Path $ws -Parent
+        if (-not $parent -or $parent -eq $ws) { break }
+        $ws = $parent
+    }
+    return (Resolve-Path $StartDir).Path
+}
+
+# Module path relative to the workspace root, with forward slashes for the server
+# (e.g. workspace platform/, module platform/apps/geostat -> "apps/geostat").
+function Get-RelativeModulePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkspaceRoot,
+        [Parameter(Mandatory = $true)][string]$ModuleDir
+    )
+    $wsFull = (Resolve-Path $WorkspaceRoot).Path.TrimEnd('\', '/')
+    $modFull = (Resolve-Path $ModuleDir).Path.TrimEnd('\', '/')
+    if ($modFull -eq $wsFull) { return "." }
+    $rel = $modFull.Substring($wsFull.Length).TrimStart('\', '/')
+    return ($rel -replace '\\', '/')
+}
+
 # geostat mod fe deploy dist -Environment prod → ("dist","-Environment","prod") via @rest
 if ($Arg2 -eq "-Environment" -and $args.Count -ge 1 -and $args[0] -in @("dev", "prod")) {
     $Environment = [string]$args[0]
@@ -161,20 +192,38 @@ docker ps --filter name=$APP_NAME
 elseif ($Mode -eq "remote") {
     $kind = if ($Environment -eq "dev") { "compose-dev" } else { "compose-prod" }
     Set-DeployPathForMode -Kind $kind
+
+    # These apps are pnpm-workspace SPAs: their Dockerfiles build from the WORKSPACE ROOT
+    # (pnpm-lock.yaml + pnpm-workspace.yaml + sibling engine/* packages), and the per-module
+    # compose declares `build: { context: ../../, dockerfile: apps/<app>/src/Dockerfile }`.
+    # A module-dir-only archive omits the lockfile + engine/* → the server `docker build`
+    # fails. So we archive the WORKSPACE ROOT and land it server-side under $DEPLOY_PATH/context/
+    # — the same `context-dir` layout node-api uses (toolkit/deploy/node-upload.sh), giving ONE
+    # consistent remote-build model across node-api + node-vite. Compose then runs from
+    # $DEPLOY_PATH/context/<module> so the existing compose relative paths resolve:
+    #   ../../                          -> $DEPLOY_PATH/context           (workspace root / build context)
+    #   apps/<app>/src/Dockerfile      -> the app Dockerfile
+    #   ../../../ops/config/<app>/.env  -> $DEPLOY_PATH/ops/config/<app>/.env.<env> (env_file, placed below)
+    $WORKSPACE_ROOT = Get-NodeWorkspaceDir -StartDir $ROOT
+    $relModule = Get-RelativeModulePath -WorkspaceRoot $WORKSPACE_ROOT -ModuleDir $ROOT
+    $remoteModuleDir = "$DEPLOY_PATH/context/$relModule"
+
     $ARCHIVE = "${APP_NAME}_deploy_${Environment}.tar.gz"
     $stagingDir = "$SERVER_BASE/deploy-staging"
-    $ARCHIVE_TMP = Join-Path (Split-Path $ROOT -Parent) $ARCHIVE
+    $ARCHIVE_TMP = Join-Path (Split-Path $WORKSPACE_ROOT -Parent) $ARCHIVE
 
     LogBanner "$APP_NAME - Deploy: remote ($Environment)" @{
-        Server = $SERVER
-        Deploy = $DEPLOY_PATH
-        API    = $VITE_API_URL
+        Server    = $SERVER
+        Deploy    = $DEPLOY_PATH
+        Workspace = $WORKSPACE_ROOT
+        Module    = $relModule
+        API       = $VITE_API_URL
     }
 
-    LogSection "[1/5] Archive source"
+    LogSection "[1/5] Archive workspace"
     if (Test-Path $ARCHIVE_TMP) { Remove-Item $ARCHIVE_TMP -Force }
-    Push-Location $ROOT
-    tar -czf "../$ARCHIVE" --exclude=node_modules --exclude=.git --exclude=dist --exclude=.idea --exclude=.vscode . 2>&1 | Out-Null
+    Push-Location $WORKSPACE_ROOT
+    tar -czf "../$ARCHIVE" --exclude=node_modules --exclude='**/node_modules' --exclude=.git --exclude=dist --exclude='**/dist' --exclude=.idea --exclude=.vscode . 2>&1 | Out-Null
     $exitCode = $LASTEXITCODE
     Pop-Location
     if ($exitCode -ne 0) { Log "tar FAILED" "ERROR"; exit 1 }
@@ -185,7 +234,13 @@ elseif ($Mode -eq "remote") {
     if ($rc -ne 0) { Log "scp FAILED" "ERROR"; exit 1 }
 
     LogSection "[3/5] Upload env for server compose"
+    # .env.<env> at $DEPLOY_PATH is used for `--env-file` (compose variable substitution).
     $remoteEnvName = Publish-RemoteEnvFiles -Environment $Environment
+    # The per-module compose's `env_file: ../../../ops/config/<app>/.env.<env>` resolves, from the
+    # server run dir $DEPLOY_PATH/context/<module>, to $DEPLOY_PATH/ops/config/<app>/.env.<env>.
+    # Place the same env bundle there so the compose env_file directive resolves on the server.
+    $composeEnvFile = "$DEPLOY_PATH/ops/config/$OpsSecretsModule/.env.$Environment"
+    Invoke-SSH "mkdir -p $DEPLOY_PATH/ops/config/$OpsSecretsModule && cp -f $DEPLOY_PATH/$remoteEnvName $composeEnvFile" | Out-Null
 
     $feComposeFiles = if ($Environment -eq "dev") {
         "-f docker-compose.yml -f docker-compose.override.yml"
@@ -196,21 +251,22 @@ elseif ($Mode -eq "remote") {
     LogSection "[4/5] Build on server"
     $remoteScript = @"
 set -euo pipefail
-mkdir -p $DEPLOY_PATH
-tar -xzf $stagingDir/$ARCHIVE -C $DEPLOY_PATH
+rm -rf $DEPLOY_PATH/context
+mkdir -p $DEPLOY_PATH/context
+tar -xzf $stagingDir/$ARCHIVE -C $DEPLOY_PATH/context
 rm -f $stagingDir/$ARCHIVE
 docker stop $APP_NAME 2>/dev/null || true
 docker rm   $APP_NAME 2>/dev/null || true
-cd $DEPLOY_PATH
+cd $remoteModuleDir
 set -a
-source ./$remoteEnvName
+source $DEPLOY_PATH/$remoteEnvName
 set +a
 export VITE_API_URL=$VITE_API_URL
 export DEPLOY_HOST_PORT=$HOST_PORT
 if docker compose version >/dev/null 2>&1; then
-  docker compose --env-file ./$remoteEnvName $feComposeFiles up -d --build
+  docker compose --env-file $DEPLOY_PATH/$remoteEnvName $feComposeFiles up -d --build
 else
-  docker-compose --env-file ./$remoteEnvName $feComposeFiles up -d --build
+  docker-compose --env-file $DEPLOY_PATH/$remoteEnvName $feComposeFiles up -d --build
 fi
 docker ps --filter name=$APP_NAME
 "@

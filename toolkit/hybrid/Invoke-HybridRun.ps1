@@ -1,4 +1,4 @@
-# Local app run: host process + manifest secrets (.env.dev); optional remote infra via tunnel
+# Local app run: host process + manifest secrets (.env.dev); optional remote infra via tunnel.
 param(
     [Parameter(Mandatory = $true)]
     [string]$ModuleId
@@ -12,6 +12,7 @@ $PackageRoot = if ($env:GEOSTAT_KIT_ROOT) { $env:GEOSTAT_KIT_ROOT } else {
 . (Join-Path $PackageRoot "lib\project.ps1")
 . (Join-Path $PackageRoot "lib\env.ps1")
 . (Join-Path $PackageRoot "lib\drivers.ps1")
+. (Join-Path $PackageRoot "lib\module-manifest.ps1")
 
 $root = Get-ProjectRootFromManifest
 if (-not $root) { throw "geostat.ops.json not found" }
@@ -23,7 +24,8 @@ $modPath = Get-ModuleProjectPath $ModuleId
 $secretsModule = Get-ModuleSecretsFolder $ModuleId
 $envDev = Join-Path (Get-SecretsModuleDir $secretsModule) ".env.dev"
 
-function Import-GeostatDotEnv([string]$Path, [switch]$SkipEmptyValues) {
+function Import-GeostatDotEnv {
+    param([string]$Path, [switch]$SkipEmptyValues)
     if (-not (Test-Path $Path)) { return }
     Get-Content $Path | ForEach-Object {
         if ($_ -match '^\s*#' -or $_ -notmatch '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$') { return }
@@ -48,29 +50,30 @@ switch ($driverType) {
             if ($jar -and (Test-Path $jar)) {
                 Invoke-GeostatHybridJarBoot -Root $root -ModuleId $ModuleId -ModPath $modPath
             } else {
-                Write-Host "[hybrid] boot JAR missing - falling back to gradle bootRun (build first or set hybrid.bootJar)" -ForegroundColor Yellow
+                Write-Host "[hybrid] JAR not found - falling back to gradle bootRun (run a build first, or set hybrid.bootJar)" -ForegroundColor Yellow
             }
         }
 
-        $profiles = Get-ManifestField "modules.$ModuleId.hybrid.springProfiles"
+        $profiles = Get-ModuleHybridProfiles $ModuleId
         if ($profiles) { $env:SPRING_PROFILES_ACTIVE = $profiles }
 
-        $wrapperRel = Get-ManifestField "modules.$ModuleId.hybrid.gradleWrapper"
+        $wrapperRel = Get-ModuleGradleWrapper $ModuleId
         if (-not $wrapperRel) {
+            $modRelPath = Get-ManifestField "modules.$ModuleId.path"
             if (Test-Path (Join-Path $modPath "gradlew.bat")) {
-                $wrapperRel = (Join-Path (Get-ManifestField "modules.$ModuleId.path") "gradlew.bat") -replace '\\', '/'
+                $wrapperRel = "$modRelPath/gradlew.bat"
             } elseif (Test-Path (Join-Path $modPath "gradlew")) {
-                $wrapperRel = (Join-Path (Get-ManifestField "modules.$ModuleId.path") "gradlew") -replace '\\', '/'
+                $wrapperRel = "$modRelPath/gradlew"
             }
         }
         if (-not $wrapperRel) {
-            throw "No gradlew in module path; set modules.$ModuleId.hybrid.gradleWrapper in geostat.ops.json"
+            throw "No Gradle wrapper found; set modules.$ModuleId.hybrid.gradleWrapper in geostat.ops.json"
         }
 
         $wrapper = Join-Path $root ($wrapperRel -replace '/', '\')
         if (-not (Test-Path $wrapper)) { throw "Gradle wrapper not found: $wrapper" }
 
-        $gradleProject = Get-ManifestField "modules.$ModuleId.hybrid.gradleProject"
+        $gradleProject = Get-ModuleGradleProject $ModuleId
         $bootTask = if ($gradleProject) { ":${gradleProject}:bootRun" } else { "bootRun" }
 
         Set-Location $modPath
@@ -78,12 +81,27 @@ switch ($driverType) {
         exit $LASTEXITCODE
     }
     "node-vite" {
-        $npmScript = Get-ManifestField "modules.$ModuleId.debug.npmScript"
-        if (-not $npmScript) { $npmScript = Get-ManifestField "modules.$ModuleId.hybrid.npmScript" }
+        $npmScript = Get-ModuleNpmScript $ModuleId
         if (-not $npmScript) { $npmScript = "dev" }
 
         Set-Location $modPath
         npm run $npmScript
+        exit $LASTEXITCODE
+    }
+    "node-api" {
+        # pnpm-workspace Node service: run the module's dev/start script via pnpm so
+        # workspace deps (e.g. @geostat/engine) resolve. Same npm-script contract as
+        # node-vite, pnpm instead of npm (the api lives in a pnpm workspace).
+        $npmScript = Get-ModuleNpmScript $ModuleId
+        if (-not $npmScript) { $npmScript = "dev" }
+
+        Set-Location $modPath
+        if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+            pnpm run $npmScript
+        } else {
+            Write-Host "[hybrid] pnpm not on PATH - falling back to npm run $npmScript" -ForegroundColor Yellow
+            npm run $npmScript
+        }
         exit $LASTEXITCODE
     }
     default {

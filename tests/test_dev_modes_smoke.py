@@ -60,9 +60,15 @@ def test_mode4_hybrid_compound_and_tunnel_task(repo_root: Path, manifest: dict) 
 
 
 def test_java_launch_env_file_from_secrets(repo_root: Path, manifest: dict) -> None:
-    api_ids = modules_by_role(manifest, "api")
-    if not api_ids:
-        pytest.skip("no api module")
+    # Java launch config is emitted only for java-boot api modules; node-api (and other
+    # non-JVM api drivers) get their own launch shape, so guard on driver type not role.
+    java_api = [
+        mid
+        for mid in modules_by_role(manifest, "api")
+        if manifest["modules"][mid].get("type") == "java-boot"
+    ]
+    if not java_api:
+        pytest.skip("no java-boot api module")
     ctx = ProjectContext(root=repo_root, manifest=manifest)
     launch = build_launch_json(ctx)
     java_cfg = next(c for c in launch["configurations"] if c.get("type") == "java")

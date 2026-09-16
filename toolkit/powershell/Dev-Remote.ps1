@@ -105,7 +105,10 @@ function Invoke-DevRsyncToRemote {
         $code = $LASTEXITCODE
     } else {
         $argList = @("-avz", "--delete") + $dryFlag + $excludeArgs + @("${src}/", $dest)
-        & $rsync @argList
+        # rsync's (verbose) stdout must NOT leak into this function's output stream, or the
+        # caller's `$rc = Invoke-DevRsyncToRemote` captures [file-list… , $code] as an ARRAY
+        # and `$rc -ne 0` is truthy → false failure. Route it to the host; keep $LASTEXITCODE.
+        & $rsync @argList 2>&1 | Out-Host
         $code = $LASTEXITCODE
     }
 

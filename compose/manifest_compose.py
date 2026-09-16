@@ -140,6 +140,7 @@ def render_module_service(
     fmt_extra: dict[str, str],
     compose_cat: dict[str, Any],
     stack_cat: dict[str, Any],
+    module_fmt: dict[str, str] | None = None,
 ) -> str:
     manifest = ctx.manifest
     cfg = (manifest.get("modules") or {}).get(module_id)
@@ -165,8 +166,14 @@ def render_module_service(
     if prod_ctx_suffix == "src" and profile == "prod":
         module_build_context = f"{module_context}/src" if not module_context.endswith("/src") else module_context
     fmt = {
+        # Optional container resource-limit block — brand-agnostic seam, empty by
+        # default. A consumer opts in by supplying `resource_limits` via a target's
+        # `fmt` or per-module `moduleFmt` (e.g. "    mem_limit: 1g\n    cpus: 1.5\n").
+        # Keeps sizing constants in the consumer catalog, not kit runtime (Law 10).
+        "resource_limits": "",
         **fmt_global,
         **fmt_extra,
+        **(module_fmt or {}),
         "service": service,
         "module_context": module_context,
         "module_build_context": module_build_context,
@@ -225,6 +232,7 @@ def build_manifest_stack_services(
     features: dict[str, Any],
     compose_cat: dict[str, Any] | None = None,
     stack_cat: dict[str, Any] | None = None,
+    module_fmt: dict[str, dict[str, str]] | None = None,
 ) -> str:
     compose_cat = compose_cat or load_compose_catalog()
     stack_cat = stack_cat or load_stack_catalog(STACK_CATALOG)
@@ -248,6 +256,7 @@ def build_manifest_stack_services(
                 fmt_extra=fmt_extra,
                 compose_cat=compose_cat,
                 stack_cat=stack_cat,
+                module_fmt=(module_fmt or {}).get(mid),
             )
         )
     if embedded_worker_enabled(ctx.manifest, features) and primary_api_module_id(

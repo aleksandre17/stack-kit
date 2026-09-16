@@ -8,9 +8,24 @@ from lib.compose_identity import load_deploy_env, resolve_module_service_name
 from lib.modules import modules_by_role
 from lib.project_context import ProjectContext
 
-# Known legacy flat folder names on existing server (profiles/legacy-server.env.example).
-LEGACY_API_DIRS = frozenset({"geostat-chat-api"})
-LEGACY_UI_DIRS = frozenset({"geostat-chat-app", "geostat-chat-ai-fe"})
+# Legacy flat folder names are project-specific (a consumer's pre-migration server
+# layout), so they are NOT hardcoded here — they are read from the consumer manifest:
+#
+#   "migration": {
+#     "legacyDirs": {
+#       "api": ["geostat-chat-api"],
+#       "ui":  ["geostat-chat-app", "geostat-chat-ai-fe"]
+#     }
+#   }
+#
+# A consumer with no prior server (greenfield) simply omits the block; both lists
+# default to empty and the rename map carries only the deploy.env-derived overrides.
+def _legacy_dirs(ctx: ProjectContext, role: str) -> frozenset[str]:
+    """Project-declared legacy flat dir names for a role, from manifest.migration.legacyDirs."""
+    migration = ctx.manifest.get("migration") or {}
+    legacy = migration.get("legacyDirs") or {}
+    names = legacy.get(role) or []
+    return frozenset(str(n) for n in names if n)
 
 
 def migration_rename_map(ctx: ProjectContext) -> dict[str, str]:
@@ -23,7 +38,7 @@ def migration_rename_map(ctx: ProjectContext) -> dict[str, str]:
 
     if api_ids:
         api_target = resolve_module_service_name(api_ids[0], ctx.manifest, deploy, repo)
-        for legacy in LEGACY_API_DIRS:
+        for legacy in _legacy_dirs(ctx, "api"):
             out[legacy] = api_target
         legacy_api = deploy.get("COMPOSE_API_SERVICE")
         if legacy_api and legacy_api != api_target:
@@ -31,7 +46,7 @@ def migration_rename_map(ctx: ProjectContext) -> dict[str, str]:
 
     if ui_ids:
         ui_target = resolve_module_service_name(ui_ids[0], ctx.manifest, deploy, repo)
-        for legacy in LEGACY_UI_DIRS:
+        for legacy in _legacy_dirs(ctx, "ui"):
             out[legacy] = ui_target
         legacy_app = deploy.get("COMPOSE_APP_SERVICE")
         if legacy_app and legacy_app != ui_target:
@@ -66,7 +81,7 @@ def migration_source_dirs(ctx: ProjectContext, role: str) -> frozenset[str]:
         target = _api_target(ctx)
         if not target:
             return frozenset()
-        out.update(LEGACY_API_DIRS)
+        out.update(_legacy_dirs(ctx, "api"))
         out.update(k for k, v in mapping.items() if v == target)
         legacy = deploy.get("COMPOSE_API_SERVICE")
         if legacy:
@@ -78,7 +93,7 @@ def migration_source_dirs(ctx: ProjectContext, role: str) -> frozenset[str]:
         target = _ui_target(ctx)
         if not target:
             return frozenset()
-        out.update(LEGACY_UI_DIRS)
+        out.update(_legacy_dirs(ctx, "ui"))
         out.update(k for k, v in mapping.items() if v == target)
         legacy = deploy.get("COMPOSE_APP_SERVICE")
         if legacy:

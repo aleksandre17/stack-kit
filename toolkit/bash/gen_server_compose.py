@@ -47,15 +47,32 @@ def _normalize_volumes(volumes: list) -> list:
     return out
 
 
-def normalize_service(svc_cfg: dict, environment: str) -> dict:
+# Server-side build layouts. The deploy upload step decides where it lands the build
+# context + Dockerfile under the remote service path ($rp), and declares it here so the
+# emitted compose's `build:` resolves correctly when `docker compose` runs from `$rp`.
+#
+#   jar          (java-boot, upload.sh):       Dockerfile + app.jar are scp'd to $rp itself.
+#                                              Build context is $rp, Dockerfile at $rp/Dockerfile.
+#   context-dir  (node-api, node-upload.sh):   the pnpm workspace is rsynced to $rp/context/
+#                                              and the Dockerfile scp'd to $rp/Dockerfile, so
+#                                              the context is $rp/context and the Dockerfile is
+#                                              one level up (../Dockerfile relative to context).
+BUILD_LAYOUTS = {
+    "jar": {"context": ".", "dockerfile": "Dockerfile"},
+    "context-dir": {"context": "./context", "dockerfile": "../Dockerfile"},
+}
+
+
+def normalize_service(svc_cfg: dict, environment: str, build_layout: str) -> dict:
     cfg = copy.deepcopy(svc_cfg)
     cfg.pop("build", None)
     if "image" not in cfg and "container_name" in cfg:
         cfg["image"] = cfg["container_name"]
-    # Server deploy uploads ./Dockerfile + ./app.jar — build locally, do not pull from registry.
-    cfg["build"] = {"context": ".", "dockerfile": "Dockerfile"}
-    # Stack services reach API via Docker DNS (geostat-chat-ai-api:8090). Omit host ports so
-    # legacy containers (e.g. geostat-chat-api on :8090) can stay up during P6 transition.
+    # Server deploy builds the image locally from uploaded files (never pulls a registry).
+    # The build paths depend on where the upload step placed the context + Dockerfile.
+    cfg["build"] = dict(BUILD_LAYOUTS[build_layout])
+    # Stack services reach the api over the compose network; host ports are omitted so a
+    # pre-migration container can hold the port during transition.
     if "ports" in cfg:
         cfg.pop("ports", None)
 
@@ -72,6 +89,13 @@ def main() -> int:
     p.add_argument("--src", required=True)
     p.add_argument("--service", required=True)
     p.add_argument("--environment", required=True, choices=("dev", "prod"))
+    p.add_argument(
+        "--build-layout",
+        default="jar",
+        choices=tuple(BUILD_LAYOUTS),
+        help="Where the upload step placed the build context + Dockerfile under $rp "
+        "(jar=java-boot, context-dir=node-api). Default 'jar' preserves legacy behavior.",
+    )
     p.add_argument("--out", required=True)
     args = p.parse_args()
 
@@ -82,7 +106,9 @@ def main() -> int:
         print(f"ERROR: service '{args.service}' not in {args.src}", file=sys.stderr)
         return 1
 
-    svc_cfg = normalize_service(src["services"][args.service], args.environment)
+    svc_cfg = normalize_service(
+        src["services"][args.service], args.environment, args.build_layout
+    )
 
     named_vols: dict = {}
     if "volumes" in src:

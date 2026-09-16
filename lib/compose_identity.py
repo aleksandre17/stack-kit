@@ -147,9 +147,13 @@ def resolve_module_service_name(
             return override
         return f"{slug}-{(target or module_id).replace('_', '-')}"
     if role == "api":
-        return deploy.get("COMPOSE_API_SERVICE") if module_id == primary_api_module_id(manifest) else (
-            f"{slug}-{(target or module_id).replace('_', '-')}"
-        )
+        if module_id == primary_api_module_id(manifest):
+            # Primary API: honor the legacy override, else derive from the slug.
+            # (Previously returned the override unconditionally — yielding None
+            # when COMPOSE_API_SERVICE was unset for a primary api not named
+            # "backend". The "backend" branch above already had this fallback.)
+            return deploy.get("COMPOSE_API_SERVICE") or f"{slug}-api"
+        return f"{slug}-{(target or module_id).replace('_', '-')}"
     return f"{slug}-{(target or module_id).replace('_', '-')}"
 
 
@@ -237,4 +241,9 @@ def build_global_fmt(
         "network_name": network,
         "api_storage_vol": f"{api_svc}-storage",
         "api_uploads_vol": f"{api_svc}-uploads",
+        # Optional container resource-limit block (brand-agnostic seam). Empty by
+        # default — a consumer opts in by supplying `resource_limits` in a compose
+        # target's `fmt` (e.g. "    mem_limit: 1g\n    cpus: 1.5\n"). Keeps project
+        # sizing constants in the consumer catalog, not in kit runtime (Law 10).
+        "resource_limits": "",
     }

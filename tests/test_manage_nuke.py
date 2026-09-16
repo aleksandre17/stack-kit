@@ -23,17 +23,13 @@ def test_manage_remote_prune_helper() -> None:
 
 def test_manifest_schema_validates_consumer() -> None:
     import json
-    import subprocess
-    import sys
 
-    root = Path(__file__).resolve().parents[2].parent
-    r = subprocess.run(
-        [sys.executable, str(PKG / "lib" / "validate_manifest.py")],
-        cwd=root,
-        env={**dict(__import__("os").environ), "GEOSTAT_PROJECT_ROOT": str(root)},
-        capture_output=True,
-        text=True,
-    )
+    from conftest import run_kit_cli
+
+    # Validate against the kit-owned synthetic fixture, not whatever geostat.ops.json
+    # sits at the real repo root. The harness pins cwd + env (PYTHONPATH so the child
+    # can import `lib`, GEOSTAT_PROJECT_ROOT -> fixture) so this is cwd-independent.
+    r = run_kit_cli(script="validate_manifest.py", check=False)
     assert r.returncode == 0, r.stderr or r.stdout
     assert "OK" in r.stdout
     schema = json.loads((PKG / "manifest.schema.json").read_text(encoding="utf-8"))

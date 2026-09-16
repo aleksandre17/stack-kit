@@ -25,5 +25,19 @@
       "compose": "ps1/compose.ps1",
       "check": "ps1/check.ps1"
     }
+  },
+  "node-api": {
+    "label": "Node — HTTP service (pnpm build + dockerized deploy, Fastify/Express/Nest)",
+    "roles": ["api"],
+    "runtime": "bash",
+    "commands": {
+      "deploy": "sh/deploy.sh",
+      "dev": "sh/dev.sh",
+      "run": "ps1/run.ps1",
+      "manage": "sh/manage.sh",
+      "compose": "sh/compose.sh",
+      "check": "sh/check.sh",
+      "modules": "sh/modules.sh"
+    }
   }
 }
