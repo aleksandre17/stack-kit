@@ -33,10 +33,10 @@ def test_preflight_structured_layout(ctx: ProjectContext) -> None:
 def test_migration_targets_include_api_and_ui(ctx: ProjectContext) -> None:
     rows = migration_targets(ctx)
     modules = {r["module"] for r in rows}
-    assert "chat-api" in modules
-    assert "frontend" in modules
-    be = next(r for r in rows if r["module"] == "chat-api")
-    fe = next(r for r in rows if r["module"] == "frontend")
+    assert "api" in modules
+    assert "web" in modules
+    be = next(r for r in rows if r["module"] == "api")
+    fe = next(r for r in rows if r["module"] == "web")
     assert be["kind"] == "runtime"
     assert "/runtime/" in be["target"]
     assert fe["kind"] == "static"
@@ -52,26 +52,26 @@ def test_legacy_rename_map(ctx: ProjectContext) -> None:
     )
 
     mapping = migration_rename_map(ctx)
-    assert mapping.get("geostat-chat-api") == "geostat-chat-ai-api"
-    assert mapping.get("geostat-chat-app") == "geostat-chat-ai-app"
+    assert mapping.get("legacy-api") == "golden-consumer-api"
+    assert mapping.get("legacy-app") == "golden-consumer-app"
     pairs = pairs_arg(mapping)
-    assert "geostat-chat-api:geostat-chat-ai-api" in pairs
+    assert "legacy-api:golden-consumer-api" in pairs
 
     api_pairs = pairs_arg_for_role(mapping, ctx, "api")
-    assert api_pairs == "geostat-chat-api:geostat-chat-ai-api"
-    assert "geostat-chat-app" not in api_pairs
+    assert api_pairs == "legacy-api:golden-consumer-api"
+    assert "legacy-app" not in api_pairs
 
     ui_pairs = pairs_arg_for_role(mapping, ctx, "ui")
-    assert "geostat-chat-app:geostat-chat-ai-app" in ui_pairs
-    assert "geostat-chat-api" not in ui_pairs
+    assert "legacy-app:golden-consumer-app" in ui_pairs
+    assert "legacy-api" not in ui_pairs
 
     api_sources = migration_source_dirs(ctx, "api")
-    assert api_sources == frozenset({"geostat-chat-api"})
-    assert "geostat-chat-ai-api" not in api_sources
+    assert api_sources == frozenset({"legacy-api"})
+    assert "golden-consumer-api" not in api_sources
     assert "mobile" not in api_sources
 
     ui_sources = migration_source_dirs(ctx, "ui")
-    assert "geostat-chat-app" in ui_sources
-    assert "geostat-chat-ai-fe" in ui_sources
-    assert "geostat-chat-ai-app" not in ui_sources
+    assert "legacy-app" in ui_sources
+    assert "legacy-ui" in ui_sources
+    assert "golden-consumer-app" not in ui_sources
     assert "geostat-system-app" not in ui_sources

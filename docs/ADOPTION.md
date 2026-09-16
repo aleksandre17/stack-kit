@@ -12,7 +12,7 @@ Manifest-driven **ops პაკეტი** — `geostat.ops.json`, drivers (`jav
 - DEV-MODES: local / Docker / remote
 - 180+ pytest, `dev-modes-verify`
 
-რეფერენსი: ეს monorepo (`geostat-chat-bot`).
+რეფერენსი: `tests/fixtures/golden-consumer/` (კიტის საკუთარი სინთეზური consumer).
 
 ## სწრაფი ჩართვა
 

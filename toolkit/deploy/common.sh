@@ -37,7 +37,7 @@ discover_services() {
   [[ ${#filtered[@]} -gt 0 ]] && SERVICES=("${filtered[@]}")
 }
 
-# Map shorthand (api, retrieval) → compose key (geostat-chat-ai-api, …)
+# Map a module shorthand (<moduleId>) → compose service key (<slug>-<moduleId>).
 resolve_deploy_service_arg() {
   local raw="$1" s
   [[ -z "$raw" || "$raw" == "all" ]] && { echo "$raw"; return 0; }

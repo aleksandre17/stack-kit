@@ -12,7 +12,7 @@ from lib.deploy_paths import (
 
 class TestInfraSlug:
     def test_normalize(self):
-        assert normalize_infra_slug("Geostat-Chat-Bot") == "geostat-chat-bot"
+        assert normalize_infra_slug("Sample-App-Stack") == "sample-app-stack"
 
 
 class TestResolveInfraDeployPath:
@@ -42,9 +42,9 @@ class TestResolveInfraDeployPath:
                 deploy_path=None,
                 server_base="/home/administrator",
                 global_project="geostat",
-                consumer_slug="geostat-chat-bot",
+                consumer_slug="sample-app-stack",
             )
-            == "/home/administrator/geostat/infra/geostat-chat-bot"
+            == "/home/administrator/geostat/infra/sample-app-stack"
         )
 
 

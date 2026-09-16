@@ -1,0 +1,7 @@
+services:
+  svc:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    env_file:
+      - ../../ops/config/svc/.env.dev

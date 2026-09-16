@@ -168,14 +168,14 @@ class TestNoLegacyPathsInCriticalFiles:
 class TestAppsConfigWiring:
     def test_vite_env_dir_points_to_ops_config(self, frontend_dir: Path) -> None:
         text = (frontend_dir / "vite.config.js").read_text(encoding="utf-8")
-        assert "ops/config/frontend" in text.replace("\\", "/")
+        assert "ops/config/web" in text.replace("\\", "/")
 
     def test_spring_imports_ops_config(self, backend_dir: Path) -> None:
         for name in ("application-dev.yml", "application-prod.yml", "application-local.yml"):
             path = backend_dir / "src/main/resources" / name
             assert path.is_file(), name
             text = path.read_text(encoding="utf-8")
-            assert "ops/config/backend" in text.replace("\\", "/"), name
+            assert "ops/config/api" in text.replace("\\", "/"), name
 
     def test_module_compose_use_ops_config(self, backend_dir: Path, frontend_dir: Path) -> None:
         for base in (backend_dir, frontend_dir):
@@ -214,15 +214,15 @@ class TestComposeCatalogAndStack:
     def test_stack_compose_paths_to_apps(self, repo_root: Path, manifest: dict) -> None:
         stack = repo_root.joinpath(*manifest["stack"]["composeDir"].split("/"))
         text = (stack / "docker-compose.yml").read_text(encoding="utf-8")
-        assert "apps/backend" in text or "../../apps/backend" in text
-        assert "apps/frontend" in text or "../../apps/frontend" in text
+        assert "apps/api" in text or "../../apps/api" in text
+        assert "apps/web" in text or "../../apps/web" in text
 
     def test_stack_compose_includes_manifest_modules(self, repo_root: Path, manifest: dict) -> None:
         stack = repo_root.joinpath(*manifest["stack"]["composeDir"].split("/"))
         text = (stack / "docker-compose.yml").read_text(encoding="utf-8")
-        for mid in ("retrieval", "ingestion"):
+        for mid in ("search", "worker"):
             if mid in (manifest.get("modules") or {}):
-                assert "retrieval-service" in text or "ingestion-service" in text or mid in text
+                assert mid in text
 
 
 class TestCliChain:

@@ -1,0 +1,13 @@
+services:
+  golden-consumer-api:
+    build:
+      context: ../../../apps/api
+  golden-consumer-search:
+    build:
+      context: ../../../apps/search
+  golden-consumer-worker:
+    build:
+      context: ../../../apps/worker
+  golden-consumer-app:
+    build:
+      context: ../../../apps/web

@@ -20,6 +20,7 @@ def test_golden_consumer_multi_credentials() -> None:
 
 def test_ui_module_uses_global_gcp_when_no_list(tmp_path: Path) -> None:
     manifest = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    # UI (node-vite) module gets no global GCP fallback and declares no list.
     creds = module_credentials(manifest, "web")
     assert creds == []
 

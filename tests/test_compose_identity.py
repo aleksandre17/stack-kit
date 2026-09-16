@@ -95,5 +95,5 @@ def test_project_context_compose_names(repo_root: Path) -> None:
     assert names.get("compose_slug") == slug
     assert names.get("api") == f"{slug}-api"
     assert names.get("app") == f"{slug}-app"
-    assert names["modules"].get("retrieval", "").endswith("-retrieval")
-    assert names["modules"]["retrieval"] == f"{slug}-retrieval"
+    assert names["modules"].get("search", "").endswith("-search")
+    assert names["modules"]["search"] == f"{slug}-search"

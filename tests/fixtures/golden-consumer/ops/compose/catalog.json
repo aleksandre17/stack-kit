@@ -1,0 +1,24 @@
+{
+  "features": {
+    "worker": false
+  },
+  "fmt": {},
+  "targets": {
+    "apps/api/docker-compose.yml": {
+      "fmt": {}
+    },
+    "apps/web/docker-compose.yml": {
+      "fmt": {}
+    },
+    "apps/svc/docker-compose.yml": {
+      "fmt": {}
+    }
+  },
+  "overlays": {
+    "app_prod_overlay": {
+      "ports": [
+        "${DEPLOY_HOST_PORT}:80"
+      ]
+    }
+  }
+}

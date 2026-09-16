@@ -1,0 +1,5 @@
+{
+  "name": "svc",
+  "private": true,
+  "scripts": { "dev": "node server.js", "build": "tsc -p ." }
+}

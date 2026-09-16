@@ -96,11 +96,11 @@ class TestDeployPathBaseInherit:
         )
         path = resolve_backend_deploy_path(
             base=base,
-            container_name="geostat-chat-ai-retrieval",
+            container_name="sample-app-search",
             kind="runtime",
             layout="structured",
         )
-        assert path == f"{self.BACKEND_BASE}/runtime/geostat-chat-ai-retrieval"
+        assert path == f"{self.BACKEND_BASE}/runtime/sample-app-search"
 
 
 class TestDeployPathSummary:

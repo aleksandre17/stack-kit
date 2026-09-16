@@ -1,0 +1,8 @@
+# Volatile bits materialised by tests/conftest.py at session start — never commit.
+# The kit self-reference (package == "kits/geostat-kit") is created as a
+# junction/symlink pointing back at the real kit; committing it would recurse.
+/kits/
+
+# deploy.env carries (synthetic) identity values; recreated from deploy.env.fixture.
+# The kit's root .gitignore already ignores **/deploy.env, but be explicit here.
+/ops/config/deploy.env

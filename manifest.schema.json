@@ -84,7 +84,7 @@
         "aliases": {
           "type": "object",
           "additionalProperties": { "type": "string" },
-          "description": "Shortcut → modules.<id> (e.g. fe → frontend, be → backend)"
+          "description": "Shortcut → modules.<id> (e.g. w → web, a → api)"
         }
       }
     },
@@ -155,7 +155,7 @@
           },
           "target": {
             "type": "string",
-            "description": "Compose service name slug (e.g. retrieval → geostat-chat-ai-retrieval). NOT a server filesystem path under structured layout — JAR deploy uses stack.deployBaseSecretsModule DEPLOY_PATH + runtime/<container>/."
+            "description": "Compose service name slug (e.g. module `search` → `<slug>-search`). NOT a server filesystem path under structured layout — JAR deploy uses stack.deployBaseSecretsModule DEPLOY_PATH + runtime/<container>/."
           },
           "compose": {
             "type": "object",

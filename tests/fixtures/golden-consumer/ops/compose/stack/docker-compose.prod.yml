@@ -1,0 +1,4 @@
+services:
+  golden-consumer-app:
+    ports:
+      - "${DEPLOY_HOST_PORT}:80"

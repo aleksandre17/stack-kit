@@ -1,4 +1,4 @@
-"""P0-kit-09 — config-gen golden output (ingestion-service)."""
+"""P0-kit-09 — config-gen golden output (worker-service)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -27,13 +27,13 @@ def ctx(repo_root: Path, pkg_root: Path) -> ProjectContext:
 
 def test_ingestion_listed_for_config_gen(ctx: ProjectContext) -> None:
     modules = java_boot_modules_with_datastores(ctx)
-    assert "ingestion" in modules
-    assert "retrieval" in modules
-    assert "chat-api" in modules
+    assert "worker" in modules
+    assert "search" in modules
+    assert "api" in modules
 
 
 def test_backend_env_profiles_mode(ctx: ProjectContext) -> None:
-    spec = _module_spec(ctx, "chat-api")
+    spec = _module_spec(ctx, "api")
     assert spec is not None
     assert spec.mode == "env-profiles"
     assert spec.port_env == "API_PORT"
@@ -43,13 +43,13 @@ def test_backend_env_profiles_mode(ctx: ProjectContext) -> None:
 def test_port_env_cli(ctx: ProjectContext) -> None:
     from lib.config_gen import port_env_for_module
 
-    assert port_env_for_module(ctx, "chat-api") == "API_PORT"
-    assert port_env_for_module(ctx, "retrieval") == "RETRIEVAL_PORT"
-    assert port_env_for_module(ctx, "ingestion") == "INGESTION_PORT"
+    assert port_env_for_module(ctx, "api") == "API_PORT"
+    assert port_env_for_module(ctx, "search") == "SEARCH_PORT"
+    assert port_env_for_module(ctx, "worker") == "WORKER_PORT"
 
 
 def test_backend_env_profiles_render(ctx: ProjectContext) -> None:
-    spec = _module_spec(ctx, "chat-api")
+    spec = _module_spec(ctx, "api")
     assert spec is not None
     files = render_module_files(spec)
     assert set(files) == {
@@ -58,48 +58,48 @@ def test_backend_env_profiles_render(ctx: ProjectContext) -> None:
         "application-dev.yml",
         "application-prod.yml",
     }
-    assert "../../ops/config/backend/.env.dev" in files["application-local.yml"]
+    assert "../../ops/config/api/.env.dev" in files["application-local.yml"]
     assert "devtools:" in files["application-dev.yml"]
     assert "path: /app/logs" in files["application-prod.yml"]
 
 
 def test_backend_no_drift(ctx: ProjectContext) -> None:
-    write_module_config(ctx, "chat-api")
-    issues = check_module_drift(ctx, "chat-api")
+    write_module_config(ctx, "api")
+    issues = check_module_drift(ctx, "api")
     assert issues == [], issues
 
 
 def test_retrieval_simple_mode(ctx: ProjectContext) -> None:
-    spec = _module_spec(ctx, "retrieval")
+    spec = _module_spec(ctx, "search")
     assert spec is not None
     assert spec.mode == "simple"
-    assert spec.port_env == "RETRIEVAL_PORT"
-    assert spec.app_name == "retrieval-service"
+    assert spec.port_env == "SEARCH_PORT"
+    assert spec.app_name == "search-service"
     files = render_module_files(spec)
     assert set(files) == {"application.yml"}
     assert "profiles:" not in files["application.yml"]
 
 
 def test_retrieval_no_drift(ctx: ProjectContext) -> None:
-    write_module_config(ctx, "retrieval")
-    issues = check_module_drift(ctx, "retrieval")
+    write_module_config(ctx, "search")
+    issues = check_module_drift(ctx, "search")
     assert issues == [], issues
 
 
 def test_ingestion_no_drift(ctx: ProjectContext) -> None:
-    issues = check_module_drift(ctx, "ingestion")
+    issues = check_module_drift(ctx, "worker")
     assert issues == [], issues
 
 
 def test_ingestion_spec_port_env(ctx: ProjectContext) -> None:
-    spec = _module_spec(ctx, "ingestion")
+    spec = _module_spec(ctx, "worker")
     assert spec is not None
-    assert spec.port_env == "INGESTION_PORT"
-    assert spec.postgres_schema == "ingestion"
+    assert spec.port_env == "WORKER_PORT"
+    assert spec.postgres_schema == "worker"
 
 
 def test_regenerate_idempotent(ctx: ProjectContext, tmp_path: Path) -> None:
-    spec = _module_spec(ctx, "ingestion")
+    spec = _module_spec(ctx, "worker")
     assert spec is not None
     first = render_module_files(spec)
     second = render_module_files(spec)
@@ -107,16 +107,16 @@ def test_regenerate_idempotent(ctx: ProjectContext, tmp_path: Path) -> None:
 
 
 def test_custom_yml_not_generated(ctx: ProjectContext) -> None:
-    resources = ctx.module_path("ingestion") / "src" / "main" / "resources"
+    resources = ctx.module_path("worker") / "src" / "main" / "resources"
     custom = resources / "application-custom.yml"
     assert custom.is_file()
     assert "geostat:" in custom.read_text(encoding="utf-8")
-    rendered = render_module_files(_module_spec(ctx, "ingestion"))
+    rendered = render_module_files(_module_spec(ctx, "worker"))
     assert "application-custom.yml" not in rendered
 
 
 def test_generated_header_present(ctx: ProjectContext) -> None:
-    path = ctx.module_path("ingestion") / "src" / "main" / "resources" / "application.yml"
+    path = ctx.module_path("worker") / "src" / "main" / "resources" / "application.yml"
     text = path.read_text(encoding="utf-8")
     assert text.startswith("# generated by geostat config-gen")
     body = strip_generated_header(text)

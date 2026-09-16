@@ -135,12 +135,15 @@ def resolve_module_service_name(
     target = str(cfg.get("target") or module_id)
     slug = compose_slug(deploy, repo_name)
 
-    if module_id == "backend" or target == "backend":
-        return deploy.get("COMPOSE_API_SERVICE") or f"{slug}-api"
-    if role == "ui" and module_id == "frontend":
-        return deploy.get("COMPOSE_APP_SERVICE") or f"{slug}-app"
     if role == "ui":
-        return deploy.get("COMPOSE_APP_SERVICE") or f"{slug}-{(target or module_id).replace('_', '-')}"
+        if module_id == primary_ui_module_id(manifest):
+            # Primary UI: honor the legacy override, else the canonical `-app`
+            # service. (Previously this branch was reached only for a module
+            # LITERALLY named "frontend" — a privileged consumer name; the
+            # role + primary derivation is the agnostic form, mirroring the
+            # primary-api branch below.)
+            return deploy.get("COMPOSE_APP_SERVICE") or f"{slug}-app"
+        return f"{slug}-{(target or module_id).replace('_', '-')}"
     if role == "worker":
         override = deploy.get("COMPOSE_WORKER_SERVICE")
         if override and module_id == (primary_worker_module_id(manifest) or module_id):

@@ -1,5 +1,22 @@
 # Changelog — geostat-kit
 
+## 1.2.0-dev — unreleased
+
+### Agnosticism
+
+- Reference test fixture is `tests/fixtures/golden-consumer/` with role-named,
+  project-neutral module ids (`api`, `search`, `worker`, `web`, `svc`). No
+  consumer brand appears in a fixture id, path or assertion.
+- `lib/compose_identity.py`: the primary UI service name derives from
+  role + primary-module resolution, not from a module literally named
+  `frontend`; the privileged `backend` branch is removed.
+
+### Capability
+
+- `node-api` driver (registry entry, `sh/`, `ps1/`, `_init.sh`).
+- `geostat dev up` (`toolkit/dev/`), `resource_limits` / `extraServices`
+  compose seams, `manifest.migration.legacyDirs`.
+
 ## 1.0.0 — 2026-05-21
 
 ### Adoption

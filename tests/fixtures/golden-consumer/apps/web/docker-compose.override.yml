@@ -1,0 +1,6 @@
+services:
+  web:
+    build:
+      target: development
+    ports:
+      - "${APP_DEV_CONTAINER_PORT:-5177}:5177"

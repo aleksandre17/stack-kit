@@ -2,7 +2,7 @@
 
 `geostat-kit` is a **reusable ops package**. It must not embed:
 
-- Project brand names (`geostat-chat-bot`, …)
+- Project brand names (any single consumer's product/repo name)
 - Fixed repo trees (`secrets/`, `packages/`, `frontend/`, `deploy/compose/`)
 - Optional artifacts assumed universal (`google-credentials.json`)
 
@@ -65,7 +65,7 @@ Resolution: `lib/credentials.py` → `module_credentials(manifest, moduleId)`.
 ```python
 from lib.project_context import ProjectContext
 ctx = ProjectContext.discover()
-ctx.secrets_module_dir("backend")  # module id, not folder name
+ctx.secrets_module_dir("<moduleId>")  # module id, not folder name
 ctx.module_id_for_type("node-vite")
 ctx.resolve_alias("fe")
 ```

@@ -12,20 +12,32 @@ FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "golden-consumer"
 
 
 def _golden_tree(tmp_path: Path) -> Path:
-    import os
+    """Copy the synthetic consumer fixture into tmp and repoint `package` at the kit.
 
-    manifest = json.loads((FIXTURE_ROOT / "geostat.ops.json").read_text(encoding="utf-8"))
+    The fixture's `apps/**` already carry the config-gen golden output and the
+    hand-maintained `application-custom.yml`, so validation (which runs config-gen
+    drift checks) passes against a faithful copy. The `kits/geostat-kit` junction
+    is skipped — `package` is rewritten as a relative path to the real kit.
+    """
+    import os
+    import shutil
+
+    shutil.copytree(
+        FIXTURE_ROOT,
+        tmp_path,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("kits", "__pycache__", ".pytest_cache"),
+    )
+    manifest = json.loads((tmp_path / "geostat.ops.json").read_text(encoding="utf-8"))
     pkg = Path(__file__).resolve().parents[1]
     manifest["package"] = os.path.relpath(pkg, tmp_path).replace("\\", "/")
     (tmp_path / "geostat.ops.json").write_text(json.dumps(manifest), encoding="utf-8")
-    for mid, cfg in manifest["modules"].items():
-        parts = cfg["path"].split("/")
-        (tmp_path.joinpath(*parts)).mkdir(parents=True, exist_ok=True)
-    (tmp_path / "ops" / "config").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "ops" / "compose").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "ops" / "compose" / "catalog.json").write_text("{}", encoding="utf-8")
-    (tmp_path / "ops" / "ci").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "ops" / "ci" / "integration-stack.sh").write_text("# stub\n", encoding="utf-8")
+    # deploy.env is gitignored / volatile; synthesize from the committed template.
+    template = tmp_path / "ops" / "config" / "deploy.env.fixture"
+    if template.is_file():
+        (tmp_path / "ops" / "config" / "deploy.env").write_text(
+            template.read_text(encoding="utf-8"), encoding="utf-8"
+        )
     return tmp_path
 
 

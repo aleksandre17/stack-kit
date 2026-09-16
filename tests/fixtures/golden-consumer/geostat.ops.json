@@ -2,25 +2,68 @@
   "version": 2,
   "package": "kits/geostat-kit",
   "secrets": "ops/config",
-  "features": { "gcpCredentials": true },
+  "features": {
+    "gcpCredentials": true
+  },
   "compose": {
     "catalog": "ops/compose/catalog.json",
     "syncModules": "apps/api/ops.modules"
   },
-  "stack": { "composeDir": "ops/compose/stack" },
-  "cli": { "aliases": { "w": "web", "a": "api" } },
+  "migration": {
+    "legacyDirs": {
+      "api": [
+        "legacy-api"
+      ],
+      "ui": [
+        "legacy-app",
+        "legacy-ui"
+      ]
+    }
+  },
+  "stack": {
+    "composeDir": "ops/compose/stack",
+    "networkName": "golden-consumer-net",
+    "composeModules": [
+      "api",
+      "search",
+      "worker",
+      "web"
+    ],
+    "infra": {
+      "services": [
+        "postgres",
+        "redis",
+        "qdrant"
+      ]
+    }
+  },
+  "cli": {
+    "aliases": {
+      "w": "web",
+      "a": "api",
+      "s": "search",
+      "k": "worker",
+      "v": "svc"
+    }
+  },
   "modules": {
-    "web": {
-      "role": "ui",
-      "type": "node-vite",
-      "path": "apps/web",
-      "secretsModule": "web"
-    },
     "api": {
       "role": "api",
       "type": "java-boot",
       "path": "apps/api",
       "secretsModule": "api",
+      "target": "api",
+      "configGen": {
+        "mode": "env-profiles"
+      },
+      "spring": {
+        "portEnv": "API_PORT",
+        "applicationName": "api-service"
+      },
+      "debug": {
+        "mainClass": "com.example.app.AppApplication",
+        "projectName": "app"
+      },
       "credentials": [
         {
           "file": "gcp-primary.json",
@@ -33,6 +76,58 @@
           "envVar": "GCP_SECONDARY_CREDENTIALS"
         }
       ]
+    },
+    "search": {
+      "role": "api",
+      "type": "java-boot",
+      "path": "apps/search",
+      "secretsModule": "search",
+      "target": "search",
+      "configGen": {
+        "mode": "simple"
+      },
+      "spring": {
+        "applicationName": "search-service"
+      },
+      "datastores": {
+        "qdrant": {
+          "collection": "documents"
+        }
+      }
+    },
+    "worker": {
+      "role": "worker",
+      "type": "java-boot",
+      "path": "apps/worker",
+      "secretsModule": "worker",
+      "target": "worker",
+      "datastores": {
+        "postgres": {
+          "schema": "worker",
+          "database": "geostat",
+          "flyway": true
+        },
+        "rabbitmq": {}
+      }
+    },
+    "web": {
+      "role": "ui",
+      "type": "node-vite",
+      "path": "apps/web",
+      "secretsModule": "web",
+      "debug": {
+        "npmScript": "dev"
+      }
+    },
+    "svc": {
+      "role": "api",
+      "type": "node-api",
+      "path": "apps/svc",
+      "secretsModule": "svc",
+      "target": "svc",
+      "debug": {
+        "npmScript": "dev"
+      }
     }
   },
   "adapters": {
@@ -40,6 +135,10 @@
       "credentialsFile": "google-credentials.json",
       "containerMount": "/app/google-credentials.json"
     }
+  },
+  "vscode": {
+    "folder": ".vscode",
+    "geostatScript": "tools/geostat.ps1"
   },
   "ci": {
     "integration": "ops/ci/integration-stack.sh",

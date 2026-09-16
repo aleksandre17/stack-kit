@@ -1,37 +1,64 @@
-﻿# geostat-kit package tests — last run
+# geostat-kit package tests — last run
 
 | Field | Value |
 |-------|--------|
-| Date | 2026-05-21 |
+| Date | 2026-09-16 |
 | Host | Windows (`win32`) |
-| Python | 3.13.x |
-| **Result** | **148 passed, 17 skipped** |
-| Project root | `GEOSTAT_PROJECT_ROOT` → consumer repo with `geostat.ops.json` |
+| Python | 3.13.3 |
+| **Result** | **251 passed, 1 failed, 23 skipped** (0 errors) |
+| Project root | **synthetic fixture** `tests/fixtures/golden-consumer` (self-contained) |
 
 ## Command
 
 ```powershell
-cd kits\geostat-kit
-$env:PYTHONPATH = (Get-Location).Path
-$env:GEOSTAT_PROJECT_ROOT = "C:\path\to\your-project"
+cd stack-kit
 py -3 -m pytest tests -q
 ```
 
-## Golden-path scenarios verified (path logic)
+No `GEOSTAT_PROJECT_ROOT` is required: the suite runs against a synthetic,
+self-contained reference consumer that the kit owns. `conftest.py` materialises
+the two volatile bits at session start (a `kits/geostat-kit` junction back to the
+real kit, and `ops/config/deploy.env` from `deploy.env.fixture`). Set
+`GEOSTAT_PROJECT_ROOT` only to smoke-test the kit against a *real* consumer repo.
 
-| ID | Kind on server |
-|----|----------------|
-| B1 / B2 / B3 | `.../static/{COMPOSE_APP_SERVICE}/` |
-| C1 / C2 | `.../compose/dev|prod/{service}/` |
-| D1 / D2 / D3 | `.../compose/dev/{service}/` |
+## The one failure — declared, not hidden
 
-Tests use abstract bases (`/home/example/my-app/...`) and `COMPOSE_*` from `deploy.env` — no consumer brand names.
+`tests/test_driver_api.py::TestNodeApiDriver::test_node_step_helpers_exist`
+asserts `toolkit/deploy/pnpm-build.sh` exists. That file has not landed yet: it
+is the subject of a separate, still-open decision (it hardcodes a privileged npm
+script name and must be generalised to a manifest-declared prebuild list before
+it is taken). The test is correct and the tree is honestly red until that lands.
 
-## Package boundary
+## Why a synthetic fixture
 
-- `test_layout_v2.py` — bans legacy `secrets/`, `packages/geostat`, `deploy/compose` in toolkit sources
-- `test_scaffold_abstract_names.py` — scaffold has no branded service names
-- `test_project_context.py` — manifest resolution API
+The suite used to point `repo_root` at whatever `geostat.ops.json` sat at the
+real project root, asserting one adopting project's module ids. When that
+consumer's module set changed, dozens of tests failed — the suite was testing the
+consumer, not the kit. The kit is a reusable package, so its tests now run
+against a fixture it controls: deterministic, and immune to consumer manifest
+churn (standard golden-fixture pattern).
+
+## The reference consumer is GENERIC by construction
+
+`tests/fixtures/golden-consumer/` models a representative multi-module consumer
+under **role-named, project-neutral ids** — no consumer brand appears in an id,
+a path, a service name or an assertion:
+
+| id | driver | role | exercises |
+|----|--------|------|-----------|
+| `api` | `java-boot` | api | env-profiles config-gen, two credentials, `spring.portEnv` |
+| `search` | `java-boot` | api | simple config-gen, qdrant datastore |
+| `worker` | `java-boot` | worker | postgres (+ flyway) and rabbitmq datastores |
+| `web` | `node-vite` | ui | vite env wiring, primary-UI compose naming |
+| `svc` | `node-api` | api | node-api driver resolution |
+
+## What the suite meaningfully verifies
+
+- Manifest validation + schema + package boundary (`test_validate_manifest`, `test_layout_v2`)
+- Driver registry integrity + driver_api resolution incl. node-api & node-vite (`test_driver_api`, `test_registry_integrity`)
+- Compose service naming + config-gen golden output (`test_compose_identity`, `test_config_gen`)
+- Deploy-path logic, stack-deploy ordering, migrate-layout (`test_deploy_paths`, `test_migrate_layout`)
+- Credentials (explicit list + global GCP fallback), vscode-gen, scaffold abstractness
 
 ## Not run in this suite
 

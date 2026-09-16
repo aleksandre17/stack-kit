@@ -13,8 +13,8 @@ from lib.project_context import ProjectContext
 #
 #   "migration": {
 #     "legacyDirs": {
-#       "api": ["geostat-chat-api"],
-#       "ui":  ["geostat-chat-app", "geostat-chat-ai-fe"]
+#       "api": ["legacy-api"],
+#       "ui":  ["legacy-app", "legacy-ui"]
 #     }
 #   }
 #

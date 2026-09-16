@@ -1,0 +1,7 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    env_file:
+      - ../../ops/config/web/.env.dev
