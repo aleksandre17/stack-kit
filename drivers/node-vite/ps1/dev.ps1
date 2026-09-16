@@ -46,11 +46,11 @@ if ($SubCommand -eq "help") {
     Write-Host "  bootstrap | sync | watch | restart" -ForegroundColor White
     Write-Host ""
     Write-Host "  NOT the same as deploy watch:" -ForegroundColor Yellow
-    Write-Host "    fe deploy watch  ->  npm build + dist/ + nginx (static prod-like)" -ForegroundColor Gray
-    Write-Host "    fe dev watch     ->  rsync src only + Vite in container" -ForegroundColor Gray
+    Write-Host "    <alias> deploy watch  ->  npm build + dist/ + nginx (static prod-like)" -ForegroundColor Gray
+    Write-Host "    <alias> dev watch     ->  rsync src only + Vite in container" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  Example: geostat fe dev bootstrap -Environment dev" -ForegroundColor Gray
-    Write-Host "           geostat fe dev watch" -ForegroundColor Gray
+    Write-Host "  Example: geostat <alias> dev bootstrap -Environment dev" -ForegroundColor Gray
+    Write-Host "           geostat <alias> dev watch" -ForegroundColor Gray
     Write-Host ""
     exit 0
 }
@@ -186,7 +186,7 @@ switch ($SubCommand) {
 
         Write-Host ""
         Write-Host "  dev watch [source rsync]: debounce ${DebounceMs}ms. Ctrl+C to stop." -ForegroundColor Cyan
-        Write-Host "  (For static dist loop use: geostat fe deploy watch)" -ForegroundColor DarkGray
+        Write-Host "  (For static dist loop use: geostat <alias> deploy watch)" -ForegroundColor DarkGray
         Write-Host "  Run dev bootstrap once if container is not up." -ForegroundColor Gray
         Write-Host ""
 

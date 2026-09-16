@@ -1,7 +1,10 @@
 {
   "java-boot": {
     "label": "JVM — Gradle / Spring Boot (multi-module JAR deploy)",
-    "roles": ["api", "worker"],
+    "roles": [
+      "api",
+      "worker"
+    ],
     "runtime": "bash",
     "commands": {
       "deploy": "sh/deploy.sh",
@@ -11,11 +14,22 @@
       "compose": "sh/compose.sh",
       "check": "sh/check.sh",
       "modules": "sh/modules.sh"
+    },
+    "tasks": {
+      "devWatch": [
+        "dev",
+        "watch"
+      ]
+    },
+    "vscode": {
+      "launch": "java"
     }
   },
   "node-vite": {
     "label": "Node — SPA dev remote + static deploy (Vite, Angular, Nx)",
-    "roles": ["ui"],
+    "roles": [
+      "ui"
+    ],
     "runtime": "powershell",
     "commands": {
       "deploy": "ps1/deploy.ps1",
@@ -24,11 +38,26 @@
       "manage": "ps1/manage.ps1",
       "compose": "ps1/compose.ps1",
       "check": "ps1/check.ps1"
+    },
+    "tasks": {
+      "devWatch": [
+        "dev",
+        "watch"
+      ],
+      "deployWatch": [
+        "deploy",
+        "watch"
+      ]
+    },
+    "vscode": {
+      "launch": "node-terminal"
     }
   },
   "node-api": {
     "label": "Node — HTTP service (pnpm build + dockerized deploy, Fastify/Express/Nest)",
-    "roles": ["api"],
+    "roles": [
+      "api"
+    ],
     "runtime": "bash",
     "commands": {
       "deploy": "sh/deploy.sh",
@@ -38,6 +67,15 @@
       "compose": "sh/compose.sh",
       "check": "sh/check.sh",
       "modules": "sh/modules.sh"
+    },
+    "tasks": {
+      "devWatch": [
+        "dev",
+        "watch"
+      ]
+    },
+    "vscode": {
+      "launch": "node-terminal"
     }
   }
 }

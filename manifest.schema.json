@@ -249,6 +249,14 @@
             "properties": {
               "applicationName": { "type": "string" },
               "defaultProfile": { "type": "string" },
+              "managementEndpoints": {
+                "description": "Spring actuator web exposure include list. Kit default is the narrow 'health,info' — a wider management surface is DECLARED, never a default.",
+                "default": "health,info",
+                "oneOf": [
+                  { "type": "string", "minLength": 1 },
+                  { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+                ]
+              },
               "portEnv": {
                 "type": "string",
                 "description": "Env var for server.port (default: {secretsModule}_PORT)"
@@ -300,6 +308,19 @@
               "presentationResources": {
                 "type": "array",
                 "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": false
+          },
+          "node": {
+            "type": "object",
+            "description": "Node-stack build declarations (node-api / node-vite drivers)",
+            "properties": {
+              "prebuildScripts": {
+                "type": "array",
+                "description": "Workspace pnpm/npm scripts that must build before this module's package, in order. Absent or empty = nothing runs.",
+                "items": { "type": "string", "minLength": 1 },
+                "default": []
               }
             },
             "additionalProperties": false
@@ -386,6 +407,19 @@
             }
           },
           "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "dev": {
+      "type": "object",
+      "description": "Development orchestration declarations (geostat dev up)",
+      "properties": {
+        "bootOrder": {
+          "type": "array",
+          "description": "Module roles in the order `dev up all` boots them. Absent = [\"api\", \"worker\", \"ui\"].",
+          "items": { "type": "string", "minLength": 1 },
+          "default": ["api", "worker", "ui"]
         }
       },
       "additionalProperties": false

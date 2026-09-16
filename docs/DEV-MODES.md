@@ -10,8 +10,8 @@ Run and Debug (`launch.json`) — იხ. [LOCAL-DEBUG.md](LOCAL-DEBUG.md). Gold
 | რეჟიმი | სად მუშაობს | Docker | VS Code Run and Debug |
 |--------|-------------|--------|------------------------|
 | **① ლოკალური, host** | შენი Windows/Mac — Node/Java პირდაპირ | **არა** | **კი** — `npm run dev`, `Spring Boot`, `Full stack (local)` |
-| **② ლოკალური Docker** | იგივე მანქანა, `localhost` | **კი** | Task / launch: `geostat stack`, `fe/be compose up` |
-| **③ Remote + Docker** | Linux სერვერი (SSH) | **კი** (სერვერზე) | **არა** — `geostat fe/be dev watch` |
+| **② ლოკალური Docker** | იგივე მანქანა, `localhost` | **კი** | Task / launch: `geostat stack`, `<alias> compose up` |
+| **③ Remote + Docker** | Linux სერვერი (SSH) | **კი** (სერვერზე) | Tasks: `geostat: <alias> dev watch` — ან `geostat dev up <alias> --mode remote` |
 | **④ Hybrid** | Apps host-ზე, infra remote + tunnel | **კი** (remote) | **კი** — `Hybrid: infra tunnel + API + UI`, `geostat hybrid boot` |
 
 ---
@@ -24,15 +24,15 @@ Run and Debug (`launch.json`) — იხ. [LOCAL-DEBUG.md](LOCAL-DEBUG.md). Gold
 
 | კონფიგურაცია | რა ხდება |
 |---------------|----------|
-| **frontend: npm run dev** | Vite — `modules.<ui>.path` (მაგ. `apps/frontend`), პორტი ~5173 |
-| **backend: Spring Boot** | Gradle/Java ლოკალურად, breakpoints |
+| **`<ui-module>: npm run dev`** | Vite — `modules.<ui>.path` (მაგ. `apps/web`), პორტი ~5173 |
+| **`<api-module>: Spring Boot`** | Gradle/Java ლოკალურად, breakpoints |
 | **Full stack (local)** | UI + API ერთად (compound) |
 
 ### ტერმინალი (იგივე რეჟიმი)
 
 ```powershell
-cd apps/frontend; npm run dev
-cd apps/backend; .\gradlew bootRun
+cd <ui-module-path>; npm run dev
+cd <api-module-path>; .\gradlew bootRun
 ```
 
 **Docker არ გჭირდება.** API შეიძლება იყოს ლოკალური ან remote URL — `ops/config/<ui>/env.dev` (`VITE_API_URL`).
@@ -48,14 +48,14 @@ cd apps/backend; .\gradlew bootRun
 | სახელი | რა ხდება |
 |--------|----------|
 | **geostat: stack (compose dev)** | მთელი stack — `geostat stack up -d --build` |
-| Task: **geostat: fe compose up** | მხოლოდ UI კონტეინერი |
-| Task: **geostat: be compose up** | მხოლოდ API კონტეინერი |
+| Task: **geostat: <ui-alias> compose up** | მხოლოდ UI კონტეინერი |
+| Task: **geostat: <api-alias> compose up** | მხოლოდ API კონტეინერი |
 
 ### ტერმინალი
 
 ```powershell
-.\tools\geostat.ps1 fe compose up -d --build
-.\tools\geostat.ps1 be compose up -d --build
+.\tools\geostat.ps1 <ui-alias> compose up -d --build
+.\tools\geostat.ps1 <api-alias> compose up -d --build
 .\tools\geostat.ps1 stack up -d --build
 ```
 
@@ -66,21 +66,46 @@ cd apps/backend; .\gradlew bootRun
 ## ③ Remote სერვერი + Docker (Linux / SSH)
 
 კოდი იწერება **ლოკალურად** (Windows), გაშვება **სერვერზე** Docker compose-ით.  
-**Run and Debug launch-ში არ არის** — მხოლოდ `geostat` CLI.
+Run and Debug launch-ში ეს mode **არ ჩანს** — VS Code Tasks (`geostat: <alias> dev watch`) ან CLI.
+
+### სწრაფი გაშვება — ერთი ბრძანება
+
+```powershell
+geostat dev up <alias> --mode remote   # rsync → server, watch კონტეინერში
+geostat dev up all --mode remote       # ყველა მოდული: თითო ახალ terminal window-ში
+```
+
+`dev up --mode remote` კითხულობს driver-ის `tasks.devWatch` argv-ს `drivers/registry.json`-იდან —
+ახალი driver-ის დამატება **დეკლარაციაა**, არა კოდის ცვლილება.
+
+### VS Code Tasks (Terminal → Run Task)
+
+`vscode-gen` თითოეული მოდულისთვის აგენერირებს იმ watch task-ებს, რომლებსაც მისი driver
+**აცხადებს** `registry.json`-ში:
+
+| Task | საიდან მოდის |
+|------|---------------|
+| `geostat: <alias> dev watch` | driver-ის `tasks.devWatch` |
+| `geostat: <alias> deploy watch` | driver-ის `tasks.deployWatch` (თუ აცხადებს) |
+
+driver, რომელიც watch task-ს არ აცხადებს, ვერც ერთს მიიღებს — და ეს **გაცხადებული
+არყოფნაა**, არა ჩუმი ნაკლი.
+
+### ხელით CLI (bootstrap საჭიროა პირველ გაშვებაზე)
 
 ### Frontend (Vite კონტეინერში)
 
 | მიზანი | ბრძანება | სერვერზე |
 |--------|----------|----------|
-| Remote dev | `geostat fe dev bootstrap` → **`geostat fe dev watch`** | `{DEPLOY_PATH}/compose/dev/{container}/` + Docker |
-| Prod-like static | `geostat fe deploy dist` → **`geostat fe deploy watch`** | `static/` + nginx |
+| Remote dev | `geostat <ui-alias> dev bootstrap` → **`geostat <ui-alias> dev watch`** | `{DEPLOY_PATH}/compose/dev/{container}/` + Docker |
+| Prod-like static | `geostat <ui-alias> deploy dist` → **`geostat <ui-alias> deploy watch`** | `static/` + nginx |
 
 ### Backend (Gradle bootRun კონტეინერში)
 
 | მიზანი | ბრძანება | სერვერზე |
 |--------|----------|----------|
-| Remote dev | `geostat be dev bootstrap` → **`geostat be dev watch`** | workspace + Docker |
-| Prod JAR | `geostat be deploy all` | `runtime/` |
+| Remote dev | `geostat <api-alias> dev bootstrap` → **`geostat <api-alias> dev watch`** | workspace + Docker |
+| Prod JAR | `geostat <api-alias> deploy all` | `runtime/` |
 
 ### Full stack prod (remote)
 
@@ -90,10 +115,10 @@ cd apps/backend; .\gradlew bootRun
 
 ### პირობები
 
-- `ops/config/*/deploy.env` — `DEPLOY_SERVER`, `DEPLOY_LAYOUT=structured`
+- `ops/config/deploy.env` — `DEPLOY_SERVER`, `DEPLOY_LAYOUT=structured`
 - SSH: `ops/config/ssh/`
 
-დეტალი: [REMOTE-DEV-DOCKERFILE-FLOW.md](REMOTE-DEV-DOCKERFILE-FLOW.md), [GOLDEN-PATHS.md](GOLDEN-PATHS.md), პროექტი `docs/DEV-REMOTE.md`, `docs/FE-WATCH.md`.
+დეტალი: [REMOTE-DEV-DOCKERFILE-FLOW.md](REMOTE-DEV-DOCKERFILE-FLOW.md), [GOLDEN-PATHS.md](GOLDEN-PATHS.md), consumer `docs/DEV-REMOTE.md`, `docs/FE-WATCH.md`.
 
 ---
 
@@ -110,7 +135,7 @@ cd apps/backend; .\gradlew bootRun
 
 **Env:** `ops/config/<module>/.env.dev` — `INFRA_HOST=127.0.0.1`, peer URLs (`RETRIEVAL_BASE_URL`, …). Spring profile — manifest `modules.*.hybrid.springProfiles`.
 
-**არ აურიო:** legacy `apps/backend/worker` — worker = `ingestion-service`.
+**არ აურიო:** `worker` role-ის მოდული compose service-ს თავისი `modules.<id>` დეკლარაციით იღებს.
 
 სრული არქიტექტურა: consumer [HYBRID-DEV-ARCHITECTURE.md](../../../docs/plan/HYBRID-DEV-ARCHITECTURE.md).
 
@@ -124,7 +149,7 @@ cd apps/backend; .\gradlew bootRun
                     └─────────────────────────────────────┘
          │                              │
          │ ① ლოკალური, NO Docker         │ ② ლოკალური Docker
-         │    Run and Debug:            │    stack / fe|be compose
+         │    Run and Debug:            │    stack / <alias> compose
          │    npm + Java                │    localhost
          │    Full stack (local)        │
          │                              │
@@ -133,7 +158,7 @@ cd apps/backend; .\gradlew bootRun
                         ▼
                     ┌─────────────────────────────────────┐
                     │  Linux სერვერი                        │
-                    │  ③ geostat fe|be dev watch            │
+                    │  ③ geostat <alias> dev watch            │
                     │     Docker on server                  │
                     └─────────────────────────────────────┘
 ```
@@ -145,23 +170,27 @@ cd apps/backend; .\gradlew bootRun
 | მინდა… | აირჩიე |
 |--------|--------|
 | F5, breakpoints, UI+API სწრაფად ლოკალურად | **Full stack (local)** |
-| მხოლოდ UI ლოკალურად | **frontend: npm run dev** |
-| ყველაფერი Docker-ში ლაპტოპზე | **geostat: stack** ან tasks `fe/be compose up` |
-| ვწერ Windows-ზე, ვიღებ Linux+Docker-ზე | **`geostat fe dev watch`** / **`geostat be dev watch`** |
-| Prod UI სერვერზე | **`geostat fe deploy watch`** |
-| Prod API სერვერზე | **`geostat be deploy all`** |
+| მხოლოდ UI ლოკალურად | **`<ui-module>: npm run dev`** |
+| ყველაფერი Docker-ში ლაპტოპზე | task **geostat: stack dev** ან `geostat stack up -d --build` |
+| Apps local, infra remote (✓ breakpoints) | task **geostat: dev up <alias>** / `geostat dev up <alias>` |
+| ყველა მოდული ერთდროულად (hybrid) | `geostat dev up all` — ახალ windows-ებში |
+| ვწერ Windows-ზე, ვიღებ Linux+Docker-ზე | **`geostat <alias> dev watch`** / `geostat dev up <alias> --mode remote` |
+| ყველა მოდული remote watch | `geostat dev up all --mode remote` |
+| Prod UI სერვერზე | **`geostat <ui-alias> deploy watch`** |
+| Prod API სერვერზე | **`geostat <api-alias> deploy all`** |
 
 ---
 
 ## `deploy watch` vs `dev watch` (remote)
 
-| ბრძანება | რას აკეთებს | path სერვერზე |
-|----------|-------------|----------------|
-| **`fe deploy watch`** | build → static + nginx | `.../static/{service}/` |
-| **`fe dev watch`** | rsync სორსი, Vite კონტეინერში | `.../compose/dev/{service}/` |
-| **`be dev watch`** | rsync + Gradle bootRun კონტეინერში | workspace |
+| ბრძანება | რას აკეთებს | path სერვერზე | VS Code Task |
+|----------|-------------|----------------|--------------|
+| **`<ui-alias> dev watch`** | rsync სორსი, dev server კონტეინერში | `.../compose/dev/{service}/` | `geostat: <alias> dev watch` |
+| **`<ui-alias> deploy watch`** | build static → nginx reload loop | `.../static/{service}/` | `geostat: <alias> deploy watch` |
+| **`<api-alias> dev watch`** | rsync + in-container restart (bootRun / tsx watch) | workspace | `geostat: <alias> dev watch` |
 
-**წესი:** `deploy` = artifact; `dev` = სორსი + compose dev.
+**წესი:** `dev watch` = სორსი live + compose dev; `deploy watch` = artifact build loop.
+რომელი watch არსებობს, ამას **driver აცხადებს** (`registry.json` → `tasks`), და არა ეს დოკუმენტი.
 
 ---
 
@@ -186,8 +215,8 @@ bash kits/geostat-kit/scripts/dev-modes-verify.sh --skip-docker --skip-integrati
 | რეჟიმი | ავტომატური | ხელით (E2E) |
 |--------|------------|-------------|
 | ① host | paths, gradlew, npm, launch.json | `npm run dev`, Java F5 |
-| ② Docker | `fe/be check`, docker daemon | `stack up`, compose |
-| ③ remote | `DEPLOY_LAYOUT`, module-ops-smoke | SSH + `fe/be dev watch` |
+| ② Docker | `<alias> check`, docker daemon | `stack up`, compose |
+| ③ remote | `DEPLOY_LAYOUT`, module-ops-smoke | SSH + `<alias> dev watch` |
 
 პაკეტის pytest: `tests/test_dev_modes_smoke.py`.
 

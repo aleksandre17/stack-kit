@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.manifest_defaults import default_field, read_nested
-from lib.modules import infer_cli_aliases, modules_by_role
+from lib.modules import driver_registry, infer_cli_aliases, modules_by_role
 from lib.project_context import ProjectContext
 
 
@@ -52,7 +52,7 @@ def _module_debug_cfg(manifest: dict[str, Any], module_id: str) -> dict[str, Any
     return dbg if isinstance(dbg, dict) else {}
 
 
-def _launch_node_vite(
+def _launch_node_terminal(
     ctx: ProjectContext, module_id: str, aliases: dict[str, str]
 ) -> dict[str, Any]:
     rel = _posix_rel(ctx.root, ctx.module_path(module_id))
@@ -148,14 +148,12 @@ def _find_launch_name_for_module(
     configs: list[dict[str, Any]], module_id: str, ctx: ProjectContext
 ) -> str | None:
     rel = _posix_rel(ctx.root, ctx.module_path(module_id))
-    typ = read_nested(ctx.manifest, f"modules.{module_id}.type", "")
+    kind = _launch_kind(read_nested(ctx.manifest, f"modules.{module_id}.type", ""))
     for cfg in configs:
         cwd = str(cfg.get("cwd", "")).replace("\\", "/")
         if not cwd.endswith(rel):
             continue
-        if typ == "java-boot" and cfg.get("type") == "java":
-            return cfg["name"]
-        if typ == "node-vite" and cfg.get("type") == "node-terminal":
+        if kind and cfg.get("type") == kind:
             return cfg["name"]
     return None
 
@@ -194,6 +192,36 @@ def _infra_tunnel_task(ctx: ProjectContext) -> dict[str, Any]:
     }
 
 
+# Launch builders are keyed by the launch KIND a driver DECLARES in
+# drivers/registry.json ("vscode": {"launch": ...}). A new driver becomes debuggable by
+# declaring a kind it already supports; the generator holds no driver name of its own.
+LAUNCH_BUILDERS = {
+    "node-terminal": _launch_node_terminal,
+    "java": _launch_java,
+}
+
+
+def _driver_vscode(driver_id: str) -> dict[str, Any]:
+    entry = driver_registry().get(driver_id) or {}
+    vs = entry.get("vscode")
+    return vs if isinstance(vs, dict) else {}
+
+
+def _launch_kind(driver_id: str) -> str:
+    return str(_driver_vscode(driver_id).get("launch") or "")
+
+
+def _driver_watch_tasks(driver_id: str) -> dict[str, list[str]]:
+    tasks = (driver_registry().get(driver_id) or {}).get("tasks")
+    if not isinstance(tasks, dict):
+        return {}
+    out: dict[str, list[str]] = {}
+    for name, argv in tasks.items():
+        if isinstance(argv, list) and argv:
+            out[str(name)] = [str(a) for a in argv]
+    return out
+
+
 def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
     aliases = infer_cli_aliases(ctx.manifest)
     configs: list[dict[str, Any]] = []
@@ -201,18 +229,15 @@ def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
 
     for mid in ctx.list_module_ids():
         typ = read_nested(ctx.manifest, f"modules.{mid}.type", "")
-        if typ == "node-vite":
-            cfg = _launch_node_vite(ctx, mid, aliases)
-            configs.append(cfg)
-            if read_nested(ctx.manifest, f"modules.{mid}.role", "") == "ui":
-                compounds_members.append(cfg["name"])
-        elif typ == "java-boot":
-            cfg = _launch_java(ctx, mid, aliases)
-            if cfg:
-                configs.append(cfg)
-                role = read_nested(ctx.manifest, f"modules.{mid}.role", "")
-                if role in ("api", "worker"):
-                    compounds_members.append(cfg["name"])
+        builder = LAUNCH_BUILDERS.get(_launch_kind(typ))
+        if builder is None:
+            continue  # driver declares no launch kind — an honest absence, not a guess
+        cfg = builder(ctx, mid, aliases)
+        if not cfg:
+            continue
+        configs.append(cfg)
+        if read_nested(ctx.manifest, f"modules.{mid}.role", "") in ("ui", "api", "worker"):
+            compounds_members.append(cfg["name"])
 
     gs = _geostat_script_rel(ctx)
     configs.extend(
@@ -226,17 +251,16 @@ def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
             },
         ]
     )
-    for alias, target in sorted(aliases.items()):
-        if alias in ("fe", "be", "ui", "api", "worker") or len(alias) <= 3:
-            configs.append(
-                {
-                    "name": f"geostat: {alias} check",
-                    "type": "node-terminal",
-                    "request": "launch",
-                    "command": f'powershell -ExecutionPolicy Bypass -File "${{workspaceFolder}}/{gs}" {alias} check',
-                    "cwd": "${workspaceFolder}",
-                }
-            )
+    for alias, _target in sorted(aliases.items()):
+        configs.append(
+            {
+                "name": f"geostat: {alias} check",
+                "type": "node-terminal",
+                "request": "launch",
+                "command": f'powershell -ExecutionPolicy Bypass -File "${{workspaceFolder}}/{gs}" {alias} check',
+                "cwd": "${workspaceFolder}",
+            }
+        )
 
     out: dict[str, Any] = {"version": "0.2.0", "configurations": configs}
     if len(compounds_members) >= 2:
@@ -318,6 +342,11 @@ def build_tasks_json(ctx: ProjectContext) -> dict[str, Any]:
                 [short, "compose", "up", "-d", "--build"],
             )
         )
+        # Watch tasks are DECLARED per driver in drivers/registry.json — a driver that
+        # declares none simply gets none, and a new driver needs no generator edit.
+        driver_id = read_nested(ctx.manifest, f"modules.{alias}.type", "")
+        for _name, argv in sorted(_driver_watch_tasks(driver_id).items()):
+            tasks.append(_task(f"geostat: {short} {' '.join(argv)}", [short, *argv]))
 
     return {"version": "2.0.0", "tasks": tasks}
 

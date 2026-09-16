@@ -58,6 +58,13 @@ if [[ -z "${NODE_PKG_FILTER:-}" ]]; then
 fi
 export NODE_PKG_FILTER
 
+# Workspace scripts that MUST build before this module's package, in declared order.
+# Declared by the consumer as modules.<id>.node.prebuildScripts (default: none).
+if [[ -z "${NODE_PREBUILD_SCRIPTS:-}" ]]; then
+  NODE_PREBUILD_SCRIPTS="$(geostat_read_manifest_list "modules.${GEOSTAT_MODULE_ID}.node.prebuildScripts" 2>/dev/null)"
+fi
+export NODE_PREBUILD_SCRIPTS
+
 # Local npm/pnpm script for `run` / dev (manifest debug.npmScript, default dev).
 if [[ -z "${NODE_RUN_SCRIPT:-}" ]]; then
   NODE_RUN_SCRIPT="$(geostat_read_manifest_field "modules.${GEOSTAT_MODULE_ID}.debug.npmScript" "" 2>/dev/null)"

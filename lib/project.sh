@@ -107,6 +107,27 @@ print(v if v is not None else d)
 " "$mf" "$field" "$default" 2>/dev/null || echo "$default"
 }
 
+# Read an ARRAY-valued manifest field as newline-separated items (empty when absent,
+# not an array, or no manifest). Generic companion to geostat_read_manifest_field.
+geostat_read_manifest_list() {
+  local field="$1" mf
+  mf="$(_geostat_manifest_file 2>/dev/null)" || return 0
+  geostat_python -c "
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as fh:
+    m = json.load(fh)
+v = m
+for k in sys.argv[2].split('.'):
+    if not isinstance(v, dict) or k not in v:
+        sys.exit(0)
+    v = v[k]
+if isinstance(v, list):
+    for item in v:
+        if item is not None and str(item).strip():
+            print(str(item).strip())
+" "$mf" "$field" 2>/dev/null || true
+}
+
 geostat_kit_package_root() {
   if [[ -n "${OPS_PACKAGE_ROOT:-}" ]]; then
     echo "$OPS_PACKAGE_ROOT"

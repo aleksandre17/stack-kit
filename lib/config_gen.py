@@ -83,6 +83,21 @@ def _secrets_env_file_rel(ctx: ProjectContext, module_id: str, env_file: str) ->
     return os.path.relpath(secret_path, mod_path).replace("\\", "/")
 
 
+# Spring management-endpoint exposure. The kit default is the NARROW one (OWASP: a
+# management surface is not exposure-by-default material); a consumer that wants more
+# DECLARES it as modules.<id>.spring.managementEndpoints.
+DEFAULT_MANAGEMENT_ENDPOINTS = "health,info"
+
+
+def _management_endpoints(spring_cfg: dict[str, Any]) -> str:
+    raw = spring_cfg.get("managementEndpoints")
+    if isinstance(raw, list):
+        joined = ",".join(str(x).strip() for x in raw if str(x).strip())
+        return joined or DEFAULT_MANAGEMENT_ENDPOINTS
+    text = str(raw or "").strip()
+    return text or DEFAULT_MANAGEMENT_ENDPOINTS
+
+
 @dataclass(frozen=True)
 class ModuleConfigSpec:
     module_id: str
@@ -93,6 +108,7 @@ class ModuleConfigSpec:
     postgres_schema: str = ""
     postgres_db: str = ""
     default_profile: str = ""
+    management_endpoints: str = DEFAULT_MANAGEMENT_ENDPOINTS
     profile_groups: dict[str, list[str]] = field(default_factory=dict)
     rabbitmq: bool = False
     events_enabled_env: str = ""
@@ -149,6 +165,7 @@ def _postgres_module_spec(ctx: ProjectContext, module_id: str, cfg: dict[str, An
         postgres_schema=str(pg.get("schema") or module_id),
         postgres_db=str(pg.get("database") or "geostat"),
         default_profile=default_profile,
+        management_endpoints=_management_endpoints(spring_cfg),
         profile_groups=profile_groups,
         rabbitmq=rabbitmq,
         events_enabled_env=events_env,
@@ -165,6 +182,7 @@ def _simple_module_spec(ctx: ProjectContext, module_id: str, cfg: dict[str, Any]
         app_name=app_name,
         port_env=port_env,
         port_default=port_default,
+        management_endpoints=_management_endpoints(spring_cfg),
     )
 
 
@@ -194,6 +212,7 @@ def _env_profiles_module_spec(ctx: ProjectContext, module_id: str, cfg: dict[str
         port_env=port_env,
         port_default=port_default,
         default_profile=default_profile,
+        management_endpoints=_management_endpoints(spring_cfg),
         env_profiles=enriched,
     )
 
@@ -266,6 +285,7 @@ def render_module_files(
         "port_default": spec.port_default,
         "app_name": spec.app_name,
         "default_profile": spec.default_profile,
+        "management_endpoints": spec.management_endpoints,
         "profile_groups_yaml": _profile_groups_yaml(spec.profile_groups),
         "postgres_schema": spec.postgres_schema,
         "postgres_db": spec.postgres_db,

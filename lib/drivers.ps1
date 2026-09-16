@@ -82,6 +82,29 @@ function Get-DriverCommandPath {
     Join-Path (Get-DriverRoot $ModuleId) $entry.commands.$Command
 }
 
+# The role a driver DECLARES it serves first (drivers/registry.json "roles"), used only
+# when a module omits an explicit role. No driver name is known to this file.
+function Get-DriverDefaultRole {
+    param([string]$Type)
+    if (-not $Type) { return "" }
+    $reg = Get-Content (Get-DriverRegistryPath) -Raw | ConvertFrom-Json
+    if (-not $reg.PSObject.Properties[$Type]) { return "" }
+    $roles = @($reg.$Type.roles)
+    if ($roles.Count -gt 0) { return [string]$roles[0] }
+    return ""
+}
+
+# The argv a driver DECLARES for a named watch loop (registry "tasks"), or $null.
+function Get-DriverTaskArgs {
+    param([string]$Type, [string]$TaskName)
+    if (-not $Type) { return $null }
+    $reg = Get-Content (Get-DriverRegistryPath) -Raw | ConvertFrom-Json
+    if (-not $reg.PSObject.Properties[$Type]) { return $null }
+    $tasks = $reg.$Type.tasks
+    if (-not $tasks -or -not $tasks.PSObject.Properties[$TaskName]) { return $null }
+    return @($tasks.$TaskName)
+}
+
 function Get-CliAliasesFromManifest {
     $mf = Get-ProjectManifestPath
     if (-not $mf) { return @{} }
@@ -99,8 +122,7 @@ function Get-CliAliasesFromManifest {
             $data.modules.PSObject.Properties |
                 Where-Object {
                     $r = $_.Value.role
-                    if (-not $r -and $_.Value.type -eq "node-vite") { $r = "ui" }
-                    if (-not $r -and $_.Value.type -eq "java-boot") { $r = "api" }
+                    if (-not $r) { $r = Get-DriverDefaultRole ([string]$_.Value.type) }
                     $r -eq $role
                 } |
                 ForEach-Object { $_.Name }

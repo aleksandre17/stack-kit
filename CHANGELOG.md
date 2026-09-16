@@ -7,6 +7,25 @@
 - Reference test fixture is `tests/fixtures/golden-consumer/` with role-named,
   project-neutral module ids (`api`, `search`, `worker`, `web`, `svc`). No
   consumer brand appears in a fixture id, path or assertion.
+- **Driver facts live in `drivers/registry.json`, not in generators.** Each driver
+  declares `tasks` (e.g. `devWatch` argv) and `vscode.launch` (its launch shape).
+  `lib/vscode_gen.py` no longer contains a `node-vite`/`java-boot` ladder or a
+  privileged alias allow-list, so `node-api` — which previously got no VS Code
+  tasks at all — now gets them by declaration. A new driver needs no generator edit.
+- Role inference when a module omits `role` now reads the driver's declared
+  `roles[0]` (`lib/modules.py`, `lib/drivers.ps1`) instead of a type→role ladder.
+- `toolkit/deploy/pnpm-build.sh`: build ordering is declared as
+  `modules.<id>.node.prebuildScripts` (default `[]`); no consumer script name lives
+  in the kit. A declared script the workspace lacks now fails instead of silently
+  skipping.
+- `toolkit/dev/Invoke-DevUp.ps1`: help text renders from the resolved manifest's
+  `cli.aliases` (placeholders when absent); remote watch uses the driver's declared
+  `tasks.devWatch`; boot order is `dev.bootOrder` (default `api, worker, ui`).
+- Spring actuator exposure is `modules.<id>.spring.managementEndpoints`, default the
+  narrow `health,info`. A wider management surface is declared, never a kit default.
+- `docs/DEV-MODES.md`, `docs/LOCAL-DEBUG.md`, `drivers/node-api/README.md` and the
+  `node-vite` dev help use `<alias>` / `<moduleId>` placeholders only. The `node-api`
+  README no longer claims the driver is unregistered.
 - `lib/compose_identity.py`: the primary UI service name derives from
   role + primary-module resolution, not from a module literally named
   `frontend`; the privileged `backend` branch is removed.

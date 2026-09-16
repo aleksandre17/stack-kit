@@ -1,6 +1,9 @@
 """N-module manifest resolution — roles, types, CLI aliases (package boundary)."""
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 MODULE_ROLES = frozenset({"ui", "api", "worker", "gateway", "data", "other"})
@@ -10,6 +13,28 @@ LAYOUT_SIMULATOR_BY_TYPE: dict[str, str] = {
     "node-vite": "simulate-frontend-layout.ps1",
     "java-boot": "simulate-backend-layout.ps1",
 }
+
+
+@lru_cache(maxsize=1)
+def driver_registry() -> dict[str, Any]:
+    """The declared driver registry — the ONE home of what a driver is and can do."""
+    path = Path(__file__).resolve().parent.parent / "drivers" / "registry.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def driver_default_role(driver_id: str) -> str:
+    """First role the driver DECLARES it serves — never a name hardcoded here."""
+    entry = driver_registry().get(str(driver_id)) or {}
+    roles = entry.get("roles")
+    if isinstance(roles, list):
+        for r in roles:
+            if str(r).strip().lower() in MODULE_ROLES:
+                return str(r).strip().lower()
+    return ""
 
 
 def module_ids(manifest: dict[str, Any]) -> list[str]:
@@ -27,12 +52,7 @@ def module_role(manifest: dict[str, Any], module_id: str) -> str:
     if role in MODULE_ROLES:
         return role
     # Infer from driver registry roles when manifest omits role (migration)
-    typ = str(cfg.get("type", ""))
-    if typ == "node-vite":
-        return "ui"
-    if typ == "java-boot":
-        return "api"
-    return "other"
+    return driver_default_role(str(cfg.get("type", ""))) or "other"
 
 
 def modules_by_role(manifest: dict[str, Any], role: str) -> list[str]:
