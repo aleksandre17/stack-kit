@@ -8,7 +8,7 @@ from pathlib import Path
 
 from lib.compose_identity import compose_service_names, load_deploy_env, resolve_module_service_name
 from lib.deploy_paths import resolve_backend_deploy_path, resolve_module_deploy_path
-from lib.modules import modules_by_role
+from lib.modules import driver_deploy_kind, modules_by_role
 from lib.project_context import ProjectContext
 
 
@@ -62,9 +62,10 @@ def migration_targets(ctx: ProjectContext) -> list[dict[str, str]]:
         svc = resolve_module_service_name(mid, ctx.manifest, deploy, repo)
         layout = dep.get("DEPLOY_LAYOUT") or "flat"
         path_mode = dep.get("DEPLOY_PATH_MODE") or "base"
-        if role == "api" or typ == "java-boot":
-            if role != "api" and typ != "java-boot":
-                continue
+        # Which deploy artefact this module produces: the module's ROLE, or the
+        # kind its DRIVER declares. No driver is named here.
+        declared_kind = driver_deploy_kind(typ)
+        if role == "api" or declared_kind == "runtime":
             target = resolve_backend_deploy_path(
                 base=base,
                 container_name=svc,
@@ -73,7 +74,7 @@ def migration_targets(ctx: ProjectContext) -> list[dict[str, str]]:
                 path_mode=path_mode,
             )
             kind = "runtime"
-        elif role == "ui" or typ == "node-vite":
+        elif role == "ui" or declared_kind == "static":
             target = resolve_module_deploy_path(
                 base=base,
                 container_name=svc,

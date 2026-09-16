@@ -23,14 +23,23 @@ PKG = Path(__file__).resolve().parents[1]
 
 # ── 1. No privileged driver name in the generators ────────────────────────────
 
-GENERATORS = ["lib/vscode_gen.py", "lib/modules.py"]
+# Wave 2c closed the last six. The list only ever grows: an interpreter that has
+# stopped naming drivers is added here, and a name that comes back fails the build.
+# There is no exclusion — an exclusion is how a cured file quietly relapses.
+GENERATORS = [
+    "lib/vscode_gen.py",
+    "lib/modules.py",
+    "lib/config_gen.py",
+    "lib/credentials.py",
+    "lib/migrate_layout_preflight.py",
+    "lib/migrate_manifest.py",
+    "lib/stack_deploy.py",
+]
 
 
 @pytest.mark.parametrize("rel", GENERATORS)
 def test_generator_names_no_driver(rel: str) -> None:
     text = (PKG / rel).read_text(encoding="utf-8")
-    # LAYOUT_SIMULATOR_BY_TYPE is a known, reported remnant — exclude its block only.
-    text = re.sub(r"LAYOUT_SIMULATOR_BY_TYPE.*?\}", "", text, flags=re.S)
     for driver_id in driver_registry():
         assert driver_id not in text, f"{rel} hardcodes driver '{driver_id}'"
 

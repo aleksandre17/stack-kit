@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from lib.manifest_defaults import load_scaffold_manifest, read_nested
+from lib.modules import driver_accepts_global_credentials
 
 
 def _normalize_entry(raw: Any, *, default_mount_prefix: str = "/app") -> dict[str, str] | None:
@@ -50,9 +51,10 @@ def global_gcp_credentials(manifest: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _module_accepts_global_gcp(cfg: dict[str, Any]) -> bool:
+    """Two declared routes to the manifest-wide credential: the DRIVER says so, or the ROLE does."""
     role = str(cfg.get("role") or "").lower()
     typ = str(cfg.get("type") or "")
-    if typ == "java-boot":
+    if driver_accepts_global_credentials(typ):
         return True
     return role in ("api", "worker", "gateway", "data")
 

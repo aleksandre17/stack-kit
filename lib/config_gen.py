@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from lib.modules import driver_supports_config_gen
 from lib.project_context import ProjectContext
 from lib.stack_endpoints import load_stack_catalog, resolve_module_port
 
@@ -219,7 +220,7 @@ def _env_profiles_module_spec(ctx: ProjectContext, module_id: str, cfg: dict[str
 
 def _module_spec(ctx: ProjectContext, module_id: str) -> ModuleConfigSpec | None:
     cfg = (ctx.manifest.get("modules") or {}).get(module_id)
-    if not isinstance(cfg, dict) or cfg.get("type") != "java-boot":
+    if not isinstance(cfg, dict) or not driver_supports_config_gen(str(cfg.get("type") or "")):
         return None
 
     config_gen = cfg.get("configGen") if isinstance(cfg.get("configGen"), dict) else {}
@@ -395,7 +396,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--all",
         action="store_true",
-        help="All java-boot modules eligible for config-gen",
+        help="All modules whose driver declares config-gen support",
     )
     parser.add_argument("--port-env", metavar="MODULE", help="Print port env var name for module")
     parser.add_argument("--check", action="store_true", help="Report drift only; exit 1 if any")

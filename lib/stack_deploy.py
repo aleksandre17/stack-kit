@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lib.modules import _modules, module_ids, module_role
+from lib.modules import _modules, driver_deploy_args, module_ids, module_role
 
 ROLE_DEPLOY_ORDER = ("api", "worker", "gateway", "data", "ui", "other")
 
@@ -41,17 +41,15 @@ def ordered_stack_deploy_modules(manifest: dict[str, Any], module_filter: list[s
 
 
 def deploy_step_for_module(manifest: dict[str, Any], module_id: str) -> dict[str, Any]:
+    """The deploy step for a module — argv comes from what its DRIVER declares.
+
+    The interpreter knows there is a `deploy` command and that a driver may need
+    extra argv; it does not know any driver's name. A driver that declares no
+    `deployArgs` deploys with none.
+    """
     cfg = _modules(manifest).get(module_id) or {}
     typ = str(cfg.get("type") or "")
-    if typ == "java-boot":
-        return {"module": module_id, "command": "deploy", "args": ["all"]}
-    if typ == "node-vite":
-        return {
-            "module": module_id,
-            "command": "deploy",
-            "args": ["dist", "-Environment", "{environment}"],
-        }
-    return {"module": module_id, "command": "deploy", "args": []}
+    return {"module": module_id, "command": "deploy", "args": driver_deploy_args(typ)}
 
 
 def default_stack_deploy_steps(manifest: dict[str, Any]) -> list[dict[str, Any]]:

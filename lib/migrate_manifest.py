@@ -7,19 +7,16 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from lib.modules import driver_accepts_global_credentials, driver_default_role
 from lib.project_context import ProjectContext, find_project_root, load_manifest
 
 
 def _infer_role(cfg: dict[str, Any]) -> str:
+    """A module's role: declared on the module, else the role its DRIVER declares."""
     role = (cfg.get("role") or "").lower()
     if role:
         return role
-    typ = cfg.get("type", "")
-    if typ == "node-vite":
-        return "ui"
-    if typ == "java-boot":
-        return "api"
-    return "other"
+    return driver_default_role(str(cfg.get("type", ""))) or "other"
 
 
 def migrate_manifest(manifest: dict[str, Any], *, apply: bool = False) -> list[str]:
@@ -56,7 +53,9 @@ def migrate_manifest(manifest: dict[str, Any], *, apply: bool = False) -> list[s
         gcp = (manifest.get("adapters") or {}).get("gcp") or {}
         fn = gcp.get("credentialsFile", "google-credentials.json") if isinstance(gcp, dict) else "google-credentials.json"
         for mid, cfg in mods.items():
-            if not isinstance(cfg, dict) or cfg.get("type") != "java-boot":
+            if not isinstance(cfg, dict) or not driver_accepts_global_credentials(
+                str(cfg.get("type") or "")
+            ):
                 continue
             if cfg.get("role") not in ("api", "worker"):
                 continue

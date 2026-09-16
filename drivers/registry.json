@@ -5,6 +5,13 @@
       "api",
       "worker"
     ],
+    "configGen": true,
+    "acceptsGlobalCredentials": true,
+    "deployKind": "runtime",
+    "deployArgs": [
+      "all"
+    ],
+    "layoutSimulator": "simulate-backend-layout.ps1",
     "runtime": "bash",
     "commands": {
       "deploy": "sh/deploy.sh",
@@ -30,6 +37,13 @@
     "roles": [
       "ui"
     ],
+    "deployKind": "static",
+    "deployArgs": [
+      "dist",
+      "-Environment",
+      "{environment}"
+    ],
+    "layoutSimulator": "simulate-frontend-layout.ps1",
     "runtime": "powershell",
     "commands": {
       "deploy": "ps1/deploy.ps1",
@@ -58,6 +72,7 @@
     "roles": [
       "api"
     ],
+    "deployKind": "runtime",
     "runtime": "bash",
     "commands": {
       "deploy": "sh/deploy.sh",
