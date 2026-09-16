@@ -135,6 +135,36 @@
             "type": "string",
             "description": "Folder under secrets root for ops/config (often same as module id)"
           },
+          "composeDir": {
+            "type": "string",
+            "description": "Directory (relative to project root) holding this module's docker-compose.<env>.yml. Default: module path. Use when compose orchestration is owned outside the source tree."
+          },
+          "dev": {
+            "type": "object",
+            "description": "Remote source dev (dev bootstrap|watch) declarations; undeclared values keep driver conventions",
+            "properties": {
+              "watchRoots": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Paths relative to module path polled by dev watch (default: src, shared, worker)"
+              },
+              "services": {
+                "type": "object",
+                "description": "Per compose-service overrides keyed by service name",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "dockerfile": { "type": "string", "description": "Dockerfile relative to module path for the workspace image" },
+                    "portEnv": { "type": "string", "description": "Env key holding the service port" },
+                    "port": { "type": "integer", "description": "Default port when portEnv is unset" },
+                    "healthPath": { "type": "string", "description": "HTTP path whose body contains UP when healthy" }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "credentials": {
             "type": "array",
             "description": "Credential files under secretsModule (overrides global adapters.gcp for this module)",

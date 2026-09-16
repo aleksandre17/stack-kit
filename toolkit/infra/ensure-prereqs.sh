@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # One-time server prerequisites — SSH from local machine
 # Usage: geostat infra  |  bash kits/geostat-kit/toolkit/infra/ensure-prereqs.sh
 

@@ -3,7 +3,7 @@
 
 deploy_step_server_compose() {
   deploy_log "  [4/5] Generating compose files..."
-  scp "$PROJECT_DIR/$COMPOSE_FILE" "$SERVER:/tmp/compose-src.yml" >/dev/null 2>&1
+  scp "${COMPOSE_DIR:-$PROJECT_DIR}/$COMPOSE_FILE" "$SERVER:/tmp/compose-src.yml" >/dev/null 2>&1
   local gen
   gen="$(geostat_kit_package_root)/toolkit/bash/gen_server_compose.py"
   scp "$gen" "$SERVER:/tmp/gen_server_compose.py" >/dev/null 2>&1

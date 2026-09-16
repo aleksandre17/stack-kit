@@ -73,7 +73,7 @@ echo "  ════════════════════════
 section "Local — Project Files"
 
 # docker-compose.prod.yml
-if [ -f "$PROJECT_DIR/docker-compose.prod.yml" ]; then
+if [ -f "${COMPOSE_DIR:-$PROJECT_DIR}/docker-compose.prod.yml" ]; then
     ok "docker-compose.prod.yml found"
 else
     fail "docker-compose.prod.yml missing"
@@ -104,7 +104,7 @@ fi
 # ── Discover services ──
 mapfile -t SERVICES < <(
     awk '/^services:/{f=1;next} f && /^[^ ]/{f=0} f && /^  [a-zA-Z0-9_-]+:/{gsub(/[ :]/,""); print}' \
-    "$PROJECT_DIR/docker-compose.prod.yml" 2>/dev/null
+    "${COMPOSE_DIR:-$PROJECT_DIR}/docker-compose.prod.yml" 2>/dev/null
 )
 if [ ${#SERVICES[@]} -eq 0 ]; then
     fail "No services found in docker-compose.prod.yml"

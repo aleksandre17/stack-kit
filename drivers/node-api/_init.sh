@@ -22,6 +22,7 @@ source "$GEOSTAT_KIT_ROOT/lib/env.sh"
 source "$GEOSTAT_KIT_ROOT/lib/drivers.sh"
 
 PROJECT_DIR="$(geostat_module_project_dir "$GEOSTAT_MODULE_ID")"
+COMPOSE_DIR="$(geostat_module_compose_dir "$GEOSTAT_MODULE_ID" 2>/dev/null || echo "$PROJECT_DIR")"
 MONOREPO="$GEOSTAT_PROJECT_ROOT"
 OPS_SCRIPT_DIR="$PROJECT_DIR"
 mkdir -p "$OPS_SCRIPT_DIR/logs"

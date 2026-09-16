@@ -20,6 +20,7 @@ source "$GEOSTAT_KIT_ROOT/lib/env.sh"
 source "$GEOSTAT_KIT_ROOT/lib/drivers.sh"
 
 PROJECT_DIR="$(geostat_module_project_dir "$GEOSTAT_MODULE_ID")"
+COMPOSE_DIR="$(geostat_module_compose_dir "$GEOSTAT_MODULE_ID" 2>/dev/null || echo "$PROJECT_DIR")"
 MONOREPO="$GEOSTAT_PROJECT_ROOT"
 OPS_SCRIPT_DIR="$PROJECT_DIR"
 mkdir -p "$OPS_SCRIPT_DIR/logs"
@@ -28,7 +29,7 @@ if [[ -f "$PROJECT_DIR/ops.config.sh" ]]; then
   # shellcheck source=/dev/null
   source "$PROJECT_DIR/ops.config.sh"
 else
-  OPS_SECRETS_MODULE="${GEOSTAT_MODULE_ID}"
+  OPS_SECRETS_MODULE="$(geostat_secrets_module_name "$GEOSTAT_MODULE_ID")"
   OPS_TARGET_DEFAULT="backend"
   VERSIONS_KEEP=5
   HEALTH_RETRIES=24

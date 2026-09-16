@@ -1,4 +1,4 @@
-﻿# Module ops — must match geostat.ops.json modules.<id>.secretsModule
+# Module ops — must match geostat.ops.json modules.<id>.secretsModule
 OPS_SECRETS_MODULE="backend"
 OPS_PROJECT_NAME=""
 OPS_TARGET_DEFAULT="backend"

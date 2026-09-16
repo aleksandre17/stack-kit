@@ -43,7 +43,7 @@ source "$GEOSTAT_KIT_ROOT/toolkit/bash/manage-remote.sh"
 # ── Discover deployed services (compose keys that have a deploy compose on server) ──
 mapfile -t _SVCS < <(
   awk '/^services:/{f=1;next} f && /^[^ ]/{f=0} f && /^  [a-zA-Z0-9_-]+:/{gsub(/[ :]/,""); print}' \
-    "$PROJECT_DIR/$COMPOSE_FILE" 2>/dev/null
+    "${COMPOSE_DIR:-$PROJECT_DIR}/$COMPOSE_FILE" 2>/dev/null
 )
 SERVICES=()
 for _ms in "${_SVCS[@]}"; do

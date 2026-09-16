@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # geostat init — bash entry (calls PowerShell implementation when available)
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/../.." && pwd)"

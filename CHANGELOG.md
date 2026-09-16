@@ -32,6 +32,22 @@
 
 ### Capability
 
+- `modules.<id>.composeDir` — compose discovery (`docker-compose.<env>.yml`) may live
+  outside the source tree (e.g. a canonical ops/compose authority); default is the
+  module path, so existing consumers are unchanged.
+- `modules.<id>.dev` — remote source dev declares `watchRoots` and per-service
+  `dockerfile` / `portEnv` / `port` / `healthPath`. Multi-module Gradle consumers
+  (`core`/`api`/…) no longer inherit the single-project `src|shared|worker` watch
+  roots or the subproject `WORKER_PORT` + `/actuator/health` heuristic.
+
+### Fixes
+
+- java-boot `_init.sh` resolves `OPS_SECRETS_MODULE` from `modules.<id>.secretsModule`
+  (previously the module id), matching node-api.
+- Sourced bash scripts no longer carry a UTF-8 BOM (sourcing failed on line 1).
+- Remote-dev workspace marker records the real module id instead of `backend`.
+- `dev watch` also polls Groovy `build.gradle` / `settings.gradle`.
+
 - `node-api` driver (registry entry, `sh/`, `ps1/`, `_init.sh`).
 - `geostat dev up` (`toolkit/dev/`), `resource_limits` / `extraServices`
   compose seams, `manifest.migration.legacyDirs`.

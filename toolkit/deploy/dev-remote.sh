@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Backend remote dev — rsync Gradle tree to workspace/ + bootRun in container
 # Requires: deploy-path.sh, modules.sh, Git rsync (Windows: Git for Windows)
 
@@ -100,6 +100,15 @@ dev_publish_workspace_env() {
   done < <(geostat_module_credentials_lines "$s")
 }
 
+# Declared per-service remote-dev settings:
+#   modules.<id>.dev.services.<service>.{dockerfile,portEnv,port,healthPath}
+# Empty when undeclared, so callers keep the conventional default.
+dev_service_setting() {
+  local s="$1" key="$2"
+  [[ -n "${GEOSTAT_MODULE_ID:-}" ]] || return 0
+  geostat_read_manifest_field "modules.${GEOSTAT_MODULE_ID}.dev.services.${s}.${key}" "" 2>/dev/null || true
+}
+
 dev_gradle_task_for() {
   local s="$1" gn
   gn="$(module_gradle_name "$s")"
@@ -111,7 +120,9 @@ dev_gradle_task_for() {
 }
 
 dev_dockerfile_for() {
-  local s="$1" gn
+  local s="$1" gn declared
+  declared="$(dev_service_setting "$s" dockerfile)"
+  [[ -n "$declared" ]] && { echo "$declared"; return 0; }
   gn="$(module_gradle_name "$s")"
   if [[ -n "$gn" ]]; then
     echo "$gn/Dockerfile.dev.remote"
@@ -121,7 +132,9 @@ dev_dockerfile_for() {
 }
 
 dev_health_path_for() {
-  local s="$1" gn
+  local s="$1" gn declared
+  declared="$(dev_service_setting "$s" healthPath)"
+  [[ -n "$declared" ]] && { echo "$declared"; return 0; }
   gn="$(module_gradle_name "$s")"
   if [[ -n "$gn" ]]; then
     echo "/actuator/health"
@@ -131,7 +144,9 @@ dev_health_path_for() {
 }
 
 dev_port_var_for() {
-  local s="$1" gn
+  local s="$1" gn declared
+  declared="$(dev_service_setting "$s" portEnv)"
+  [[ -n "$declared" ]] && { echo "$declared"; return 0; }
   gn="$(module_gradle_name "$s")"
   if [[ -n "$gn" ]]; then
     echo "WORKER_PORT"
@@ -141,7 +156,9 @@ dev_port_var_for() {
 }
 
 dev_default_port_for() {
-  local s="$1" gn
+  local s="$1" gn declared
+  declared="$(dev_service_setting "$s" port)"
+  [[ -n "$declared" ]] && { echo "$declared"; return 0; }
   gn="$(module_gradle_name "$s")"
   if [[ -n "$gn" ]]; then
     echo "8091"
@@ -257,8 +274,22 @@ dev_write_workspace_manifest() {
   local ts
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)"
   ssh -n "$SERVER" "cat > '$rp/.geostat-deploy.json'" <<JSON
-{"version":1,"module":"backend","service":"${cname}","deployMode":"dev-bootstrap","kind":"workspace","environment":"dev","deployPath":"${rp}","updatedAt":"${ts}"}
+{"version":1,"module":"${GEOSTAT_MODULE_ID:-}","service":"${cname}","deployMode":"dev-bootstrap","kind":"workspace","environment":"dev","deployPath":"${rp}","updatedAt":"${ts}"}
 JSON
+}
+
+# Watch roots relative to the module path: modules.<id>.dev.watchRoots, else
+# the conventional single-project layout.
+dev_watch_roots() {
+  local declared=""
+  [[ -n "${GEOSTAT_MODULE_ID:-}" ]] && declared="$(geostat_read_manifest_list "modules.${GEOSTAT_MODULE_ID}.dev.watchRoots")"
+  if [[ -n "$declared" ]]; then
+    printf '%s
+' "$declared"
+  else
+    printf '%s
+' src shared worker
+  fi
 }
 
 # Polling watch (Git Bash / Linux) — debounced rsync + compose restart on source changes
@@ -266,7 +297,11 @@ dev_watch_poll() {
   local s="$1" debounce_ms="${2:-1500}" restart_java="${3:-1}"
   local debounce_sec
   debounce_sec="$(awk "BEGIN { printf \"%.2f\", ${debounce_ms}/1000 }" 2>/dev/null || echo "1.5")"
-  local -a find_roots=("$PROJECT_DIR/src" "$PROJECT_DIR/shared" "$PROJECT_DIR/worker")
+  local -a find_roots=()
+  local declared_root
+  while IFS= read -r declared_root; do
+    [[ -n "$declared_root" ]] && find_roots+=("$PROJECT_DIR/$declared_root")
+  done < <(dev_watch_roots)
   local busy=0
 
   echo ""
@@ -289,7 +324,7 @@ dev_watch_poll() {
         break
       fi
     done
-    for root in "$PROJECT_DIR/build.gradle.kts" "$PROJECT_DIR/settings.gradle.kts"; do
+    for root in "$PROJECT_DIR/build.gradle.kts" "$PROJECT_DIR/settings.gradle.kts"       "$PROJECT_DIR/build.gradle" "$PROJECT_DIR/settings.gradle"; do
       [[ -f "$root" ]] && find "$root" -mmin -0.05 2>/dev/null | grep -q . && changed=1
     done
 

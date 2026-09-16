@@ -53,7 +53,7 @@ source "$GEOSTAT_KIT_ROOT/toolkit/bash/manage-logs.sh"
 # ── Discover services: local compose keys with deploy compose on server ──
 mapfile -t _MANAGE_COMPOSE_SVCS < <(
     awk '/^services:/{f=1;next} f && /^[^ ]/{f=0} f && /^  [a-zA-Z0-9_-]+:/{gsub(/[ :]/,""); print}' \
-        "$PROJECT_DIR/$COMPOSE_FILE" 2>/dev/null
+        "${COMPOSE_DIR:-$PROJECT_DIR}/$COMPOSE_FILE" 2>/dev/null
 )
 SERVICES=()
 for _ms in "${_MANAGE_COMPOSE_SVCS[@]}"; do

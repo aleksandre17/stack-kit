@@ -16,14 +16,14 @@ is_subproject() {
 container_name_for() {
   local s="$1"
   local name
-  name=$(awk "/^  ${s}:/{f=1;next} f && /^  [^ ]/{f=0} f && /container_name:/{gsub(/.*container_name:[[:space:]]*/,\"\"); gsub(/[\"']/,\"\"); print; exit}" "$PROJECT_DIR/$COMPOSE_FILE")
+  name=$(awk "/^  ${s}:/{f=1;next} f && /^  [^ ]/{f=0} f && /container_name:/{gsub(/.*container_name:[[:space:]]*/,\"\"); gsub(/[\"']/,\"\"); print; exit}" "${COMPOSE_DIR:-$PROJECT_DIR}/$COMPOSE_FILE")
   echo "${name:-$s}"
 }
 
 discover_services() {
   mapfile -t SERVICES < <(
     awk '/^services:/{f=1;next} f && /^[^ ]/{f=0} f && /^  [a-zA-Z0-9_-]+:/{gsub(/[ :]/,""); print}' \
-      "$PROJECT_DIR/$COMPOSE_FILE" 2>/dev/null
+      "${COMPOSE_DIR:-$PROJECT_DIR}/$COMPOSE_FILE" 2>/dev/null
   )
   module_load_registry
   local filtered=() s

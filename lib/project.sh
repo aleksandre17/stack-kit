@@ -197,6 +197,20 @@ geostat_module_path() {
   echo "$proj/$rel"
 }
 
+# Directory holding the module's docker-compose.<env>.yml. Declared by
+# modules.<id>.composeDir (relative to project root) when the consumer keeps
+# orchestration outside the source tree; defaults to the module path.
+geostat_module_compose_dir() {
+  local module_id="$1" proj rel
+  proj="$(geostat_find_project_root)" || return 1
+  rel="$(geostat_read_manifest_field "modules.${module_id}.composeDir" "")"
+  if [[ -n "$rel" ]]; then
+    echo "$proj/$rel"
+    return 0
+  fi
+  geostat_module_path "$module_id"
+}
+
 geostat_secrets_module_name() {
   local module_id="$1" sm
   sm="$(geostat_read_manifest_field "modules.${module_id}.secretsModule" "$module_id")"

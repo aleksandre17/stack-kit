@@ -44,7 +44,7 @@ echo "  Pre-flight Checks (node-api)  [$SERVICE → $DEPLOY_SUMMARY]"
 
 # ── Local project files ──
 section "Local — Project Files"
-[ -f "$PROJECT_DIR/docker-compose.prod.yml" ] && ok "docker-compose.prod.yml found" || fail "docker-compose.prod.yml missing"
+[ -f "${COMPOSE_DIR:-$PROJECT_DIR}/docker-compose.prod.yml" ] && ok "docker-compose.prod.yml found" || fail "docker-compose.prod.yml missing"
 [ -f "$SECRETS_DIR/.env.prod" ] && ok "${SECRETS_DIR}/.env.prod found" || fail "${SECRETS_DIR}/.env.prod missing (see ${SECRETS_DIR}/.env.example)"
 [ -f "$PROJECT_DIR/package.json" ] && ok "package.json found (pnpm filter: $NODE_PKG_FILTER)" || fail "package.json missing"
 [ -f "$NODE_WORKSPACE_DIR/pnpm-workspace.yaml" ] && ok "pnpm workspace: $NODE_WORKSPACE_DIR" || warn "pnpm-workspace.yaml not found at $NODE_WORKSPACE_DIR"
@@ -55,7 +55,7 @@ fi
 # ── Discover services + per-service Dockerfile ──
 mapfile -t SERVICES < <(
   awk '/^services:/{f=1;next} f && /^[^ ]/{f=0} f && /^  [a-zA-Z0-9_-]+:/{gsub(/[ :]/,""); print}' \
-    "$PROJECT_DIR/docker-compose.prod.yml" 2>/dev/null
+    "${COMPOSE_DIR:-$PROJECT_DIR}/docker-compose.prod.yml" 2>/dev/null
 )
 [ ${#SERVICES[@]} -eq 0 ] && fail "No services found in docker-compose.prod.yml"
 

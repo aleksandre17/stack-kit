@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Backend remote dev — Windows edit → Linux workspace + Gradle bootRun
 #
 # Usage:
