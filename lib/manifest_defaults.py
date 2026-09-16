@@ -1,4 +1,4 @@
-"""Single source of convention defaults: scaffold/geostat.ops.json (not inline dicts)."""
+"""Single source of convention defaults: the scaffold manifest (not inline dicts)."""
 from __future__ import annotations
 
 import json
@@ -6,8 +6,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from lib.identity import MANIFEST_FILENAME
+
 _PKG = Path(__file__).resolve().parents[1]
-_SCAFFOLD = _PKG / "scaffold" / "geostat.ops.json"
+_SCAFFOLD = _PKG / "scaffold" / MANIFEST_FILENAME
 
 
 @lru_cache(maxsize=1)

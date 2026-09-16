@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migrate geostat.ops.json toward v2 conventions (roles, credentials hints)."""
+"""Migrate the project manifest toward v2 conventions (roles, credentials hints)."""
 from __future__ import annotations
 
 import json
@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from lib.identity import MANIFEST_FILENAME, find_manifest
 from lib.modules import driver_accepts_global_credentials, driver_default_role
 from lib.project_context import ProjectContext, find_project_root, load_manifest
 
@@ -74,7 +75,7 @@ def main() -> int:
     except FileNotFoundError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
-    mf = root / "geostat.ops.json"
+    mf = find_manifest(root) or (root / MANIFEST_FILENAME)
     manifest = load_manifest(root)
     changes = migrate_manifest(manifest, apply=apply)
     if not changes:

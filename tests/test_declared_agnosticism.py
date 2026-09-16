@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from lib.config_gen import DEFAULT_MANAGEMENT_ENDPOINTS, _management_endpoints
+from lib.identity import MANIFEST_FILENAME, manifest_filenames
 from lib.modules import driver_default_role, driver_registry
 from lib.project_context import ProjectContext
 from lib.vscode_gen import LAUNCH_BUILDERS, build_tasks_json
@@ -42,6 +43,38 @@ def test_generator_names_no_driver(rel: str) -> None:
     text = (PKG / rel).read_text(encoding="utf-8")
     for driver_id in driver_registry():
         assert driver_id not in text, f"{rel} hardcodes driver '{driver_id}'"
+
+
+# ── 1b. The kit's own name has ONE home ───────────────────────────────────────
+
+#: `identity.py` IS the home, so it is the only file allowed to spell the name.
+IDENTITY_HOME = "lib/identity.py"
+
+
+def test_no_interpreter_spells_the_manifest_filename() -> None:
+    """The manifest filename is DECLARED in identity.py and projected everywhere else.
+
+    It once lived in 77 places across three languages. A truth with many homes does
+    not become wrong — it becomes unverifiable, because every copy stays locally
+    correct while the set drifts. Renaming the kit must be a change to ONE file.
+    """
+    offenders: list[str] = []
+    for path in sorted((PKG / "lib").glob("*.py")):
+        rel = f"lib/{path.name}"
+        if rel == IDENTITY_HOME:
+            continue
+        if MANIFEST_FILENAME in path.read_text(encoding="utf-8"):
+            offenders.append(rel)
+    assert not offenders, (
+        f"these spell '{MANIFEST_FILENAME}' instead of importing it from {IDENTITY_HOME}: {offenders}"
+    )
+
+
+def test_legacy_manifest_names_are_declared_not_improvised() -> None:
+    """Every accepted manifest name is declared, canonical first, with no duplicates."""
+    names = manifest_filenames()
+    assert names[0] == MANIFEST_FILENAME, "the canonical name must be tried first"
+    assert len(set(names)) == len(names), "a name is declared once"
 
 
 def test_every_driver_declares_a_role_and_launch_kind() -> None:

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.credentials import global_gcp_credentials, module_credentials
+from lib.identity import MANIFEST_FILENAME, find_manifest, has_manifest
 from lib.manifest_defaults import (
     default_field,
     legacy_root_discovery_enabled,
@@ -34,14 +35,14 @@ def _read_nested(data: dict[str, Any], dotted: str, default: str = "") -> str:
 
 def find_project_root(start: Path | None = None) -> Path:
     start = (start or Path.cwd()).resolve()
-    if (start / "geostat.ops.json").is_file():
+    if has_manifest(start):
         return start
     if os.environ.get("GEOSTAT_PROJECT_ROOT"):
         env_root = Path(os.environ["GEOSTAT_PROJECT_ROOT"]).resolve()
-        if (env_root / "geostat.ops.json").is_file():
+        if has_manifest(env_root):
             return env_root
     for p in [start, *start.parents]:
-        if (p / "geostat.ops.json").is_file():
+        if has_manifest(p):
             return p
     if legacy_root_discovery_enabled():
         for p in [start, *start.parents]:
@@ -49,14 +50,14 @@ def find_project_root(start: Path | None = None) -> Path:
                 if (p / "kits" / "geostat-kit").is_dir() or (p / "packages" / "geostat-kit").is_dir():
                     return p
     raise FileNotFoundError(
-        "project root not found (geostat.ops.json required; "
+        f"project root not found ({MANIFEST_FILENAME} required; "
         "set GEOSTAT_LEGACY_ROOT_DISCOVERY=1 for pre-v2 trees)"
     )
 
 
 def load_manifest(root: Path) -> dict[str, Any]:
-    mf = root / "geostat.ops.json"
-    if mf.is_file():
+    mf = find_manifest(root)
+    if mf is not None:
         return json.loads(mf.read_text(encoding="utf-8"))
     return {}
 

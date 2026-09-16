@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate geostat.ops.json — schema + package boundary checks."""
+"""Validate the project manifest — schema + package boundary checks."""
 from __future__ import annotations
 
 import json
@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.compose_identity import primary_api_module_id, primary_worker_module_id
+from lib.identity import MANIFEST_FILENAME
 from lib.credentials import all_module_credential_files, module_credentials
 from lib.project_context import ProjectContext, load_manifest
 
@@ -109,7 +110,7 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
             if cat_worker and not has_manifest_flag:
                 warnings.append(
                     "compose.catalog features.worker=true is deprecated — set "
-                    f"modules.{primary}.compose.embeddedWorker in geostat.ops.json (P0-kit-13)"
+                    f"modules.{primary}.compose.embeddedWorker in {MANIFEST_FILENAME} (P0-kit-13)"
                 )
             if cat_worker and primary_worker_module_id(ctx.manifest):
                 warnings.append(
@@ -198,7 +199,7 @@ def main() -> int:
         for e in errs:
             print(f"ERROR: {e}", file=sys.stderr)
         return 1
-    print("[validate] geostat.ops.json OK")
+    print(f"[validate] {MANIFEST_FILENAME} OK")
     return 0
 
 

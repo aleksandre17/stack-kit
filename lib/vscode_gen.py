@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate .vscode/launch.json and tasks.json from geostat.ops.json (manifest-driven)."""
+"""Generate .vscode/launch.json and tasks.json from the project manifest (manifest-driven)."""
 from __future__ import annotations
 
 import json

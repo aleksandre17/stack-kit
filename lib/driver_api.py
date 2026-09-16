@@ -11,6 +11,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from lib.identity import MANIFEST_FILENAME, find_manifest
+
 
 def _root() -> Path:
     r = os.environ.get("GEOSTAT_PROJECT_ROOT", "").strip()
@@ -28,9 +30,9 @@ def _pkg() -> Path:
 
 def load_manifest(root: Path | None = None) -> dict[str, Any]:
     root = root or _root()
-    path = root / "geostat.ops.json"
-    if not path.is_file():
-        raise SystemExit(f"geostat.ops.json not found under {root}")
+    path = find_manifest(root)
+    if path is None:
+        raise SystemExit(f"{MANIFEST_FILENAME} not found under {root}")
     with path.open(encoding="utf-8") as f:
         return json.load(f)
 
@@ -49,7 +51,7 @@ def module_ids(manifest: dict[str, Any]) -> list[str]:
 def module_entry(manifest: dict[str, Any], module_id: str) -> dict[str, Any]:
     mods = manifest.get("modules", {})
     if module_id not in mods:
-        raise SystemExit(f"Unknown module '{module_id}' — add modules.{module_id} in geostat.ops.json")
+        raise SystemExit(f"Unknown module '{module_id}' — add modules.{module_id} in {MANIFEST_FILENAME}")
     return mods[module_id]
 
 
@@ -106,7 +108,7 @@ def resolve_module_id(manifest: dict[str, Any], module_or_alias: str) -> str:
     target = resolve_alias(manifest, module_or_alias)
     if not target:
         raise SystemExit(
-            f"Unknown module or alias '{module_or_alias}' — add modules.{module_or_alias} or cli.aliases in geostat.ops.json"
+            f"Unknown module or alias '{module_or_alias}' — add modules.{module_or_alias} or cli.aliases in {MANIFEST_FILENAME}"
         )
     return target
 
