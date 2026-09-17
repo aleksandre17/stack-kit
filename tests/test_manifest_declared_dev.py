@@ -11,6 +11,7 @@ is proven by behaviour, not by grepping script text:
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -113,6 +114,102 @@ def test_declared_dev_settings_override_conventions(tmp_path: Path) -> None:
         "dev_port_var_for api; dev_default_port_for api; dev_health_path_for api; dev_dockerfile_for api; dev_watch_roots; dev_port_var_for mobile",
     ).splitlines()
     assert out == ["API_PORT", "8081", "/health", "api/Dockerfile.dev", "core/src", "api/src", "WORKER_PORT"]
+
+
+def test_undeclared_profile_and_volumes_keep_conventions(tmp_path: Path) -> None:
+    root = _consumer(tmp_path, {"secretsModule": "backend"})
+    out = _run(root, 'dev_profile_for api; echo "[$(dev_compose_volumes_yaml api)]"; echo "[$(dev_compose_named_volumes_yaml api)]"')
+    assert out.splitlines() == ["dev", "[]", "[]"]
+
+
+def test_declared_profile_and_volumes_render_compose(tmp_path: Path) -> None:
+    root = _consumer(
+        tmp_path,
+        {
+            "secretsModule": "backend",
+            "dev": {
+                "services": {
+                    "api": {
+                        "profile": "prod",
+                        "volumes": [
+                            "api_storage:/app/storage",
+                            "/srv/tls/edge.p12:/run/secrets/edge.p12:ro",
+                            "${TRUST_FILE:?TRUST_FILE is required}:/run/secrets/trust.p12:ro",
+                        ],
+                    }
+                }
+            },
+        },
+    )
+    out = _run(
+        root,
+        'dev_profile_for api; echo ---; dev_compose_volumes_yaml api; echo ---; dev_compose_named_volumes_yaml api; echo ---; dev_profile_for mobile',
+    )
+    profile, volumes, named, other = [part.strip("\n") for part in out.split("---")]
+    assert profile == "prod"
+    assert volumes.splitlines() == [
+        "      - api_storage:/app/storage",
+        "      - /srv/tls/edge.p12:/run/secrets/edge.p12:ro",
+        "      - ${TRUST_FILE:?TRUST_FILE is required}:/run/secrets/trust.p12:ro",
+    ]
+    assert named.splitlines() == ["  api_storage:"]
+    assert other.strip() == "dev"
+
+
+def test_undeclared_compose_base_renders_no_extends(tmp_path: Path) -> None:
+    root = _consumer(tmp_path, {"secretsModule": "backend"})
+    assert _run(root, 'echo "[$(dev_compose_extends_yaml api)]"; echo "[$(dev_compose_base_named_volumes api)]"').splitlines() == ["[]", "[]"]
+
+
+def test_declared_compose_base_extends_shared_service(tmp_path: Path) -> None:
+    root = _consumer(
+        tmp_path,
+        {
+            "secretsModule": "backend",
+            "dev": {"services": {"api": {"composeBase": "ops/compose/api.base.yml", "volumes": ["svc_cache:/cache", "svc_state:/state"]}}},
+        },
+    )
+    (root / "ops" / "compose" / "api.base.yml").write_text(
+        "services:\n"
+        "  api:\n"
+        "    environment:\n      KEY: ${KEY}\n"
+        "    volumes:\n"
+        "      - svc_state:/app/state\n"
+        "      - /srv/host:/app/host:ro\n"
+        "      - type: volume\n        source: svc_uploads\n        target: /app/uploads\n",
+        encoding="utf-8",
+    )
+    out = _run(root, "echo ---; dev_compose_extends_yaml api; echo ---; dev_compose_named_volumes_yaml api")
+    extends, named = [part.strip("\n") for part in out.split("---")[1:]]
+    assert extends.splitlines() == ["    extends:", "      file: docker-compose.base.yml", "      service: api"]
+    assert named.splitlines() == ["  svc_cache:", "  svc_state:", "  svc_uploads:"]
+
+
+def test_tar_fallback_keeps_rsync_exclude_semantics(tmp_path: Path) -> None:
+    root = _consumer(tmp_path, {"secretsModule": "backend"})
+    out = _run(root, 'for p in ".git/" "**/build/" "*.log" ".env.dev"; do dev_tar_exclude_pattern "$p"; done')
+    assert out.splitlines() == [".git", "build", "*.log", ".env.dev"]
+
+
+def test_remote_scripts_never_source_dotenv_files() -> None:
+    """dotenv is not shell syntax: sourcing truncates values at ';' and those exports
+    then override --env-file during compose interpolation."""
+    sourced_dotenv = re.compile(r"\bsource\s+\S*(\.env\b|ENV_FILE|EnvName)")
+    offenders = [
+        f"{script.relative_to(PKG)}:{number}"
+        for folder in ("toolkit", "drivers", "lib")
+        for script in (PKG / folder).rglob("*")
+        if script.suffix in {".sh", ".ps1"}
+        for number, line in enumerate(script.read_text(encoding="utf-8", errors="ignore").splitlines(), 1)
+        if sourced_dotenv.search(line)
+    ]
+    assert offenders == []
+
+
+def test_sync_preserves_published_compose_base() -> None:
+    text = (PKG / "toolkit" / "deploy" / "dev-remote.sh").read_text(encoding="utf-8")
+    block = text.split("DEV_RSYNC_EXCLUDES=(", 1)[1].split(")", 1)[0]
+    assert '"docker-compose.base.yml"' in block
 
 
 def test_workspace_manifest_marker_uses_module_id() -> None:

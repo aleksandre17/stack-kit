@@ -25,7 +25,6 @@ deploy_watch_restart_runtime() {
   ssh "$SERVER" "
     set -euo pipefail
     cd '$rp'
-    set -a && source ./$ENV_FILE && set +a
     if docker compose version >/dev/null 2>&1; then DC='docker compose'; else DC=docker-compose; fi
     \$DC -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE up -d --build
   "

@@ -205,9 +205,6 @@ function Invoke-DevRemoteComposeUp {
     $remoteScript = @"
 set -euo pipefail
 cd '$($script:DEPLOY_PATH)'
-set -a
-source ./$remoteEnvName
-set +a
 export DEPLOY_HOST_PORT=${script:HOST_PORT}
 if docker compose version >/dev/null 2>&1; then
   docker compose --env-file ./$remoteEnvName $composeArgs up -d $buildFlag $recreateFlag

@@ -157,7 +157,14 @@
                     "dockerfile": { "type": "string", "description": "Dockerfile relative to module path for the workspace image" },
                     "portEnv": { "type": "string", "description": "Env key holding the service port" },
                     "port": { "type": "integer", "description": "Default port when portEnv is unset" },
-                    "healthPath": { "type": "string", "description": "HTTP path whose body contains UP when healthy" }
+                    "healthPath": { "type": "string", "description": "HTTP path whose body contains UP when healthy" },
+                    "composeBase": { "type": "string", "description": "Shared service definition (path from project root) the workspace service extends; every environment line declares configuration keys, state and health once" },
+                    "profile": { "type": "string", "description": "Runtime profile for the workspace container (default: dev); use the production profile for a prod-parity prototype" },
+                    "volumes": {
+                      "type": "array",
+                      "items": { "type": "string", "pattern": "^(\\$\\{[^}]+\\}|[^:\\s$]+):/[^:\\s]*(:(ro|rw))?$" },
+                      "description": "Extra compose volumes as source:/container/path[:ro|rw]; a source without '/' is a named volume and is declared automatically; a ${VAR} source is interpolated from the environment line's env file. Use for state that rsync --delete must not remove."
+                    }
                   },
                   "additionalProperties": false
                 }

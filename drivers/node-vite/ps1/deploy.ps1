@@ -258,9 +258,6 @@ rm -f $stagingDir/$ARCHIVE
 docker stop $APP_NAME 2>/dev/null || true
 docker rm   $APP_NAME 2>/dev/null || true
 cd $remoteModuleDir
-set -a
-source $DEPLOY_PATH/$remoteEnvName
-set +a
 export VITE_API_URL=$VITE_API_URL
 export DEPLOY_HOST_PORT=$HOST_PORT
 if docker compose version >/dev/null 2>&1; then
