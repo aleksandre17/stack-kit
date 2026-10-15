@@ -5,14 +5,22 @@
 #   deploy remote
 #       Refused. Delivering the artifact to a host (IIS, a VM, a container registry) is not
 #       declared by this driver yet; an unsupported path is an explicit refusal, never a guess.
-param(
-    [Parameter(Position = 0)][string]$Action = "artifact",
-    [string]$Configuration,
-    [string]$Output,
-    [switch]$AllowDirty
-)
+# The kit CLI forwards arguments as strings, so options are parsed here rather than bound
+# by PowerShell (a forwarded "-AllowDirty" string would never bind to a [switch]).
+param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest = @())
 
 $ErrorActionPreference = "Stop"
+$Action = "artifact"; $Configuration = $null; $Output = $null; $AllowDirty = $false
+for ($i = 0; $i -lt $Rest.Count; $i++) {
+    $a = [string]$Rest[$i]
+    switch -Regex ($a) {
+        '^-AllowDirty$'    { $AllowDirty = $true; continue }
+        '^-Configuration$' { if ($i + 1 -ge $Rest.Count) { throw "-Configuration needs a value" }; $Configuration = $Rest[++$i]; continue }
+        '^-Output$'        { if ($i + 1 -ge $Rest.Count) { throw "-Output needs a value" }; $Output = $Rest[++$i]; continue }
+        '^-'               { throw "dotnet-aspnet deploy: unknown option '$a' (supported: -AllowDirty, -Configuration, -Output)" }
+        default            { $Action = $a }
+    }
+}
 . (Join-Path $PSScriptRoot "..\_init.ps1")
 
 $moduleId = $env:GEOSTAT_MODULE_ID

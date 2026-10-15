@@ -101,3 +101,35 @@ class TestComposeIsOptional:
         manifest = _manifest()
         manifest["compose"] = {}
         assert "compose: missing catalog" in _validate_required(manifest)
+
+
+class TestCliReportsDriverFailure:
+    """A PowerShell driver command that FAILS must make the CLI exit non-zero.
+
+    The masked case is a failure that sets no $LASTEXITCODE - e.g. a parameter-binding
+    error (an argument the script does not accept). The CLI used to print it and exit 0.
+    """
+
+    def test_binding_failure_exits_non_zero(self, tmp_path: Path) -> None:
+        import json
+        import os
+        import shutil
+        import subprocess
+
+        import pytest
+
+        pwsh = shutil.which("pwsh") or shutil.which("powershell")
+        if not pwsh:
+            pytest.skip("PowerShell not available")
+        (tmp_path / "src" / "api").mkdir(parents=True)
+        (tmp_path / "src" / "api" / "Api.csproj").write_text("<Project />", encoding="utf-8")
+        (tmp_path / "ops" / "config" / "api").mkdir(parents=True)
+        manifest = _manifest()
+        manifest["package"] = os.path.relpath(PKG, tmp_path)
+        (tmp_path / "geostat.ops.json").write_text(json.dumps(manifest), encoding="utf-8")
+        env = {**os.environ, "GEOSTAT_PROJECT_ROOT": str(tmp_path)}
+        proc = subprocess.run(
+            [pwsh, "-NoProfile", "-File", str(PKG / "cli" / "geostat.ps1"), "mod", "api", "check", "unexpected-positional"],
+            capture_output=True, text=True, env=env, cwd=tmp_path, timeout=120,
+        )
+        assert proc.returncode == 1, proc.stdout + proc.stderr

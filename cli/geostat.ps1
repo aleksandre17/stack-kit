@@ -207,6 +207,10 @@ function Invoke-ModuleDriver {
         & $bash $script @rest
 
     } else {
+        # A PowerShell driver reports failure by THROWING; a throw sets no $LASTEXITCODE,
+        # so without this a failed command exited 0 (seen with dotnet-aspnet deploy).
+        $global:LASTEXITCODE = 0
+        try {
         if ($type -eq "node-vite" -and $sub -eq "deploy") {
             $feEnv = "prod"
             $feArgs = [System.Collections.ArrayList]@()
@@ -226,6 +230,10 @@ function Invoke-ModuleDriver {
             }
         } else {
             & $script @rest
+        }
+        } catch {
+            Write-Host "[$ModuleId $sub] $($_.Exception.Message)" -ForegroundColor Red
+            exit 1
         }
     }
 

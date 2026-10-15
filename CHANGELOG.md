@@ -42,6 +42,11 @@
   refusing; the three existing rungs are unchanged.
 - `lib/vscode_gen.py`: launch kind `dotnet` (C# Dev Kit `"type": "dotnet"`, project from
   `modules.<id>.dotnet.project` or the module's single `*.csproj`; ambiguity renders nothing).
+- **`cli/geostat.ps1` no longer exits 0 when a PowerShell driver command fails** without
+  setting `$LASTEXITCODE` (statement-terminating errors such as parameter binding). The
+  PowerShell branch runs inside `try/catch` and exits 1 with the message. Proven by
+  `TestCliReportsDriverFailure` (fails on the previous CLI).
+- `validate` warns about `compose.catalog` only when the manifest declares `compose`.
 - Manifest: `compose` is **optional** (schema `required` and `_validate_required`); a present
   `compose` without `catalog` is still refused. New module block `dotnet` (`project`,
   `launchProfile`, `configuration`, `publishExpect`).

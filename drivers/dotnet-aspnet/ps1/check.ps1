@@ -1,4 +1,6 @@
 # Pre-flight - dotnet-aspnet module
+# Advanced script: an argument it does not declare is a binding error, never silently ignored.
+[CmdletBinding()]
 param(
     [switch]$Quiet
 )
