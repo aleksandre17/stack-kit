@@ -20,4 +20,4 @@ Then: `.\tools\stack-kit.ps1 compose-gen`
 
 ## Layout
 
-See [kits/stack-kit/scaffold/README.md](../scaffold/README.md) and [kits/stack-kit/docs/ADOPTION-LINE.md](../docs/ADOPTION-LINE.md).
+See [kits/stack-kit/scaffold/README.md](../../kits/stack-kit/scaffold/README.md) and [kits/stack-kit/docs/ADOPT.md#configuration](../../kits/stack-kit/docs/ADOPT.md#configuration).

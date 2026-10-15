@@ -4,7 +4,7 @@ Default `catalog.full.json` in scaffold **does not** mount `google-credentials.j
 
 If your **java-boot** API needs GCP:
 
-1. Add to `infra/compose/catalog.json` templates `api_dev` / `api_prod`:
+1. Add to `ops/compose/catalog.json` templates `api_dev` / `api_prod`:
 
    ```yaml
    volumes:

@@ -35,7 +35,7 @@ echo "--- validate ---"
 if python3 "$PKG/lib/validate_manifest.py"; then ok "validate"; else bad "validate"; fi
 
 echo "--- docs + vscode ---"
-[[ -f "$PKG/docs/DEV-MODES.md" ]] && ok "DEV-MODES.md" || bad "DEV-MODES.md"
+[[ -f "$PKG/docs/GOLDEN-PATHS.md" ]] && ok "GOLDEN-PATHS.md" || bad "GOLDEN-PATHS.md"
 [[ -f "$ROOT/.vscode/launch.json" ]] && ok "launch.json" || bad "launch.json"
 [[ -f "$ROOT/.vscode/tasks.json" ]] && ok "tasks.json" || bad "tasks.json"
 

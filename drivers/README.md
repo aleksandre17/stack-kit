@@ -61,12 +61,11 @@ Only manifest + driver folder change; `stack-kit be` still targets `modules.back
 | `"type": "java-boot"` | `"type": "node-api"` |
 | `drivers/java-boot/` | `drivers/node-api/` (implemented) |
 
-Frontend stays `node-vite`; catalog / compose may need catalog entries for the new service — that is project `infra/compose/`, not the driver registry.
+Frontend stays `node-vite`; catalog / compose may need catalog entries for the new service — that is the project's `ops/compose/`, not the driver registry.
 
 ## Resolution
 
-- PowerShell: `lib/drivers.ps1`
-- Bash: `lib/drivers.sh` → `lib/driver_api.py`
+- One resolver: `lib/resolution.py` reads `drivers/registry.json`; `lib/drivers.ps1` and `lib/drivers.sh` look its answers up
 - List types: `python3 kits/stack-kit/lib/driver_api.py list-types`
 
-See [docs/adr/007-module-drivers.md](../../../docs/adr/007-module-drivers.md).
+See [docs/REFERENCE.md, Drivers](../docs/REFERENCE.md#drivers).

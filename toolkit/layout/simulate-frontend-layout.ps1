@@ -691,7 +691,7 @@ $scenarios["_summary"] = [PSCustomObject]@{
         "SERVER COMPOSE (dev/staging): {base}/compose/{service}/  - full source; isolate from static.",
         "PATH: clarify DEPLOY_PATH  - base directory OR full service path; avoid silent /{container_name} append.",
         "CI: npm build + optional dist layout dry-run; integration via stack not fe deploy.",
-        "stack-deploy: uses dist (B1)  - align docs and ADOPTION-LINE with chosen prod mode."
+        "stack-deploy: uses dist (B1)  - align docs (GOLDEN-PATHS) with the chosen prod mode."
     )
     Matrix = @(
         [PSCustomObject]@{ Use = "Daily dev (local)"; Mode = "A1 / A2"; Server = "No"; Update = "HMR / compose watch" },

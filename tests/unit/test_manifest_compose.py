@@ -6,9 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from conftest import PKG
 from lib.project_context import ProjectContext
 
-COMPOSE_PKG = Path(__file__).resolve().parents[1] / "compose"
+COMPOSE_PKG = PKG / "compose"
 from compose.manifest_compose import (  # noqa: E402
     build_manifest_stack_services,
     load_compose_catalog,

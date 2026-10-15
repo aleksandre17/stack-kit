@@ -56,6 +56,9 @@ LEGACY_VENDOR_DIRS: tuple[str, ...] = tuple(_DECLARATION.get("legacyVendorDirs")
 #: Manifest fields renamed in place: {old dotted path: new dotted path}.
 LEGACY_MANIFEST_FIELDS: dict[str, str] = dict(_DECLARATION.get("legacyManifestFields") or {})
 
+#: The name the kit carried before, and so its former command's name.
+LEGACY_KIT_NAME: str = _DECLARATION.get("legacyKitName") or ""
+
 #: The release that stops reading every legacy name above.
 LEGACY_REMOVED_IN: str = _DECLARATION.get("legacyRemovedIn") or ""
 
@@ -136,6 +139,30 @@ def manifest_field(manifest: dict[str, Any], dotted: str) -> Any:
                 notice(f"{MANIFEST_FILENAME}: {old}", dotted)
                 return legacy
     return None
+
+
+def with_current_fields(manifest: dict[str, Any]) -> dict[str, Any]:
+    """A copy of `manifest` with every renamed field under its current name only (each former one
+    noticed). What the schema and the resolver read, so a host on a former field is held to the
+    same contract as one on the current field -- and is not refused for the spelling."""
+    import copy
+
+    out = copy.deepcopy(manifest)
+    for old, new in LEGACY_MANIFEST_FIELDS.items():
+        *oparent, oleaf = old.split(".")
+        holder = _dig(out, ".".join(oparent)) if oparent else out
+        if not isinstance(holder, dict) or oleaf not in holder:
+            continue
+        value = holder.pop(oleaf)
+        if _dig(out, new) is not None:
+            continue  # the current name is already there; it wins, as everywhere
+        notice(f"{MANIFEST_FILENAME}: {old}", new)
+        node = out
+        *nparent, nleaf = new.split(".")
+        for part in nparent:
+            node = node.setdefault(part, {})
+        node[nleaf] = value
+    return out
 
 
 def _dig(data: Any, dotted: str) -> Any:

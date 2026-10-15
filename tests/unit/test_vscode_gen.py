@@ -7,6 +7,7 @@ import pytest
 
 from lib.project_context import ProjectContext
 from lib.vscode_gen import build_launch_json, build_tasks_json, write_vscode
+from conftest import PKG
 
 
 def test_launch_paths_use_manifest_modules(repo_root: Path, manifest: dict) -> None:
@@ -52,7 +53,7 @@ def test_write_vscode_tmp(tmp_path: Path) -> None:
     }
     (tmp_path / "stack-kit.json").write_text(json.dumps(manifest), encoding="utf-8")
     (tmp_path / "apps" / "web").mkdir(parents=True)
-    pkg = Path(__file__).resolve().parents[1]
+    pkg = PKG
     manifest["package"] = os.path.relpath(pkg, tmp_path).replace("\\", "/")
     (tmp_path / "stack-kit.json").write_text(json.dumps(manifest), encoding="utf-8")
     ctx = ProjectContext(root=tmp_path, manifest=manifest)

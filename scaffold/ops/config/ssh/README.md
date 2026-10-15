@@ -36,4 +36,4 @@ ssh-copy-id user@YOUR_SERVER
 | `DEPLOY_SSH_IDENTITY_FILE` | optional |
 | `DEPLOY_SSH_CONFIG_FILE` | optional |
 
-სრული adoption: [kits/stack-kit/docs/ADOPTION-LINE.md](../../docs/ADOPTION-LINE.md)
+სრული adoption: [kits/stack-kit/docs/ADOPT.md#configuration](../../../kits/stack-kit/docs/ADOPT.md#configuration)

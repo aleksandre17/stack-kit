@@ -15,8 +15,8 @@ from lib.modules import driver_registry
 from lib.project_context import ProjectContext
 from lib.validate_manifest import _validate_required
 from lib.vscode_gen import LAUNCH_BUILDERS, build_launch_json
+from conftest import PKG
 
-PKG = Path(__file__).resolve().parents[1]
 DRIVER = "dotnet-aspnet"
 
 

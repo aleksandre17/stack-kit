@@ -168,3 +168,42 @@ listed in the changelog.
 still names fields, by design one file of them; it moves with the module facts into the context
 when a driver needs them in bash too. `lib/driver_api.py` and `lib/modules_cli.py` remain separate
 CLIs over the same Python and fold into `resolve_cli.py` with K3's tree.
+
+## Amendment 3 — K3 and K4 as built (2026-10-15, owner-delegated)
+
+**K3 landed.** `docs/` holds `decisions/` and the four guides, each declaring `kind: guide` and what
+it `owns`; twelve guides were folded in and deleted, with every unique still-true fact kept and each
+fact the code contradicted dropped (held by `tests/unit/test_handwriting.py`, including every
+relative link). Tests are split `unit/` (in-process, 1.4 s) and `acceptance/` (shells and CLIs,
+14 s). The host tree is a declared layout held by `validate` as a floor (`lib/layout_floor.py`,
+the agent kit's row shape over disjoint places; `tests/acceptance/test_layout_floor.py`).
+`.gitattributes` pins LF.
+
+**K4 landed.** `validate.stages` (`lib/pipeline.py`) and structure-only migrations
+(`lib/migrations_gate.py`, each driver declaring its migration files and data patterns), proved by
+`tests/acceptance/test_pipeline.py` and `tests/unit/test_migrations_gate.py`.
+
+**Decided while building, with what was rejected:**
+
+1. **No parallel runner.** The suite takes 18 s. *Rejected:* porting the agent kit's runner, which
+   exists because its suite took 28 minutes; matching the handwriting is not a reason to carry a
+   tool with nothing to do.
+2. **Derived rows only from what the manifest DECLARES**, never from a default the host never
+   wrote. *Rejected:* requiring every convention place; a host that uses no compose would fail for
+   lacking a catalog.
+3. **The schema is interpreted by the kit on every machine** (`lib/schema_check.py`, the agent
+   kit's subset plus `oneOf`, schema-valued `additionalProperties` and `default`). *Rejected:*
+   keeping `jsonschema` optional (found: on a host without it the whole schema was decoration),
+   and requiring it (an install the host must do before the kit can judge).
+4. **Plain `validate` refuses an unprovable stage list; only `validate --stages` runs it.**
+   *Rejected:* running the stack on every `validate`, which developers run constantly.
+5. **The technology of migrations is the driver's declaration.** *Rejected:* SQL patterns in the
+   gate, which would name one technology and miss the next driver's.
+6. **Launchers declare a simple param block.** Found while reducing the guides: an advanced block
+   adds PowerShell's common parameters, and `-d` bound to `-Debug` before the CLI saw it.
+   `tests/unit/test_handwriting.py` holds every launcher the kit ships.
+
+**Owed, named:** the CLI help omits `--mode remote`; `toolkit/deploy/deploy-path.sh` defaults
+`stack.deployBaseSecretsModule` to a literal module id; `manifest.schema.json` still carries
+consumer-shaped fields (`ci.rag*`, `modules.*.catalog`, `modules.*.derivation`), each to be
+generalized or removed with a deprecation read.

@@ -56,9 +56,9 @@ Write-Host "--- 2. Manifest validate ---" -ForegroundColor Cyan
 $valOut = & @pyCmd (Join-Path $Kit "lib\validate_manifest.py") 2>&1 | Out-String
 Add-Result "stack-kit validate" ($LASTEXITCODE -eq 0) $valOut.Trim()
 
-# 3 DEV-MODES doc + vscode files
+# 3 GOLDEN-PATHS doc (dev modes) + vscode files
 Write-Host "--- 3. Docs + .vscode ---" -ForegroundColor Cyan
-Add-Result "DEV-MODES.md" (Test-Path (Join-Path $Kit "docs\DEV-MODES.md")) ""
+Add-Result "GOLDEN-PATHS.md" (Test-Path (Join-Path $Kit "docs\GOLDEN-PATHS.md")) ""
 $launch = Join-Path $Root ".vscode\launch.json"
 $tasks = Join-Path $Root ".vscode\tasks.json"
 Add-Result ".vscode/launch.json" (Test-Path $launch) $launch

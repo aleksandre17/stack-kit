@@ -202,7 +202,7 @@ function Show-Checklist {
     Write-Host "    .\tools\stack-kit.ps1 compose-gen    # after catalog edits"
     Write-Host "    .\tools\stack-kit.ps1 stack up -d --build"
     Write-Host "    .\tools\stack-kit.ps1 mod <moduleId> check   # or cli aliases (fe, be, ui, api)"
-    Write-Host "  Docs: kits\stack-kit\docs\ADOPTION-LINE.md"
+    Write-Host "  Docs: kits\stack-kit\docs\ADOPT.md"
     Write-Host ""
 }
 

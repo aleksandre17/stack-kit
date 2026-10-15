@@ -11,8 +11,8 @@ from lib.manifest_defaults import (
     resolve_cli_alias,
 )
 from lib.project_context import ProjectContext
+from conftest import PKG
 
-PKG = Path(__file__).resolve().parents[1]
 SCAFFOLD = PKG / "scaffold" / "stack-kit.json"
 
 

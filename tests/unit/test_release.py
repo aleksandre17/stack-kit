@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from conftest import PKG
 
-PKG = Path(__file__).resolve().parents[1]
 
 
 def test_version_file_semver() -> None:

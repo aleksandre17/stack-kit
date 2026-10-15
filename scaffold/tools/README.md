@@ -8,4 +8,4 @@ Delegates to `kits/stack-kit/cli/`.
 .\tools\stack-kit.ps1 stack up -d --build
 ```
 
-See [kits/stack-kit/docs/ADOPTION-LINE.md](../kits/stack-kit/docs/ADOPTION-LINE.md).
+See [kits/stack-kit/docs/ADOPT.md](../kits/stack-kit/docs/ADOPT.md).

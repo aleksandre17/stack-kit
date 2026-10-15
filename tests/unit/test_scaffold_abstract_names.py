@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
+from conftest import PKG
 
 BANNED = (
     "stack-kit-chat",
@@ -15,7 +16,7 @@ BANNED = (
     "ELEVENLABS",
 )
 
-SCAFFOLD = Path(__file__).resolve().parents[1] / "scaffold"
+SCAFFOLD = PKG / "scaffold"
 
 
 @pytest.mark.parametrize("path", list(SCAFFOLD.rglob("*")), ids=lambda p: str(p.relative_to(SCAFFOLD)))

@@ -64,21 +64,7 @@ def _text(value: Any) -> str:
 
 def _normalized(manifest: dict[str, Any]) -> dict[str, Any]:
     """The manifest with every field the kit renamed under its current name (the former noticed)."""
-    import copy
-
-    out = copy.deepcopy(manifest)
-    for old, new in identity.LEGACY_MANIFEST_FIELDS.items():
-        if identity._dig(out, new) is not None:
-            continue
-        value = identity.manifest_field(out, new)
-        if value is None:
-            continue
-        node = out
-        *parent, leaf = new.split(".")
-        for part in parent:
-            node = node.setdefault(part, {})
-        node[leaf] = value
-    return out
+    return identity.with_current_fields(manifest)
 
 
 def _lines(items) -> str:

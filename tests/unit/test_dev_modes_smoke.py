@@ -1,4 +1,4 @@
-"""Smoke: DEV-MODES paths map to real CLI, drivers, and .vscode artifacts."""
+"""Smoke: the dev-mode paths (docs/GOLDEN-PATHS.md) map to real CLI, drivers, and .vscode artifacts."""
 from __future__ import annotations
 
 import json
@@ -10,13 +10,9 @@ from lib.modules import infer_cli_aliases, modules_by_role
 from lib.project_context import ProjectContext
 from lib.validate_manifest import validate_manifest
 from lib.vscode_gen import build_launch_json, build_tasks_json
+from conftest import PKG
 
-PKG = Path(__file__).resolve().parents[1]
 REPO = PKG.parents[1]
-
-
-def test_dev_modes_doc_exists() -> None:
-    assert (PKG / "docs" / "DEV-MODES.md").is_file()
 
 
 def test_validate_consumer_manifest_clean(repo_root: Path) -> None:

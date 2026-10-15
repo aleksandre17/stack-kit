@@ -2,10 +2,11 @@
 # Full stack compose runner (manifest: stack.composeDir)
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/../.." && pwd)"
-ROOT="$(cd "$PKG/../.." && pwd)"
-export STACK_KIT_PROJECT_ROOT="$ROOT"
 # shellcheck source=../../lib/env.sh
 source "$PKG/lib/env.sh"
+# The one discovery (a declared root is authoritative) -- never a guess from where the kit sits.
+ROOT="$(stack_kit_find_project_root)" || { echo "ERROR: project root not found" >&2; exit 1; }
+export STACK_KIT_PROJECT_ROOT="$ROOT"
 
 COMPOSE_REL="$(stack_kit_read_manifest_field stack.composeDir ops/compose/stack)"
 COMPOSE_DIR="$ROOT/$COMPOSE_REL"

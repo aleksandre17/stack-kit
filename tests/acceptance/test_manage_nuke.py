@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from conftest import PKG
 
-PKG = Path(__file__).resolve().parents[1]
 MANAGE_SH = PKG / "drivers" / "java-boot" / "sh" / "manage.sh"
 MANAGE_REMOTE = PKG / "toolkit" / "bash" / "manage-remote.sh"
 

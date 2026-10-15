@@ -1,0 +1,11 @@
+# Line endings are part of the contract, not of the checkout (ADR-001 K3).
+# A bash script carried to a Linux server with CRLF fails on its first line; core.autocrlf on a
+# Windows workstation would hand it CRLF. So scripts and the files the resolver and drivers read
+# are LF everywhere; PowerShell runs either way and stays LF too, for one rule.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
+*.jar binary

@@ -2,6 +2,41 @@
 
 ## 1.2.0-dev — unreleased
 
+### Validation is a proof (ADR-001 K4)
+
+- **The manifest schema is enforced on every machine.** `validate` used to hand
+  `manifest.schema.json` to `jsonschema` when it happened to be installed and skip it otherwise,
+  so on a host that had installed nothing every `required`, `enum` and
+  `additionalProperties: false` was decoration. `lib/schema_check.py` interprets the schema's
+  keywords itself and refuses any it cannot honour. A host may now see schema errors that were
+  always there. A manifest on a former field name is validated under the current name.
+- **`validate.stages`** declares the real-stack proof: `setup`, `migrate`, `build`, `test`,
+  `health`, `ingest`, `anchor` and `teardown` stages, each an argv, fail-fast. Teardown always
+  runs. An `anchor` compares its command's output (`equals`, `matches`, `atLeast`). A list with
+  no anchor, or whose last working stage is not an anchor, is refused by plain `validate` before
+  anything runs. Run it with `stack-kit validate --stages`.
+- **Migrations are structure-only.** Each driver declares its migrations (`drivers/registry.json`
+  `migrations`: globs, excluded generated files, data-statement patterns) for `java-boot`
+  (Flyway SQL) and `dotnet-aspnet` (EF Core). `validate` names any migration that carries data.
+  A module points elsewhere with `modules.<id>.migrations.paths`, and allows a reference-data
+  file with `migrations.allowData: [{path, reason}]`.
+- `cli/stack-kit.ps1` passed no arguments to `migrate`, `init` and `stack`: their handlers are
+  invoked without arguments, so `@Args` was always empty, and `stack-kit migrate --apply` from
+  PowerShell silently ran as a dry run. They pass the CLI's operands now, as does `validate`.
+
+### The handwriting (ADR-001 K3)
+
+- `.gitattributes` pins LF for every text file (CRLF only for `.cmd`/`.bat`). Under
+  `core.autocrlf` a Windows checkout handed bash scripts CRLF, which fails on a Linux server.
+- The host's tree is a declared layout held by `validate` as a floor (`lib/layout_floor.py`).
+  Every place the manifest declares must exist (vendored kit, secrets root, module directories,
+  declared compose catalog, CI scripts, infra compose directory once infra services are
+  declared, nginx template). `layout.entries` adds rows in the agent kit's row shape;
+  `layout.closed` names directories where an undeclared child is a failure. A `pending` row is
+  printed, not failed.
+- Tests are split into `tests/unit/` (in-process) and `tests/acceptance/` (shells and CLIs), and
+  read the kit root and the fixture from `conftest.py` instead of computing their own.
+
 ### One resolver (ADR-001 K2)
 
 Project discovery, manifest fields and their defaults, modules, roles, types, aliases, driver

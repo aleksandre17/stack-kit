@@ -7,6 +7,6 @@ Edit `catalog.json`, then:
 ```
 
 Default from scaffold: `catalog.minimal.json` (API only, `worker: false`).  
-Extend using your app's `infra/compose/catalog.json` or [ADOPTION-LINE.md](../../docs/ADOPTION-LINE.md).
+Extend using your app's `ops/compose/catalog.json` or [ADOPT.md#compose-catalog](../../kits/stack-kit/docs/ADOPT.md#compose-catalog).
 
 Do not hand-edit `# GENERATED` compose files.

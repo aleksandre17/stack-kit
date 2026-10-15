@@ -42,6 +42,6 @@ your-app/
 
 1. `stack-kit init` — scaffold + seed + compose-gen + checklist
 2. შეავსე `ops/config/deploy.env`, env ფაილები
-3. [docs/ADOPTION-LINE.md](../docs/ADOPTION-LINE.md)
+3. [docs/ADOPT.md](../docs/ADOPT.md)
 
 `ops/compose/catalog.full.json` — სრული stack; `catalog.minimal.json` — მხოლოდ API (`init -MinimalCatalog`).

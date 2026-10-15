@@ -8,4 +8,4 @@ export PYTHONPATH="${PKG}${PYTHONPATH:+:$PYTHONPATH}"
 if ! python3 -m pytest --version >/dev/null 2>&1; then
   python3 -m pip install -q pytest
 fi
-python3 -m pytest tests/ -v --tb=short "$@"
+python3 -m pytest tests -v --tb=short "$@"

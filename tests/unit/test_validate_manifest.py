@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from lib.validate_manifest import validate_manifest
+from conftest import FIXTURE_ROOT, PKG
 
-FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "golden-consumer"
 
 
 def _golden_tree(tmp_path: Path) -> Path:
@@ -29,8 +29,12 @@ def _golden_tree(tmp_path: Path) -> Path:
         ignore=shutil.ignore_patterns("kits", "__pycache__", ".pytest_cache"),
     )
     manifest = json.loads((tmp_path / "stack-kit.json").read_text(encoding="utf-8"))
-    pkg = Path(__file__).resolve().parents[1]
-    manifest["package"] = os.path.relpath(pkg, tmp_path).replace("\\", "/")
+    vendored = manifest["package"].rstrip("/")
+    manifest["package"] = os.path.relpath(PKG, tmp_path).replace("\\", "/")
+    # Every declared path into the vendored kit follows it (the layout floor holds them all).
+    for key, value in (manifest.get("ci") or {}).items():
+        if isinstance(value, str) and value.startswith(vendored + "/"):
+            manifest["ci"][key] = manifest["package"] + value[len(vendored):]
     (tmp_path / "stack-kit.json").write_text(json.dumps(manifest), encoding="utf-8")
     # deploy.env is gitignored / volatile; synthesize from the committed template.
     template = tmp_path / "ops" / "config" / "deploy.env.fixture"

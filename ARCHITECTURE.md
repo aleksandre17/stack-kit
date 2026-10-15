@@ -39,10 +39,10 @@
 
 ## Manifest
 
-`stack-kit.json` at project root — see [manifest.schema.json](manifest.schema.json) and [docs/PACKAGE-ARCHITECTURE.md](docs/PACKAGE-ARCHITECTURE.md).
+`stack-kit.json` at project root — see [manifest.schema.json](manifest.schema.json) and [docs/REFERENCE.md#manifest](docs/REFERENCE.md#manifest).
 
-Resolution API: `lib/project_context.py` (Python), `lib/project.sh` + `lib/env.sh` (Bash), `lib/project.ps1` + `lib/env.ps1` (PowerShell).
+Resolution: one resolver, `lib/resolution.py`; the Bash and PowerShell libraries are shims over `lib/resolve_cli.py` — see [docs/REFERENCE.md#resolver](docs/REFERENCE.md#resolver).
 
 ## Deploy golden paths
 
-**[docs/GOLDEN-PATHS.md](docs/GOLDEN-PATHS.md)** — canonical policy (static dist vs compose/dev, local vs remote).
+**[docs/GOLDEN-PATHS.md](docs/GOLDEN-PATHS.md#policy)** — canonical policy (static dist vs compose/dev, local vs remote).

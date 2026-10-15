@@ -125,6 +125,26 @@
         "type": "object",
         "required": ["type", "path", "secretsModule", "role"],
         "properties": {
+          "migrations": {
+            "type": "object",
+            "description": "Where this module's migrations are when not under its own tree, and files allowed to carry reference data (ADR-001 decision 4: migrations are structure-only)",
+            "properties": {
+              "paths": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Project-relative migration directories" },
+              "allowData": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["path", "reason"],
+                  "properties": {
+                    "path": { "type": "string", "minLength": 1 },
+                    "reason": { "type": "string", "minLength": 1 }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "check": {
             "type": "object",
             "description": "Environment variables the module's pre-flight check requires or reports as optional; the project names its own integrations (ADR-001)",
@@ -487,6 +507,68 @@
         }
       },
       "additionalProperties": true
+    },
+    "validate": {
+      "type": "object",
+      "description": "The proof `stack-kit validate --stages` runs: fail-fast stages against the real stack, ending on value anchors (ADR-001 decision 4). The anchor rule is lib/pipeline.py's.",
+      "properties": {
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "kind", "run"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "kind": { "type": "string", "enum": ["setup", "migrate", "build", "test", "health", "ingest", "anchor", "teardown"] },
+              "run": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "description": "argv, run from the project root (or cwd); no shell" },
+              "cwd": { "type": "string" },
+              "env": { "type": "object", "additionalProperties": { "type": "string" } },
+              "timeout": { "type": "number", "minimum": 1 },
+              "expect": {
+                "type": "object",
+                "description": "Anchor only: exactly one comparison with the command's stripped stdout",
+                "properties": {
+                  "equals": { "type": "string" },
+                  "matches": { "type": "string" },
+                  "atLeast": { "type": "number" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layout": {
+      "type": "object",
+      "description": "The host's tree as a declared layout, held as a floor by `stack-kit validate` (ADR-001 decision 3). Places the manifest already declares (package, secrets, module paths, compose catalog, ci scripts, infra compose dir, nginx template) are rows without being listed here.",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "kind"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1, "description": "Root-relative, POSIX-formed; a directory ends in '/'" },
+              "kind": { "type": "string", "enum": ["dir", "file"] },
+              "holds": { "type": "string", "description": "The kind of truth that lives here" },
+              "writer": { "type": "string", "description": "Who may write this place" },
+              "read_when": { "type": "array", "items": { "type": "string" }, "description": "The task words that pull this place into context" },
+              "lifecycle": { "type": "string", "description": "How this place's content ages" },
+              "pending": { "type": "string", "description": "The work that gives this place content; its absence is then printed, not failed" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "closed": {
+          "type": "array",
+          "description": "Directories the declaration is exhaustive at ('.' is the root): every tracked child must be covered by a row",
+          "items": { "type": "string", "pattern": "^(\\.|[^/].*/)$" }
+        }
+      },
+      "additionalProperties": false
     },
     "ci": {
       "type": "object",

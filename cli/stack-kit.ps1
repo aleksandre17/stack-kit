@@ -1,23 +1,16 @@
 # stack-kit CLI — module drivers by stack type (java-boot, node-vite, node-api, …)
 
-param(
-
-    [Parameter(Position = 0)]
-
-    [string]$Command = "help",
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-
-    [string[]]$CliRest = @()
-
-)
+# A simple param block on purpose: an advanced one (any [Parameter()]) adds PowerShell's common
+# parameters, and an operand such as `-d` then binds as -Debug and is lost (ADR-001 K3).
+param([string]$Command = "help", [string[]]$CliRest = @())
+$CliRest = @($CliRest) + @($args)
 
 
 
 $PackageRoot = Split-Path $PSScriptRoot -Parent
 
 if ($Command -eq "init") {
-    & (Join-Path $PackageRoot "toolkit\init\Invoke-ProjectInit.ps1") -PackageRoot $PackageRoot @Args
+    & (Join-Path $PackageRoot "toolkit\init\Invoke-ProjectInit.ps1") -PackageRoot $PackageRoot @CliRest
     exit $LASTEXITCODE
 }
 
@@ -249,7 +242,7 @@ $globalCommands = @{
 
     "stack" = {
 
-        & (Join-Path $PackageRoot "toolkit\stack\compose.ps1") @Args
+        & (Join-Path $PackageRoot "toolkit\stack\compose.ps1") @CliRest
 
         exit $LASTEXITCODE
 
@@ -267,12 +260,13 @@ $globalCommands = @{
 
     "validate" = {
         $env:PYTHONPATH = "$PackageRoot"
-        Invoke-StackKitPython (Join-Path $PackageRoot "lib\validate_manifest.py")
+        Invoke-StackKitPython (Join-Path $PackageRoot "lib\validate_manifest.py") @CliRest
     }
 
     "migrate" = {
+        # The handler is invoked without arguments: the operands are the CLI's own ($CliRest).
         $env:PYTHONPATH = "$PackageRoot"
-        Invoke-StackKitPython (Join-Path $PackageRoot "lib\migrate_manifest.py") @Args
+        Invoke-StackKitPython (Join-Path $PackageRoot "lib\migrate_manifest.py") @CliRest
     }
 
     "vscode-gen" = {

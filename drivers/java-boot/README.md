@@ -48,8 +48,8 @@ Without `.env.deploy`, deploy uses legacy **flat** paths.
 
 Docs:
 
-- [docs/GOLDEN-PATHS-BACKEND.md](../../docs/GOLDEN-PATHS-BACKEND.md)
-- [docs/REMOTE-DEV-JAR-FLOW.md](../../docs/REMOTE-DEV-JAR-FLOW.md)
+- [docs/GOLDEN-PATHS.md#backend](../../docs/GOLDEN-PATHS.md#backend)
+- [docs/GOLDEN-PATHS.md#remote-dev-jar-flow](../../docs/GOLDEN-PATHS.md#remote-dev-jar-flow)
 - Repo: `docs/BACKEND-DEPLOY-LAYOUTS.md`, `docs/BACKEND-DEV-REMOTE.md`, `docs/BE-DEPLOY-WATCH.md`
 
 ## Toolkit

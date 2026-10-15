@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.compose_identity import primary_api_module_id, primary_worker_module_id
-from lib.identity import MANIFEST_FILENAME
+from lib.identity import MANIFEST_FILENAME, with_current_fields
 from lib.credentials import all_module_credential_files, module_credentials
 from lib.project_context import ProjectContext, load_manifest
 
@@ -19,16 +19,10 @@ def _load_schema(pkg_root: Path) -> dict[str, Any]:
 
 
 def _validate_jsonschema(instance: dict[str, Any], schema: dict[str, Any]) -> list[str]:
-    try:
-        import jsonschema  # type: ignore
-    except ImportError:
-        return []
-    errs: list[str] = []
-    validator = jsonschema.Draft7Validator(schema)
-    for e in sorted(validator.iter_errors(instance), key=lambda x: list(x.path)):
-        loc = ".".join(str(p) for p in e.path) or "(root)"
-        errs.append(f"{loc}: {e.message}")
-    return errs
+    # The kit's own interpreter, on every machine -- never "when a library happens to be installed".
+    from lib.schema_check import validate
+
+    return validate(instance, schema)
 
 
 def _validate_required(instance: dict[str, Any]) -> list[str]:
@@ -183,9 +177,25 @@ def validate_manifest(
     registry = json.loads((pkg / "drivers" / "registry.json").read_text(encoding="utf-8"))
 
     errs = _validate_required(ctx.manifest)
-    errs.extend(_validate_jsonschema(ctx.manifest, schema))
+    errs.extend(_validate_jsonschema(with_current_fields(ctx.manifest), schema))
     proj_errs, warnings = _validate_project(ctx, registry)
     errs.extend(proj_errs)
+    # The declared tree, held as a floor (ADR-001 decision 3).
+    from lib.layout_floor import evaluate
+
+    floor = evaluate(ctx.root, ctx.manifest)
+    errs.extend(f"layout: {f}" for f in floor.failures)
+    warnings.extend(f"layout: {p}" for p in floor.pending)
+    # Migrations shape the store; data has one way in, the ingest stage (ADR-001 decision 4).
+    from lib.migrations_gate import check as migrations_carry_data
+
+    errs.extend(f"migrations: {f}" for f in migrations_carry_data(ctx.root, ctx.manifest))
+    # A declared pipeline must be a proof before it is ever run (ADR-001 decision 4).
+    stages = (ctx.manifest.get("validate") or {}).get("stages")
+    if stages is not None:
+        from lib.pipeline import problems
+
+        errs.extend(problems(stages))
     return errs, warnings
 
 
@@ -202,6 +212,15 @@ def main() -> int:
             print(f"ERROR: {e}", file=sys.stderr)
         return 1
     print(f"[validate] {MANIFEST_FILENAME} OK")
+    if "--stages" in sys.argv[1:]:
+        from lib.pipeline import run
+
+        ctx = ProjectContext.discover()
+        stages = (ctx.manifest.get("validate") or {}).get("stages")
+        if stages is None:
+            print(f"ERROR: --stages: {MANIFEST_FILENAME} declares no validate.stages", file=sys.stderr)
+            return 1
+        return run(ctx.root, stages)
     return 0
 
 

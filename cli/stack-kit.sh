@@ -12,11 +12,11 @@ shift || true
 
 case "$CMD" in
   init) exec bash "$PKG/toolkit/init/init.sh" "$@" ;;
-  validate) export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"; exec python3 "$PKG/lib/validate_manifest.py" ;;
-  migrate) export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"; exec python3 "$PKG/lib/migrate_manifest.py" "$@" ;;
-  vscode-gen) export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"; exec python3 "$PKG/lib/vscode_gen.py" "$@" ;;
-  compose-gen) exec python3 "$PKG/compose/build.py" ;;
-  nginx-gen) exec python3 "$PKG/adapters/render_nginx.py" ;;
+  validate) export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"; stack_kit_python "$PKG/lib/validate_manifest.py" "$@" ;;
+  migrate) export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"; stack_kit_python "$PKG/lib/migrate_manifest.py" "$@" ;;
+  vscode-gen) export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"; stack_kit_python "$PKG/lib/vscode_gen.py" "$@" ;;
+  compose-gen) stack_kit_python "$PKG/compose/build.py" ;;
+  nginx-gen) stack_kit_python "$PKG/adapters/render_nginx.py" ;;
   stack-deploy) exec bash "$PKG/toolkit/deploy/stack-remote.sh" "$@" ;;
   infra)
     if [[ $# -gt 0 ]]; then
@@ -33,7 +33,10 @@ case "$CMD" in
     ;;
   stack) exec bash "$PKG/toolkit/stack/compose.sh" "$@" ;;
   *)
-    exec powershell -ExecutionPolicy Bypass -File "$ROOT/tools/stack-kit.ps1" "$CMD" "$@" 2>/dev/null \
-      || exec powershell -ExecutionPolicy Bypass -File "$PKG/cli/stack-kit.ps1" "$CMD" "$@"
+    # Every other verb is the PowerShell CLI's: pwsh on any platform, Windows PowerShell where only it
+    # exists. (`exec` does not return, so a `|| fallback` after it could never run.)
+    ps="$(command -v pwsh || command -v powershell.exe || command -v powershell || true)"
+    [[ -n "$ps" ]] || { echo "ERROR: pwsh (PowerShell 7) is required for: stack-kit $CMD" >&2; exit 1; }
+    exec "$ps" -NoProfile -ExecutionPolicy Bypass -File "$PKG/cli/stack-kit.ps1" "$CMD" "$@"
     ;;
 esac

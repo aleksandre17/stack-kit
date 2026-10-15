@@ -235,3 +235,16 @@ def test_migrate_refuses_two_manifest_homes_and_writes_nothing(tmp_path):
     ran = _migrate(host, "--apply")
     assert ran.returncode != 0
     assert former.read_bytes() == before
+
+
+def test_a_manifest_on_a_former_field_is_held_to_the_same_schema(tmp_path):
+    # Found when the schema began to be enforced on every machine (K4): the former field was
+    # refused as undeclared -- a host on the old names would have failed validate.
+    from lib.schema_check import validate
+
+    host = _legacy_host(tmp_path)
+    manifest = json.loads((host / identity.LEGACY_MANIFEST_FILENAMES[0]).read_text(encoding="utf-8"))
+    assert identity._dig(manifest, FIELD_OLD) is not None
+    schema = json.loads((PKG / "manifest.schema.json").read_text(encoding="utf-8"))
+    assert validate(manifest, schema), "the specimen no longer carries a former field"
+    assert not validate(identity.with_current_fields(manifest), schema)

@@ -48,4 +48,3 @@ only to smoke-test an adoption.
 
 ## Last results
 
-**[TEST-RESULTS.md](./TEST-RESULTS.md)** — summary (251 passed, 1 failed, 23 skipped).

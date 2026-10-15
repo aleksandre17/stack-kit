@@ -18,8 +18,8 @@ from lib.identity import MANIFEST_FILENAME, manifest_filenames
 from lib.modules import driver_default_role, driver_registry
 from lib.project_context import ProjectContext
 from lib.vscode_gen import LAUNCH_BUILDERS, build_tasks_json
+from conftest import PKG
 
-PKG = Path(__file__).resolve().parents[1]
 
 
 # ── 1. No privileged driver name in the generators ────────────────────────────

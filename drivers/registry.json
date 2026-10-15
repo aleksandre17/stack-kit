@@ -30,6 +30,17 @@
     },
     "vscode": {
       "launch": "java"
+    },
+    "migrations": {
+      "globs": [
+        "src/main/resources/db/migration/**/*.sql"
+      ],
+      "data": [
+        "(?i)\\binsert\\s+into\\b",
+        "(?i)\\bcopy\\s+\\S+\\s.*\\bfrom\\b",
+        "(?i)\\bupdate\\s+\\S+\\s+set\\b",
+        "(?i)\\bdelete\\s+from\\b"
+      ]
     }
   },
   "node-vite": {
@@ -114,6 +125,19 @@
     "tasks": {},
     "vscode": {
       "launch": "dotnet"
+    },
+    "migrations": {
+      "globs": [
+        "**/Migrations/*.cs"
+      ],
+      "exclude": [
+        "**/Migrations/*.Designer.cs",
+        "**/Migrations/*ModelSnapshot.cs"
+      ],
+      "data": [
+        "\\.(InsertData|UpdateData|DeleteData)\\s*\\(",
+        "(?i)\\.Sql\\s*\\(\\s*@?\\$?\\\"\\s*(insert\\s+into|update\\s+\\S+\\s+set|delete\\s+from)"
+      ]
     }
   }
 }

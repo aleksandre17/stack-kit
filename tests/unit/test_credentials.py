@@ -6,8 +6,9 @@ from pathlib import Path
 
 from lib.credentials import global_gcp_credentials, module_credentials
 from lib.project_context import ProjectContext
+from conftest import FIXTURE_ROOT
 
-FIXTURE = Path(__file__).resolve().parent / "fixtures" / "golden-consumer" / "stack-kit.json"
+FIXTURE = FIXTURE_ROOT / "stack-kit.json"
 
 
 def test_golden_consumer_multi_credentials() -> None:
