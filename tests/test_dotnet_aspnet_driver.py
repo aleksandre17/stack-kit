@@ -89,6 +89,14 @@ class TestComposeIsOptional:
     def test_manifest_without_compose_passes_required_checks(self) -> None:
         assert _validate_required(_manifest()) == []
 
+    def test_no_compose_section_means_no_catalog_warning(self, tmp_path: Path) -> None:
+        from lib.validate_manifest import _validate_project
+
+        (tmp_path / "src" / "api").mkdir(parents=True)
+        ctx = ProjectContext(root=tmp_path, manifest=_manifest())
+        errs, warnings = _validate_project(ctx, driver_registry())
+        assert not [m for m in [*errs, *warnings] if "compose.catalog" in m], (errs, warnings)
+
     def test_compose_without_catalog_is_still_refused(self) -> None:
         manifest = _manifest()
         manifest["compose"] = {}

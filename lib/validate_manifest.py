@@ -97,10 +97,11 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
             if ".." in fn or fn.startswith("/"):
                 errs.append(f"modules.{mid}.credentials: invalid file '{fn}'")
 
-    cat = ctx.catalog_path
-    if not cat.is_file():
+    # A project that declares no compose section has no catalog to miss (compose is optional).
+    cat = ctx.catalog_path if "compose" in ctx.manifest else None
+    if cat is not None and not cat.is_file():
         warnings.append(f"compose.catalog: missing ({cat.relative_to(root)})")
-    elif cat.is_file():
+    elif cat is not None and cat.is_file():
         catalog = json.loads(cat.read_text(encoding="utf-8"))
         cat_worker = bool((catalog.get("features") or {}).get("worker", False))
         primary = primary_api_module_id(ctx.manifest)
