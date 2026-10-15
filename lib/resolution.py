@@ -222,6 +222,10 @@ class Resolver:
         """The last non-empty value of `key` across the folder's env files, as compose would apply it."""
         return envfile.merged(self.env_files(folder)).get(key, default)
 
+    def run_env(self, folder: str) -> dict[str, str]:
+        """The variables a host run of the folder's module sets (envfile.HOST_RUN)."""
+        return envfile.merged(envfile.host_run_files(self.secrets_root, folder))
+
     def deploy_env_value(self, key: str, default: str = "") -> str:
         """An operator's process environment first, then the shared deploy.env."""
         return os.environ.get(key) or envfile.parse(self.secrets_root / "deploy.env").get(key) or default

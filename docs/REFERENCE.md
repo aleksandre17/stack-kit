@@ -141,7 +141,7 @@ Derived rules:
 | `infra prereqs \| local up\|down\|status \| remote sync\|up\|down\|status\|purge \| tunnel` `[-Prod] [-Confirm]` | infra compose locally or on the server; `remote sync` rsyncs `stack.infraComposeDir` to `{infra deploy path}/compose/`, `remote up` syncs then starts; `purge -Confirm` = `down -v` for this `INFRA_SLUG` only; `tunnel` = `ssh -L` for `stack.infra.services` | `toolkit/infra/Invoke-Infra.ps1` ([README](../toolkit/infra/README.md)) |
 | `layout [--all] [--role <r>] [--module <id>] [--no-server] [-Markdown -OutFile <f>]` | dry-run server layout per module + server overview (`--frontend`/`--backend` deprecated → `--role ui`/`--role api`) | `toolkit/layout/` |
 | `layout migrate\|cleanup [--dry-run] [--dev\|--prod] [--backend\|--frontend\|--all]` | flat → structured on the server / remove this host's old dirs (`cleanup --legacy-segments`) | `toolkit/deploy/migrate-layout.sh`, `cleanup-scoped-layout.sh` |
-| `hybrid boot <alias\|moduleId>` | host run with `ops/config/<module>/.env.dev` (same as `<alias> run`) | `toolkit/hybrid/Invoke-HybridRun.ps1` via the driver's `run` |
+| `hybrid boot <alias\|moduleId>` | host run with the module's `.env.dev` over its `.env.prod` (same as `<alias> run`) | `toolkit/hybrid/Invoke-HybridRun.ps1`, then the driver's declared `hybrid.script` |
 | `dev up <alias\|moduleId\|all> [--mode hybrid\|local\|docker\|remote] [--no-infra] [--no-tunnel]` | dev orchestration ([GOLDEN-PATHS.md#dev-modes](GOLDEN-PATHS.md#dev-modes)) | `toolkit/dev/Invoke-DevUp.ps1` |
 | `mod <moduleId> <command> [args]` | a module's driver command (canonical form; default command `deploy`) | the driver |
 | `<alias> <command> [args]` | same, through `cli.aliases` or a role shortcut | the driver |
@@ -190,8 +190,8 @@ Per-driver detail: [java-boot](../drivers/java-boot/README.md), [node-vite](../d
 
 Entry fields: `label`, `roles` (first = default role), `runtime` (`bash` | `powershell`), `commands`
 (name → script), `tasks` (`devWatch`, `deployWatch` argv; `dev up --mode remote` and `vscode-gen` read them),
-`vscode.launch`, `deployKind`, `deployArgs`, `layoutSimulator`, `hybrid.script` (dot-sourced by the hybrid
-runner), `migrations` (`globs`, `exclude`, `data` patterns; java-boot Flyway SQL, dotnet-aspnet EF Core), `configGen`, `acceptsGlobalCredentials`. A driver that declares no watch task gets none — a declared absence.
+`vscode.launch`, `deployKind`, `deployArgs`, `layoutSimulator`, `hybrid.script` (the launch step the hybrid
+runner dot-sources; a `hybrid` rung requires it), `migrations` (`globs`, `exclude`, `data` patterns; java-boot Flyway SQL, dotnet-aspnet EF Core), `configGen`, `acceptsGlobalCredentials`. A driver that declares no watch task gets none — a declared absence.
 
 Adding a driver (Go, FastAPI, Next.js, a Node API …) — a new type, never a renamed folder:
 

@@ -25,6 +25,8 @@ PWSH = shutil.which("pwsh") or shutil.which("powershell")
 pytestmark = pytest.mark.skipif(PWSH is None, reason="no PowerShell on this machine")
 OWN = "echo-driver"
 
+HYBRID = '"hybrid module=$ModuleId a=$env:SK_ECHO_A b=$env:SK_ECHO_B"\n'
+
 PS1 = '''param([Parameter(Position=0)][string]$First = "", [string]$Environment = "none", [switch]$Fast)
 "ps1 first=$First env=$Environment fast=$Fast"
 '''
@@ -45,10 +47,16 @@ def _host(tmp_path: Path) -> Path:
     (reg / OWN / "sh").mkdir(parents=True)
     (reg / OWN / "ps1" / "deploy.ps1").write_text(PS1, encoding="utf-8")
     (reg / OWN / "sh" / "check.sh").write_text('echo "sh $*"\n', encoding="utf-8")
+    (reg / OWN / "ps1" / "hybrid.ps1").write_text(HYBRID, encoding="utf-8")
+    secrets = root / manifest["secrets"] / "echo"
+    secrets.mkdir(parents=True, exist_ok=True)
+    (secrets / ".env.prod").write_text("SK_ECHO_A=prod\nSK_ECHO_B=prod\n", encoding="utf-8")
+    (secrets / ".env.dev").write_text("SK_ECHO_A=dev\nSK_ECHO_B=\n", encoding="utf-8")
     (reg / "registry.json").write_text(json.dumps({OWN: {
         "label": "echoes its operands", "roles": ["worker"], "runtime": "powershell",
         "commands": {"deploy": "ps1/deploy.ps1", "check": "sh/check.sh"},
-        "delivery": {"release": {"command": "deploy", "args": ["dist", "-Environment", "{environment}"]},
+        "hybrid": {"script": "ps1/hybrid.ps1"},
+        "delivery": {"hybrid": {"via": "hybrid"}, "release": {"command": "deploy", "args": ["dist", "-Environment", "{environment}"]},
                      "remote-dev": {"command": "check", "args": ["remote"]},
                      "container": {"pending": "not proven yet"}},
         "operands": {"ship": {"to": ["deploy", "now", "-Fast"], "hint": "ship is deploy -Fast"}}}}),
@@ -109,9 +117,9 @@ def test_a_bash_command_rung_runs_under_bash(host):
 
 
 def test_an_undeclared_rung_is_refused_naming_the_declared_ones(host):
-    ran = _cli(host, "mod", "echo", "deliver", "hybrid")
+    ran = _cli(host, "mod", "echo", "deliver", "local")
     assert ran.returncode == 1
-    assert "declares no delivery rung 'hybrid'" in ran.stdout and "release" in ran.stdout
+    assert "declares no delivery rung 'local'" in ran.stdout and "release" in ran.stdout
 
 
 def test_a_pending_rung_is_refused_with_its_reason(host):
@@ -131,3 +139,11 @@ def test_every_rung_names_a_command_its_driver_declares_or_is_pending():
     for typ, entry in KIT.items():
         for rung, how in entry.get("delivery", {}).items():
             assert ("pending" in how) or ("via" in how) or how.get("command") in entry["commands"], (typ, rung)
+
+
+def test_the_hybrid_rung_runs_the_drivers_declared_launch_step_with_its_run_environment(host):
+    # The runner names no driver: the step is the one the registry declares, and the module's
+    # .env.dev wins over its .env.prod, an empty dev value leaving the prod one (envfile.HOST_RUN).
+    ran = _cli(host, "mod", "echo", "deliver", "hybrid")
+    assert ran.returncode == 0, ran.stdout + ran.stderr
+    assert "hybrid module=echo a=dev b=prod" in ran.stdout

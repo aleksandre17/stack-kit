@@ -43,6 +43,17 @@ function Get-SecretsEnvValue {
     return $Default
 }
 
+function Import-ModuleRunEnv {
+    # A host run's environment into this process: the folder's .env.dev over its .env.prod (the
+    # resolver's rule, envfile.HOST_RUN). The values cross a pipe, never the console.
+    param([Parameter(Mandatory = $true)][string]$Module)
+    $json = Invoke-KitResolver -Arguments @('run-env', $Module) | Select-Object -First 1
+    if (-not $json) { return }
+    foreach ($p in ($json | ConvertFrom-Json).PSObject.Properties) {
+        Set-Item -Path "env:$($p.Name)" -Value ([string]$p.Value)
+    }
+}
+
 function Get-ComposeEnvFileArgs {
     param(
         [Parameter(Mandatory = $true)][string]$Module,

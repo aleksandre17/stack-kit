@@ -563,7 +563,7 @@
     },
     "layout": {
       "type": "object",
-      "description": "The host's tree as a declared layout, held as a floor by `stack-kit validate` (ADR-001 decision 3). Places the manifest already declares (package, secrets, module paths, compose catalog, ci scripts, infra compose dir, nginx template) are rows without being listed here.",
+      "description": "The host's tree as a declared layout, held as a floor by `stack-kit validate` (ADR-001 decision 3). Places the manifest already declares (package, secrets, module paths, compose catalog, ci scripts, infra compose dir, nginx template, config.keys, vscode.cliScript) are rows without being listed here.",
       "properties": {
         "entries": {
           "type": "array",

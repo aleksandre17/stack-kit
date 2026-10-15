@@ -35,6 +35,9 @@ GENERATORS = [
     "lib/migrate_layout_preflight.py",
     "lib/migrate_manifest.py",
     "lib/stack_deploy.py",
+    "toolkit/hybrid/Invoke-HybridRun.ps1",
+    "cli/stack-kit.ps1",
+    "cli/stack-kit.sh",
 ]
 
 

@@ -264,3 +264,29 @@ under bash or PowerShell by script; undeclared and pending rungs refused; mutati
 consumer-shaped schema fields (`ci.rag*`, `modules.*.catalog`, `modules.*.derivation`); folding
 `driver_api.py` and `modules_cli.py` into `resolve_cli.py`; `lib/module-manifest.ps1`'s typed
 accessors.
+
+## Amendment 6 — the host run, as the second host found it (2026-10-16, owner-delegated)
+
+Taking geostat_in_out onto the renamed kit showed that K6 had kept its promise for the CLI and not
+for the host run: `toolkit/hybrid/Invoke-HybridRun.ps1` still branched on three driver names and
+parsed env files itself, in an order (`.env.prod`, then `.env.dev` over it) that `lib/envfile.py`
+did not know.
+
+1. **Every driver declares its launch step.** The three branches moved verbatim into
+   `drivers/<id>/ps1/hybrid.ps1`; the runner joins the guarded list in
+   `test_declared_agnosticism.py`, and a `hybrid` rung without a declared step fails
+   `test_registry_integrity.py`. *Rejected:* leaving the three as "legacy rungs", which is how a
+   ladder survives a decision that removed it.
+2. **The host-run order is a rule in the one home.** `envfile.HOST_RUN` = prod, then dev: a host
+   run is a development run, and the production file only fills what development leaves unset.
+   *Rejected:* the compose order (dev, prod), which would run a developer's process on production
+   values whenever both files set a key.
+3. **`hybrid boot` calls the runner, not the driver's `run`.** Every driver's `run.ps1` is the same
+   delegate; routing through it made a project driver need a `run` command to be host-run.
+4. **A declared host file is a floor row.** `config.keys` and `vscode.cliScript` join the derived
+   rows: a manifest naming a file that is not there is a broken manifest.
+
+Proof: `tests/acceptance/test_delivery.py` runs a project driver's hybrid rung through the real CLI
+and reads `.env.dev` over `.env.prod` from the process; `tests/unit/test_envfile.py`;
+`tests/acceptance/test_layout_floor.py`. The order was mutation-checked (reversing `HOST_RUN` fails
+both). Still owed: the four identical `run.ps1` delegates.

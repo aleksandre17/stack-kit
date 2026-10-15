@@ -56,13 +56,13 @@ cp -r /tmp/stack-kit <host>/kits/stack-kit
 | `ops/cli/stack-kit.ps1` | `kits/stack-kit/cli/stack-kit.ps1` | canonical project entry |
 | `ops/cli/stack-kit.sh` | `kits/stack-kit/cli/stack-kit.sh` | bash entry |
 
-A hand-written PowerShell launcher must forward the kit CLI's two parameters, `Command` and `CliRest`:
+A hand-written PowerShell launcher must forward the kit CLI's two parameters, `Command` and `CliRest`,
+from a SIMPLE param block: an advanced one (any `[Parameter()]`) adds PowerShell's common parameters,
+and an operand such as `-d` then binds as `-Debug` and is lost.
 
 ```powershell
-param(
-    [Parameter(Position = 0)] [string]$Command = "help",
-    [Parameter(ValueFromRemainingArguments = $true)] [string[]]$CliRest = @()
-)
+param([string]$Command = "help", [string[]]$CliRest = @())
+$CliRest = @($CliRest) + @($args)
 $Root = Split-Path $PSScriptRoot -Parent
 & (Join-Path $Root "kits\stack-kit\cli\stack-kit.ps1") -Command $Command -CliRest $CliRest
 exit $LASTEXITCODE

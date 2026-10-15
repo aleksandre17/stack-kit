@@ -16,6 +16,9 @@ _LINE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
 #: are handed to compose with repeated --env-file.
 PROFILES = ("dev", "prod", "deploy")
 
+#: A host run (`hybrid boot`) is a development run: .env.dev wins, .env.prod fills what it leaves unset.
+HOST_RUN = ("prod", "dev")
+
 
 def parse(path: Path) -> dict[str, str]:
     """KEY=value lines; comments, blank lines and empty values are not values."""
@@ -40,6 +43,12 @@ def merged(paths: list[Path]) -> dict[str, str]:
     for path in paths:
         out.update(parse(path))
     return out
+
+
+def host_run_files(secrets_root: Path, folder: str) -> list[Path]:
+    """The env files a host run reads, in the order they are applied (HOST_RUN)."""
+    files = [secrets_root / folder / f".env.{p}" for p in HOST_RUN]
+    return [f for f in files if f.is_file()]
 
 
 def folder_files(secrets_root: Path, folder: str, profile: str = "all") -> list[Path]:

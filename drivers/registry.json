@@ -19,6 +19,9 @@
       "check": "sh/check.sh",
       "modules": "sh/modules.sh"
     },
+    "hybrid": {
+      "script": "ps1/hybrid.ps1"
+    },
     "tasks": {
       "devWatch": [
         "dev",
@@ -82,6 +85,9 @@
       "compose": "ps1/compose.ps1",
       "check": "ps1/check.ps1"
     },
+    "hybrid": {
+      "script": "ps1/hybrid.ps1"
+    },
     "tasks": {
       "devWatch": [
         "dev",
@@ -140,6 +146,9 @@
       "check": "sh/check.sh",
       "modules": "sh/modules.sh"
     },
+    "hybrid": {
+      "script": "ps1/hybrid.ps1"
+    },
     "tasks": {
       "devWatch": [
         "dev",
@@ -155,6 +164,9 @@
       },
       "remote-dev": {
         "command": "dev"
+      },
+      "hybrid": {
+        "via": "hybrid"
       },
       "release": {
         "command": "deploy",

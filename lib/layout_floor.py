@@ -8,8 +8,8 @@ knows of. Two sources of rows:
 * **Derived** -- every place the manifest DECLARES explicitly is a place that must exist: the
   vendored kit, each module's directory, the secrets root, a declared compose catalog, declared CI
   scripts, the infra compose directory once infra services are declared, a declared nginx
-  template. A default the host never wrote is not a row: a host that uses no compose is not failed
-  for lacking a catalog.
+  template, the config-key catalogue, the editor launcher. A default the host never wrote is not a
+  row: a host that uses no compose is not failed for lacking a catalog.
 * **Declared** -- `layout.entries` in the manifest: whatever else the host says its tree holds.
 
 `layout.closed` names directories the declaration is EXHAUSTIVE at: every tracked child of one must
@@ -69,6 +69,10 @@ def derived_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     if declared("adapters.nginx.template"):
         rows.append(_row(declared("adapters.nginx.template"), "file", "module-source",
                          "adapters.nginx.template"))
+    if declared("config.keys"):
+        rows.append(_row(declared("config.keys"), "file", "configuration", "config.keys"))
+    if declared("vscode.cliScript"):
+        rows.append(_row(declared("vscode.cliScript"), "file", "launcher", "vscode.cliScript"))
     return rows
 
 

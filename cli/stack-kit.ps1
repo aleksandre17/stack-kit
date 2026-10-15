@@ -1,4 +1,4 @@
-# stack-kit CLI — module drivers by stack type (java-boot, node-vite, node-api, …)
+# stack-kit CLI — module drivers by stack type, as drivers/registry.json declares them
 
 # A simple param block on purpose: an advanced one (any [Parameter()]) adds PowerShell's common
 # parameters, and an operand such as `-d` then binds as -Debug and is lost (ADR-001 K3).
@@ -136,7 +136,7 @@ function Invoke-DriverScript {
         [void]$positional.Add($t)
     }
     # A PowerShell driver reports failure by THROWING; a throw sets no $LASTEXITCODE, so without
-    # this a failed command exited 0 (seen with dotnet-aspnet deploy).
+    # this a failed command exited 0 (seen with a PowerShell driver's deploy).
     $global:LASTEXITCODE = 0
     $posArgs = @($positional)
     & $Script @posArgs @named
@@ -399,7 +399,12 @@ $globalCommands = @{
             Write-Host "  Unknown module or alias: $($CliRest[1])" -ForegroundColor Red
             exit 1
         }
-        Invoke-ModuleDriver -ModuleId $target -DriverArgs @("run")
+        # The host run is the shared runner and the launch step the driver declares (hybrid.script);
+        # no driver command stands between them.
+        $env:STACK_KIT_MODULE_ID = $target
+        $env:STACK_KIT_KIT_ROOT = $PackageRoot
+        & (Join-Path $PackageRoot "toolkit\hybrid\Invoke-HybridRun.ps1") -ModuleId $target
+        exit $LASTEXITCODE
     }
 
     "dev" = {

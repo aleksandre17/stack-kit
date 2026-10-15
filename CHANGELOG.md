@@ -2,6 +2,20 @@
 
 ## 1.2.0-dev — unreleased
 
+### The host run is declared too (ADR-001 amendment 6)
+
+- `toolkit/hybrid/Invoke-HybridRun.ps1` names no driver. The `java-boot`, `node-vite` and
+  `node-api` launch steps moved into each driver's declared `hybrid.script` (`ps1/hybrid.ps1`),
+  as `dotnet-aspnet`'s already was; a driver without one is refused by name. `node-api` gains
+  the `hybrid` delivery rung its launch step always had.
+- `stack-kit hybrid boot <id>` runs the shared runner directly, not through the driver's `run`.
+- A host run's environment is the resolver's rule (`envfile.HOST_RUN`: `.env.dev` over
+  `.env.prod`; `resolve_cli.py run-env <folder>`; `Import-ModuleRunEnv`), not a fourth parser
+  in the runner. An empty value in `.env.prod` no longer unsets a variable of the process.
+- Layout floor: a declared `config.keys` and `vscode.cliScript` are rows; missing, they fail.
+- `docs/INSTALL.md`: the hand-written launcher example used the advanced param block that
+  loses `-d`; it now shows the simple one the scaffold ships.
+
 ### Delivery ladders by declaration (ADR-001 K6)
 
 - Each driver declares its delivery ladder in `drivers/registry.json` `delivery`: rung →
@@ -12,7 +26,7 @@
   |---|---|---|---|---|---|
   | java-boot | run | via hybrid | dev | deploy all | — |
   | node-vite | run | via hybrid | dev | deploy dist -Environment {environment} | — |
-  | node-api | run | — | dev | deploy | — |
+  | node-api | run | via hybrid | dev | deploy | — |
   | dotnet-aspnet | run | via hybrid | — | deploy artifact | pending: needs a docker host to prove it |
 
   The `release` rung is the one home of what `deployArgs` held (`stack-deploy` reads it; a project

@@ -87,3 +87,12 @@ def test_validate_exits_non_zero_on_a_floor_failure(host):
                          env=env, capture_output=True, text=True)
     assert ran.returncode == 1
     assert "layout: never/built/" in ran.stderr
+
+
+@pytest.mark.parametrize("dotted", ["config.keys", "vscode.cliScript"])
+def test_a_declared_host_file_that_is_missing_fails_naming_its_field(host, dotted):
+    manifest = _manifest(host)
+    section, name = dotted.split(".")
+    manifest.setdefault(section, {})[name] = "ops/declared-but-absent.json"
+    failures = evaluate(host, manifest).failures
+    assert any(dotted in f and "ops/declared-but-absent.json" in f for f in failures), failures
