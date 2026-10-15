@@ -42,13 +42,17 @@ def _read_nested(data: dict[str, Any], dotted: str, default: str = "") -> str:
 
 
 def find_project_root(start: Path | None = None) -> Path:
+    """The ONE discovery every runtime uses (ADR-001 decision 2).
+
+    An explicit `start` is walked up from. Otherwise: the declared root (`<prefix>_PROJECT_ROOT`)
+    is authoritative -- an operator's explicit answer is never overridden by a guess; then the
+    working directory and its parents; then, only when asked for, pre-v2 trees. (Not the
+    directories above the running kit: a kit checked out inside some other repository would then
+    resolve that repository from anywhere -- a guess, made silently.)
+    """
+    if start is None and env("PROJECT_ROOT"):
+        return Path(env("PROJECT_ROOT")).resolve()
     start = (start or Path.cwd()).resolve()
-    if has_manifest(start):
-        return start
-    if env("PROJECT_ROOT"):
-        env_root = Path(env("PROJECT_ROOT")).resolve()
-        if has_manifest(env_root):
-            return env_root
     for p in [start, *start.parents]:
         if has_manifest(p):
             return p

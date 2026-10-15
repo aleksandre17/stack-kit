@@ -129,3 +129,42 @@ kit owns and prints what the host wrote, and two manifest homes are refused.
 **Owed, named:** `config/config-catalog.json` `envProfileSecretsBlock` still renders one consumer's AI
 integration keys into every env-profiles module (K5, with the catalogue's sensitivity columns); several
 unit tests still use `chat-api` as sample module-id data (K3, with the test split).
+
+## Amendment 2 — K2 as built (2026-10-15, owner-delegated)
+
+**Landed.** `lib/resolution.py` is the one resolver; `lib/resolve_cli.py` is how a shell asks it.
+The seven shell libraries keep every public function and hold no rule. Proof:
+`tests/test_resolver_parity.py` asks bash, PowerShell and Python 22 questions on a host bent to
+exercise each rule that had drifted, and compares the answers; no shim spells a manifest field
+(the sensor is checked on specimens). Both are mutation-checked: a spelled field in `project.sh`,
+and first-wins in the env value, each turn the suite red. The divergences found and settled are
+listed in the changelog.
+
+**Decided while building, with what was rejected:**
+
+1. **One flat context map, identical in every runtime** (`kind:key` → text): bash holds it as one
+   associative array, PowerShell as one hashtable, so parity is a comparison of two maps.
+   *Rejected:* per-function Python calls from the shells (the bash status quo, one interpreter
+   start per field read), and a nested document each shell walks (the walk is a rule).
+2. **Cache what the manifest says; ask for what the environment says.** The context is resolved
+   once per declared root (else working directory) for a shell's lifetime; env files, deploy values,
+   slugs and paths are asked each time, because an env file is written or a variable exported
+   during a run. Secret values never enter the cached context. *Rejected:* caching the environment's
+   answers too — stale within the run that changes them.
+3. **The declared root is authoritative, and the search starts at the working directory.**
+   *Rejected:* PowerShell's search from the kit's own folder — a kit checked out inside another
+   repository resolves that repository from anywhere, silently.
+4. **Convention defaults are a declared list**, not "any field of the template": the template also
+   carries sample modules, aliases and stores.
+5. **Compose semantics for env values** (a later file wins), and **the operator's process
+   environment before `deploy.env`** (an explicit override beats a file).
+6. **No invented remote path.** With neither an explicit path nor a server to derive one from, the
+   deploy base and the infra deploy path are refused.
+7. **Paths reach Git Bash as Git Bash spells them** (`/c/...`): the resolver respells paths when
+   asked with `--shell bash` on Windows, because a drive colon handed to `scp` or `rsync` reads as a
+   host name. **Output is LF, UTF-8**: a CR would ride inside every value a shell reads.
+
+**Owed, named:** `lib/module-manifest.ps1` (typed PowerShell accessors for `hybrid.*`, `spring.*`)
+still names fields, by design one file of them; it moves with the module facts into the context
+when a driver needs them in bash too. `lib/driver_api.py` and `lib/modules_cli.py` remain separate
+CLIs over the same Python and fold into `resolve_cli.py` with K3's tree.

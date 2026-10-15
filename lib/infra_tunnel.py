@@ -27,8 +27,19 @@ def resolve_tunnel_forwards(
     Return (local_port, remote_port) pairs for ssh -L.
     Only services listed in service_ids with catalog tunnel[] entries.
     """
+    return [(f["local"], f["remote"]) for f in tunnel_forwards(
+        service_ids=service_ids, catalog=catalog, env_getter=env_getter)]
+
+
+def tunnel_forwards(
+    *,
+    service_ids: list[str],
+    catalog: dict[str, Any],
+    env_getter: Callable[[str, str], str | None],
+) -> list[dict[str, str]]:
+    """Each forward with the service and the variable it came from: local, remote, service, env."""
     modules = catalog.get("modules") or {}
-    out: list[tuple[str, str]] = []
+    out: list[dict[str, str]] = []
     seen: set[str] = set()
     for sid in service_ids:
         mod = modules.get(sid)
@@ -54,5 +65,5 @@ def resolve_tunnel_forwards(
             if port in seen:
                 continue
             seen.add(port)
-            out.append((port, port))
+            out.append({"local": port, "remote": port, "service": sid, "env": env_key})
     return out

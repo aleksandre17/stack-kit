@@ -166,4 +166,5 @@ def test_dev_orchestrator_is_registry_driven() -> None:
     for token in ("node-vite", "java-boot", "node-api", "chat-api", "frontend"):
         assert token not in src, f"Invoke-DevUp.ps1 names '{token}'"
     assert "Get-DriverTaskArgs" in src
-    assert "Get-DriverDefaultRole" in src
+    # A module's role is the resolver's answer (declared, else its driver's) -- never inferred here.
+    assert "Get-ModuleRole" in src and "ConvertFrom-Json" not in src

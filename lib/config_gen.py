@@ -55,16 +55,9 @@ def _slug_port_env(secrets_module: str) -> str:
 
 
 def _parse_env_file(path: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if not path.is_file():
-        return out
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
+    from lib.envfile import parse
+
+    return parse(path)
 
 
 def _port_env_key(cfg: dict[str, Any], secrets_module: str) -> str:

@@ -1,27 +1,27 @@
-# N-module manifest helpers (roles, types, layout routing)
+# Modules for PowerShell -- roles, types, layout routing, compose names: a SHIM over the resolver
+# (ADR-001 decision 2). No driver and no module id is named here.
 
 . (Join-Path $PSScriptRoot "project.ps1")
-. (Join-Path $PSScriptRoot "stack-kit-python.ps1")
 . (Join-Path $PSScriptRoot "drivers.ps1")
 
 function Invoke-StackKitModulesApi {
     param([string[]]$ApiArgs)
-    $pyArgs = Get-StackKitPythonArgs
-    if (-not $pyArgs) { throw "Python not found (tried py -3, python3, python)" }
+    if (-not $script:KitPython) {
+        $script:KitPython = Get-StackKitPythonArgs
+        if (-not $script:KitPython) { throw "Python not found (tried py -3, python3, python)" }
+    }
     $script = Join-Path (Get-OpsPackageRoot) "lib\modules_cli.py"
-    Invoke-StackKitPythonExe $pyArgs $script @ApiArgs
+    Invoke-StackKitPythonExe $script:KitPython $script @ApiArgs
 }
 
 function Get-ModuleRole {
     param([Parameter(Mandatory = $true)][string]$ModuleId)
-    Invoke-StackKitModulesApi @("role", $ModuleId)
+    Get-KitContextValue "module:$($ModuleId):role"
 }
 
 function Get-ModuleIdsByRole {
     param([Parameter(Mandatory = $true)][string]$Role)
-    $out = Invoke-StackKitModulesApi @("by-role", $Role)
-    if ($out) { return $out -split "`n" | Where-Object { $_ } }
-    return @()
+    Get-KitContextLines "role:$Role"
 }
 
 function Get-ModuleIdByRole {
@@ -29,27 +29,20 @@ function Get-ModuleIdByRole {
         [Parameter(Mandatory = $true)][string]$Role,
         [int]$Index = 0
     )
-    $ids = Get-ModuleIdsByRole $Role
+    $ids = @(Get-ModuleIdsByRole $Role)
     if ($Index -lt $ids.Count) { return $ids[$Index] }
     return $null
 }
 
 function Get-ModuleIdsByDriverType {
     param([Parameter(Mandatory = $true)][string]$DriverType)
-    $mf = Get-ProjectManifestPath
-    if (-not $mf) { return @() }
-    $data = Get-Content $mf -Raw | ConvertFrom-Json
-    @($data.modules.PSObject.Properties | Where-Object { $_.Value.type -eq $DriverType } | ForEach-Object { $_.Name })
+    Get-KitContextLines "type:$DriverType"
 }
 
 function Get-LayoutSimulatorScript {
+    # The layout simulator the module's driver DECLARES, or $null.
     param([Parameter(Mandatory = $true)][string]$ModuleId)
-    $typ = Get-ModuleType $ModuleId
-    switch ($typ) {
-        "node-vite" { return "simulate-frontend-layout.ps1" }
-        "java-boot" { return "simulate-backend-layout.ps1" }
-        default { return $null }
-    }
+    Get-KitContextValue "driver:$(Get-ModuleType $ModuleId):layoutSimulator"
 }
 
 function Invoke-ModuleLayoutSimulator {
@@ -77,11 +70,9 @@ function Get-ModuleComposeServiceName {
 }
 
 function Get-ComposeAppServiceName {
-    $n = Get-ModuleComposeServiceName -ModuleId "frontend"
-    if ($n) { return $n }
-    $fromDeploy = Get-DeployEnvValue "COMPOSE_APP_SERVICE"
-    if ($fromDeploy) { return $fromDeploy }
-    "$(Get-ComposeSlug)-app"
+    # The UI service's compose name, as the one naming rule (lib/compose_identity.py) gives it.
+    $names = (Invoke-StackKitModulesApi @("compose-names")) -join "`n" | ConvertFrom-Json
+    return [string]$names.app
 }
 
 function Write-StackEndpointHints {

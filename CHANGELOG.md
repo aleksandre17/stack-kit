@@ -2,6 +2,42 @@
 
 ## 1.2.0-dev — unreleased
 
+### One resolver (ADR-001 K2)
+
+Project discovery, manifest fields and their defaults, modules, roles, types, aliases, driver
+lookup, env files and values, slugs, server and deploy paths, and the infra compose and tunnel
+rules are answered by `lib/resolution.py` alone, through `lib/resolve_cli.py`. `lib/project.sh`,
+`lib/env.sh`, `lib/drivers.sh`, `lib/project.ps1`, `lib/env.ps1`, `lib/drivers.ps1` and
+`lib/modules.ps1` keep every public function and now only look answers up (1,485 lines of shell
+resolution became 844, comments included). A shell resolves what the manifest says once and
+keeps it; what the environment says is asked each time. Env files are read by one parser
+(`lib/envfile.py`) instead of three.
+
+The copies had drifted. Every runtime now gives the answer below; where a runtime used to
+differ, it is named:
+
+- **Project root:** a declared `STACK_KIT_PROJECT_ROOT` is authoritative; otherwise the working
+  directory and its parents. PowerShell searched upward from the kit's own folder instead of the
+  working directory; Python checked the working directory before the declared root.
+- **Field defaults:** a missing field takes the declared convention default
+  (`manifest_defaults.CONVENTION_DEFAULTS`), never an arbitrary template field. PowerShell applied
+  no defaults at all (its `[string]$Default = $null` is `""`, so its template fallback never ran):
+  a manifest without `secrets` gave PowerShell the project root as the secrets root.
+- **A module's role:** declared, else the first role its driver declares. Bash spelled two
+  drivers' roles inline.
+- **An env value of a secrets folder:** the last non-empty value across `.env.dev`, `.env.prod`,
+  `deploy.env`, `.env.deploy`, which is how compose applies them. Bash returned the first.
+- **A shared deploy value:** the process environment first, then `deploy.env`. Bash read the file
+  first.
+- **The server base:** `DEPLOY_SERVER_BASE`, else `/home/<user>` from `DEPLOY_SERVER`, each looked
+  up in `deploy.env` and then in every module folder. Bash looked only in `deploy.env`.
+- **A remote deploy base with no `DEPLOY_PATH` and no server to derive one from:** refused.
+  Bash produced `/<slug>/<folder>`; Python defaulted to `/home/deploy`.
+- **The infra deploy path with neither:** refused. It used to be one consumer's server path.
+- **CLI aliases, the UI compose service name, a driver's layout simulator:** the resolver's.
+  PowerShell re-derived the aliases, took the UI service from a module literally named
+  `frontend`, and mapped two driver names to simulators inline.
+
 ### Identity — the kit names no consumer (ADR-001 K1)
 
 The package, command, manifest and environment are renamed; every former name is still READ for

@@ -6,12 +6,8 @@ import re
 from pathlib import Path
 from typing import Any, Callable
 
+from lib import envfile
 from lib.project_context import ProjectContext
-
-_ENV_LINE = re.compile(
-    r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$",
-)
-
 
 def load_stack_catalog(path: Path) -> dict[str, Any]:
     if not path.is_file():
@@ -20,36 +16,11 @@ def load_stack_catalog(path: Path) -> dict[str, Any]:
 
 
 def _parse_env_files(paths: list[Path]) -> dict[str, str]:
-    merged: dict[str, str] = {}
-    for path in paths:
-        if not path.is_file():
-            continue
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            m = _ENV_LINE.match(line)
-            if not m:
-                continue
-            val = m.group(2).strip().strip('"').strip("'")
-            if val:
-                merged[m.group(1)] = val
-    return merged
+    return envfile.merged(paths)
 
 
 def _secrets_env_files(secrets_dir: Path) -> list[Path]:
-    files: list[Path] = []
-    for name in (".env.dev", ".env.prod"):
-        p = secrets_dir / name
-        if p.is_file():
-            files.append(p)
-    deploy_shared = secrets_dir.parent / "deploy.env"
-    if deploy_shared.is_file():
-        files.append(deploy_shared)
-    deploy_mod = secrets_dir / ".env.deploy"
-    if deploy_mod.is_file():
-        files.append(deploy_mod)
-    return files
+    return envfile.folder_files(secrets_dir.parent, secrets_dir.name)
 
 
 def _module_port_env_keys(

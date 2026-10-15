@@ -188,7 +188,9 @@ def resolve_infra_deploy_path(
     if server_base and global_project:
         gp = normalize_infra_slug(global_project)
         return f"{normalize_base(server_base)}/{gp}/infra/{slug}"
-    return f"/home/administrator/stack-kit/infra/{slug}"
+    # No invented server path: a deploy target nobody declared is refused, never guessed.
+    raise ValueError("infra deploy path: set DEPLOY_PATH in the infra env, or DEPLOY_SERVER_BASE / "
+                     "DEPLOY_SERVER so it can be derived")
 
 
 def infra_deploy_path_candidates(

@@ -1,72 +1,56 @@
-# Module driver resolution — manifest type + drivers/registry.json (see lib/driver_api.py)
+# Module drivers for PowerShell -- a SHIM over the resolver's context (ADR-001 decision 2).
+#
+# A module's type, the registry's commands, default roles, tasks and host-run scripts, the CLI
+# aliases: all are answered by lib/resolution.py from the manifest and drivers/registry.json. This
+# file only looks them up, and says what is missing in the words a caller needs.
 
-. (Join-Path $PSScriptRoot "stack-kit-python.ps1")
-
-function Get-DriverApiScript {
-    Join-Path (Get-OpsPackageRoot) "lib\driver_api.py"
-}
-
-function Invoke-DriverApi {
-    param([string[]]$ApiArgs)
-    $pyArgs = Get-StackKitPythonArgs
-    if (-not $pyArgs) { throw "Python not found (tried py -3, python3, python)" }
-    Invoke-StackKitPythonExe $pyArgs (Get-DriverApiScript) @ApiArgs
-    if ($LASTEXITCODE -ne 0) { throw "driver_api failed" }
-}
+. (Join-Path $PSScriptRoot "project.ps1")
 
 function Get-DriverRegistryPath {
     Join-Path (Get-OpsPackageRoot) "drivers\registry.json"
 }
 
 function Get-ModuleManifestEntry {
+    # The module's own declaration as an object, or $null when the manifest declares no such module.
     param([string]$ModuleId)
-    $mf = Get-ProjectManifestPath
-    if (-not $mf -or -not (Test-Path $mf)) { return $null }
-    $data = Get-Content $mf -Raw | ConvertFrom-Json
-    if (-not $data.modules.PSObject.Properties[$ModuleId]) { return $null }
-    return $data.modules.$ModuleId
+    $json = Get-KitContextValue "module:$($ModuleId):json"
+    if (-not $json) { return $null }
+    return ($json | ConvertFrom-Json)
 }
 
 function Get-ModuleType {
     param([string]$ModuleId)
-    $m = Get-ModuleManifestEntry $ModuleId
-    if (-not $m) {
-        throw "Unknown module '$ModuleId' - add modules.$ModuleId in $((Get-KitIdentity).manifestFilename)"
+    if (-not (Get-KitContextValue "module:$($ModuleId):json")) {
+        throw "Unknown module '$ModuleId' - declare it under modules in $((Get-KitIdentity).manifestFilename)"
     }
-    if (-not $m.type) {
-        throw "modules.$ModuleId.type is required (driver id from drivers/registry.json)"
-    }
-    return [string]$m.type
+    $t = Get-KitContextValue "module:$($ModuleId):type"
+    if (-not $t) { throw "module '$ModuleId' declares no type (a driver id from drivers/registry.json)" }
+    return $t
 }
 
 function Get-ModuleProjectPath {
     param([string]$ModuleId)
-    $root = Get-ProjectRootFromManifest
-    $m = Get-ModuleManifestEntry $ModuleId
-    $rel = if ($m.path) { $m.path } else { $ModuleId }
-    Join-Path $root $rel
+    Get-ManifestModulePath $ModuleId
 }
 
 function Get-DriverRoot {
     param([string]$ModuleId)
-    Join-Path (Get-OpsPackageRoot) "drivers\$(Get-ModuleType $ModuleId)"
+    $null = Get-ModuleType $ModuleId
+    Get-KitContextValue "module:$($ModuleId):driverRoot"
 }
 
-function Get-DriverRegistryEntry {
+function Assert-DriverRegistered {
     param([string]$Type)
-    $reg = Get-Content (Get-DriverRegistryPath) -Raw | ConvertFrom-Json
-    if (-not $reg.PSObject.Properties[$Type]) {
-        $known = ($reg.PSObject.Properties.Name) -join ", "
-        throw "Unknown driver type '$Type' - add drivers/$Type/ and registry.json. Known: $known"
+    if (-not (Get-KitContextLines 'drivers' | Where-Object { $_ -eq $Type })) {
+        throw "Unknown driver type '$Type' - add drivers/$Type/ and registry.json. Known: $((Get-KitContextLines 'drivers') -join ', ')"
     }
-    return $reg.$Type
 }
 
 function Get-DriverCapabilities {
     param([string]$ModuleId)
     $typ = Get-ModuleType $ModuleId
-    $entry = Get-DriverRegistryEntry $typ
-    @($entry.commands.PSObject.Properties.Name)
+    Assert-DriverRegistered $typ
+    Get-KitContextLines "driver:$($typ):commands"
 }
 
 function Get-DriverCommandPath {
@@ -74,96 +58,58 @@ function Get-DriverCommandPath {
         [string]$ModuleId,
         [string]$Command
     )
-    $caps = Get-DriverCapabilities $ModuleId
+    $typ = Get-ModuleType $ModuleId
+    $caps = @(Get-DriverCapabilities $ModuleId)
     if ($Command -notin $caps) {
-        throw "Driver '$(Get-ModuleType $ModuleId)' has no command '$Command' (available: $($caps -join ', '))"
+        throw "Driver '$typ' has no command '$Command' (available: $($caps -join ', '))"
     }
-    $entry = Get-DriverRegistryEntry (Get-ModuleType $ModuleId)
-    Join-Path (Get-DriverRoot $ModuleId) $entry.commands.$Command
+    Get-KitContextValue "driver:$($typ):command:$Command"
 }
 
-# The role a driver DECLARES it serves first (drivers/registry.json "roles"), used only
-# when a module omits an explicit role. No driver name is known to this file.
+# The role a driver DECLARES it serves first, used only when a module omits its own.
 function Get-DriverDefaultRole {
     param([string]$Type)
     if (-not $Type) { return "" }
-    $reg = Get-Content (Get-DriverRegistryPath) -Raw | ConvertFrom-Json
-    if (-not $reg.PSObject.Properties[$Type]) { return "" }
-    $roles = @($reg.$Type.roles)
-    if ($roles.Count -gt 0) { return [string]$roles[0] }
+    $r = Get-KitContextValue "driver:$($Type):defaultRole"
+    if ($r) { return $r }
     return ""
 }
 
-# The argv a driver DECLARES for a named watch loop (registry "tasks"), or $null.
+# The argv a driver DECLARES for a named watch loop, or $null.
 function Get-DriverTaskArgs {
     param([string]$Type, [string]$TaskName)
     if (-not $Type) { return $null }
-    $reg = Get-Content (Get-DriverRegistryPath) -Raw | ConvertFrom-Json
-    if (-not $reg.PSObject.Properties[$Type]) { return $null }
-    $tasks = $reg.$Type.tasks
-    if (-not $tasks -or -not $tasks.PSObject.Properties[$TaskName]) { return $null }
-    return @($tasks.$TaskName)
+    $argv = @(Get-KitContextLines "driver:$($Type):task:$TaskName")
+    if ($argv.Count -eq 0) { return $null }
+    return $argv
 }
 
-# The launch script a driver DECLARES for a host-process run (registry "hybrid.script"),
-# resolved under drivers/<type>/, or $null when the driver declares none.
+# The launch script a driver DECLARES for a host-process run, or $null when it declares none.
 function Get-DriverHybridScript {
     param([string]$Type)
     if (-not $Type) { return $null }
-    $reg = Get-Content (Get-DriverRegistryPath) -Raw | ConvertFrom-Json
-    if (-not $reg.PSObject.Properties[$Type]) { return $null }
-    $hybrid = $reg.$Type.hybrid
-    if (-not $hybrid -or -not $hybrid.script) { return $null }
-    $path = Join-Path (Join-Path (Get-OpsPackageRoot) "drivers\$Type") $hybrid.script
-    if (-not (Test-Path $path)) { throw "drivers/registry.json: $Type.hybrid.script points to a missing file: $path" }
+    $path = Get-KitContextValue "driver:$($Type):hybridScript"
+    if (-not $path) { return $null }
+    if (-not (Test-Path $path)) { throw "drivers/registry.json: $Type declares a host-run script that is missing: $path" }
     return $path
 }
 
 function Get-CliAliasesFromManifest {
-    $mf = Get-ProjectManifestPath
-    if (-not $mf) { return @{} }
-    $data = Get-Content $mf -Raw | ConvertFrom-Json
     $aliases = @{}
-    if ($data.cli -and $data.cli.aliases) {
-        $data.cli.aliases.PSObject.Properties | ForEach-Object {
-            $aliases[$_.Name] = [string]$_.Value
-        }
-    }
-    $used = [System.Collections.Generic.HashSet[string]]::new()
-    foreach ($v in $aliases.Values) { [void]$used.Add($v) }
-    foreach ($role in @("ui", "api", "worker", "gateway")) {
-        $ids = @(
-            $data.modules.PSObject.Properties |
-                Where-Object {
-                    $r = $_.Value.role
-                    if (-not $r) { $r = Get-DriverDefaultRole ([string]$_.Value.type) }
-                    $r -eq $role
-                } |
-                ForEach-Object { $_.Name }
-        )
-        if ($ids.Count -eq 1 -and -not $used.Contains($ids[0])) {
-            if (-not $aliases.ContainsKey($role)) { $aliases[$role] = $ids[0] }
-            [void]$used.Add($ids[0])
-        }
+    foreach ($key in @((Get-KitContext).Keys | Where-Object { $_ -like 'alias:*' })) {
+        $aliases[$key.Substring(6)] = (Get-KitContext)[$key]
     }
     return $aliases
 }
 
 function Resolve-CliAlias {
     param([string]$Alias)
-    $aliases = Get-CliAliasesFromManifest
-    if ($aliases.ContainsKey($Alias)) { return $aliases[$Alias] }
-    $mf = Get-ProjectManifestPath
-    if ($mf) {
-        $data = Get-Content $mf -Raw | ConvertFrom-Json
-        if ($data.modules.PSObject.Properties[$Alias]) { return $Alias }
-    }
+    $target = Get-KitContextValue "alias:$Alias"
+    if ($target) { return $target }
+    if (Get-KitContextValue "module:$($Alias):json") { return $Alias }
     return $null
 }
 
 function Get-ProjectModules {
-    $mf = Get-ProjectManifestPath
-    if (-not $mf) { return @() }
-    $data = Get-Content $mf -Raw | ConvertFrom-Json
-    @($data.modules.PSObject.Properties.Name)
+    Get-KitContextLines 'modules'
 }

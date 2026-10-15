@@ -24,19 +24,9 @@ def slugify(text: str) -> str:
 
 
 def parse_env_file(path: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if not path.is_file():
-        return out
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, val = line.partition("=")
-        key = key.strip()
-        val = val.strip().strip("\"'")
-        if key and val:
-            out[key] = val
-    return out
+    from lib.envfile import parse
+
+    return parse(path)
 
 
 def load_deploy_env(secrets_root: Path) -> dict[str, str]:

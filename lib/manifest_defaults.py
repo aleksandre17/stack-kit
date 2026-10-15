@@ -30,16 +30,35 @@ def read_nested(data: dict[str, Any], dotted: str, default: str = "") -> str:
 @lru_cache(maxsize=1)
 def flatten_defaults() -> dict[str, str]:
     m = load_scaffold_manifest()
-    out: dict[str, str] = {
-        "package": read_nested(m, "package"),
-        "secrets": read_nested(m, "secrets"),
-        "compose.catalog": read_nested(m, "compose.catalog"),
-        "compose.syncModules": read_nested(m, "compose.syncModules"),
-        "stack.composeDir": read_nested(m, "stack.composeDir"),
-        "stack.infraComposeDir": read_nested(m, "stack.infraComposeDir"),
-        "stack.networkName": read_nested(m, "stack.networkName"),
-    }
+    # DECLARED, not "every field of the template": the template also holds sample modules, aliases
+    # and stores, and a host module named like a sample would silently inherit the sample's values.
+    out = {dotted: read_nested(m, dotted) for dotted in CONVENTION_DEFAULTS}
     return {k: v for k, v in out.items() if v}
+
+
+#: The fields whose absence means "the convention" -- the only template fields read as defaults.
+CONVENTION_DEFAULTS = (
+    "package",
+    "secrets",
+    "compose.catalog",
+    "compose.syncModules",
+    "stack.composeDir",
+    "stack.infraComposeDir",
+    "stack.networkName",
+    "adapters.gcp.credentialsFile",
+    "adapters.gcp.containerMount",
+    "adapters.nginx.template",
+    "adapters.nginx.output",
+    "adapters.nginx.envExample",
+    "adapters.nginx.env",
+    "adapters.embed.envExample",
+    "ci.integration",
+    "ci.prepareEnv",
+    "ci.waitHealth",
+    "ci.waitStackHealth",
+    "vscode.folder",
+    "vscode.cliScript",
+)
 
 
 def default_field(dotted: str) -> str:

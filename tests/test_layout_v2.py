@@ -249,10 +249,7 @@ class TestKitPackageIntegrity:
         assert build.find_project_root().resolve() == repo_root.resolve()
         assert build.load_manifest(repo_root)["modules"]
 
-    def test_project_sh_defaults_from_scaffold(self, pkg_root: Path) -> None:
-        text = (pkg_root / "lib" / "project.sh").read_text(encoding="utf-8")
-        assert "manifest_defaults" in text or "default_field" in text
-        assert "STACK_KIT_LEGACY_ROOT_DISCOVERY" in text
+    # Defaults and discovery are the resolver's (tests/test_resolver_parity.py), not a spelling here.
 
     def test_scaffold_v2_tree(self, pkg_root: Path) -> None:
         sc = pkg_root / "scaffold"

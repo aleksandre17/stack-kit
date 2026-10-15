@@ -1,159 +1,136 @@
-# Project manifest resolution — package boundary.
+# Project resolution for PowerShell -- a SHIM over lib/resolve_cli.py (ADR-001 decision 2).
 #
-# The manifest's NAME is not spelled here. It is declared once in lib/identity.json
-# and projected into every runtime, so a rename is one edit and never an archaeology.
+# This file holds no rule. Which directory is the project, which manifest name is read, what a
+# field defaults to, which module has which role, which compose files make the infra stack: the
+# resolver answers. What the MANIFEST says is resolved once per (declared root, else working
+# directory) as one map of `kind:key` -> text and kept for the session; what the ENVIRONMENT says
+# is asked each time. A test holds this: no manifest field is spelled here.
 
-$script:StackKitIdentity = $null
+. (Join-Path $PSScriptRoot "stack-kit-python.ps1")
+
+# Dot-sourced again by drivers.ps1, modules.ps1 and env.ps1: keep what an earlier load resolved.
+foreach ($name in @('KitIdentity', 'KitContext', 'KitContextKey', 'KitPython')) {
+    if (-not (Get-Variable -Name $name -Scope Script -ErrorAction SilentlyContinue)) {
+        Set-Variable -Name $name -Scope Script -Value $null
+    }
+}
 
 function Get-KitIdentity {
-    if ($null -ne $script:StackKitIdentity) { return $script:StackKitIdentity }
+    # The declaration itself, read as data: names, not rules.
+    if ($null -ne $script:KitIdentity) { return $script:KitIdentity }
     $decl = Join-Path $PSScriptRoot 'identity.json'
-    # No guessed default: a missing declaration is a broken kit, and a fallback
-    # spelling here would be exactly the second home this file exists to remove.
     if (-not (Test-Path $decl)) { throw "kit identity declaration missing: $decl" }
-    $script:StackKitIdentity = Get-Content -Raw -Encoding UTF8 $decl | ConvertFrom-Json
-    return $script:StackKitIdentity
+    $script:KitIdentity = Get-Content -Raw -Encoding UTF8 $decl | ConvertFrom-Json
+    return $script:KitIdentity
+}
+
+function Invoke-KitResolver {
+    # The resolver's answer as lines. Its stderr (a deprecation notice, an error) is passed through
+    # unless -Quiet; a failure throws with the resolver's words, or returns $null when -Optional.
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string[]]$Arguments,
+        [switch]$Optional,
+        [switch]$Quiet
+    )
+    if (-not $script:KitPython) {
+        $script:KitPython = Get-StackKitPythonArgs
+        if (-not $script:KitPython) { throw "Python not found (tried py -3, python3, python)" }
+    }
+    $cli = Join-Path $PSScriptRoot 'resolve_cli.py'
+    $exe = $script:KitPython[0]
+    $pre = @($script:KitPython | Select-Object -Skip 1)
+    $prev = [Console]::OutputEncoding
+    # The resolver's stderr is read here, never raised: under Windows PowerShell a native stderr
+    # line is an error record, and a caller's 'Stop' preference would turn a notice into a throw.
+    $ErrorActionPreference = 'Continue'
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    try {
+        $all = @(& $exe @pre '-B' $cli @Arguments 2>&1)
+        $code = $LASTEXITCODE
+    }
+    finally {
+        [Console]::OutputEncoding = $prev
+    }
+    $said = @($all | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" })
+    $out = @($all | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" })
+    if (-not $Quiet) { foreach ($line in $said) { [Console]::Error.WriteLine($line) } }
+    if ($code -ne 0) {
+        if ($Optional) { return $null }
+        $why = ($said | Where-Object { $_ -match '\S' } | Select-Object -Last 1) -replace '^ERROR:\s*', ''
+        throw "$why"
+    }
+    return $out
+}
+
+function Set-KitEnvChanges {
+    param($Changes)
+    if ($null -eq $Changes) { return }
+    foreach ($p in $Changes.set.PSObject.Properties) { Set-Item -Path "env:$($p.Name)" -Value ([string]$p.Value) }
+    foreach ($name in @($Changes.unset)) { if ($name) { Remove-Item -Path "env:$name" -ErrorAction SilentlyContinue } }
+}
+
+function Get-KitContext {
+    $key = if ($env:STACK_KIT_PROJECT_ROOT) { $env:STACK_KIT_PROJECT_ROOT } else { "cwd:$((Get-Location).Path)" }
+    if ($null -ne $script:KitContext -and $script:KitContextKey -eq $key) { return $script:KitContext }
+    $doc = (Invoke-KitResolver -Arguments @('--shell', 'pwsh', 'context')) -join "`n" | ConvertFrom-Json
+    Set-KitEnvChanges $doc.env
+    $map = @{}
+    foreach ($p in $doc.context.PSObject.Properties) { $map[$p.Name] = [string]$p.Value }
+    $script:KitContext = $map
+    $script:KitContextKey = if ($env:STACK_KIT_PROJECT_ROOT) { $env:STACK_KIT_PROJECT_ROOT } else { "cwd:$((Get-Location).Path)" }
+    return $map
+}
+
+function Get-KitContextValue {
+    # One context entry, or $null when absent or empty.
+    param([Parameter(Mandatory = $true)][string]$Key)
+    $v = (Get-KitContext)[$Key]
+    if ($v) { return $v }
+    return $null
+}
+
+function Get-KitContextLines {
+    param([Parameter(Mandatory = $true)][string]$Key)
+    $v = Get-KitContextValue $Key
+    if (-not $v) { return @() }
+    return @($v -split "`n" | Where-Object { $_ })
 }
 
 function Write-KitDeprecation {
-    # One line, once per legacy name: what is deprecated, what replaces it, when it stops (ADR-001).
+    # One line, once per former name and process tree (ADR-001 decision 1).
     param([string]$Old, [string]$New)
-    $id = Get-KitIdentity
-    if ((Test-Path "env:$($id.envPrefix)_NO_DEPRECATION_NOTICE") -or
-        ($id.legacyEnvPrefix -and (Test-Path "env:$($id.legacyEnvPrefix)_NO_DEPRECATION_NOTICE"))) { return }
-    # The names already told travel in <prefix>_NOTICED, shared with bash and python.
-    $told = "$($id.envPrefix)_NOTICED"
-    $seen = @(((Get-Item "env:$told" -ErrorAction SilentlyContinue).Value -split '\|') | Where-Object { $_ })
-    if ($seen -contains $Old) { return }
-    Set-Item -Path "env:$told" -Value (@($seen + $Old) -join '|')
-    [Console]::Error.WriteLine("[$($id.kitName)] deprecated: $Old -> $New; read until $($id.legacyRemovedIn)")
-}
-
-function Invoke-KitLegacyEnvAdoption {
-    # Carry every legacy-prefixed variable to its canonical name for this process tree. The
-    # canonical name wins when both are set; the legacy one is removed so a child is not told twice.
-    $id = Get-KitIdentity
-    if (-not $id.legacyEnvPrefix) { return }
-    foreach ($item in @(Get-ChildItem env: | Where-Object { $_.Name -like "$($id.legacyEnvPrefix)_*" })) {
-        $new = "$($id.envPrefix)_" + $item.Name.Substring($id.legacyEnvPrefix.Length + 1)
-        if (-not (Test-Path "env:$new")) { Set-Item -Path "env:$new" -Value $item.Value }
-        Write-KitDeprecation $item.Name $new
-        Remove-Item -Path "env:$($item.Name)"
-    }
-}
-Invoke-KitLegacyEnvAdoption
-
-function Get-ManifestFileNames {
-    # Accepted manifest filenames, canonical first.
-    $id = Get-KitIdentity
-    @($id.manifestFilename) + @($id.legacyManifestFilenames | Where-Object { $_ })
-}
-
-function Get-ManifestInDirectory {
-    param([string]$Directory)
-    foreach ($name in Get-ManifestFileNames) {
-        $candidate = Join-Path $Directory $name
-        if (Test-Path $candidate) {
-            $canonical = (Get-KitIdentity).manifestFilename
-            if ($name -ne $canonical) { Write-KitDeprecation $name $canonical }
-            return $candidate
-        }
-    }
-    return $null
+    $doc = (Invoke-KitResolver -Arguments @('--shell', 'pwsh', 'notice', $Old, $New)) -join "`n" | ConvertFrom-Json
+    Set-KitEnvChanges $doc.env
 }
 
 function Get-ProjectManifestPath {
-    if ($env:STACK_KIT_PROJECT_ROOT) {
-        $mf = Get-ManifestInDirectory $env:STACK_KIT_PROJECT_ROOT
-        if ($mf) { return $mf }
-    }
-    $dir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-    while ($dir) {
-        $mf = Get-ManifestInDirectory $dir
-        if ($mf) { return $mf }
-        $parent = Split-Path $dir -Parent
-        if ($parent -eq $dir) { break }
-        $dir = $parent
-    }
-    return $null
+    Get-KitContextValue 'manifest'
 }
 
 function Get-ProjectRootFromManifest {
-    if ($env:STACK_KIT_PROJECT_ROOT) { return $env:STACK_KIT_PROJECT_ROOT }
-    $mf = Get-ProjectManifestPath
-    if ($mf) { return Split-Path $mf -Parent }
-    if ($env:STACK_KIT_LEGACY_ROOT_DISCOVERY -match '^(1|true|yes|on)$') {
-        $dir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-        while ($dir) {
-            if ((Test-Path (Join-Path $dir "ops\config")) -or (Test-Path (Join-Path $dir "secrets"))) { return $dir }
-            $parent = Split-Path $dir -Parent
-            if ($parent -eq $dir) { break }
-            $dir = $parent
-        }
-    }
-    return $null
-}
-
-function Get-ScaffoldManifestPath {
-    $name = (Get-KitIdentity).manifestFilename
-    if ($env:STACK_KIT_KIT_ROOT) {
-        return Join-Path $env:STACK_KIT_KIT_ROOT (Join-Path 'scaffold' $name)
-    }
-    Join-Path (Get-OpsPackageRoot) (Join-Path 'scaffold' $name)
-}
-
-function Get-ScaffoldManifestField {
-    param([string]$Field)
-    $path = Get-ScaffoldManifestPath
-    if (-not (Test-Path $path)) { return "" }
-    $m = Get-Content $path -Raw | ConvertFrom-Json
-    $v = $m
-    foreach ($p in ($Field -split '\.')) {
-        if ($null -eq $v) { return "" }
-        $prop = $v.PSObject.Properties[$p]
-        if (-not $prop) { return "" }
-        $v = $prop.Value
-    }
-    if ($null -eq $v) { return "" }
-    return [string]$v
+    Get-KitContextValue 'root'
 }
 
 function Get-ManifestField {
-    param([string]$Field, [string]$Default = $null)
-    if ($null -eq $Default) { $Default = Get-ScaffoldManifestField $Field }
-    $mf = Get-ProjectManifestPath
-    if (-not $mf -or -not (Test-Path $mf)) { return $Default }
-    $m = Get-Content $mf -Raw | ConvertFrom-Json
-    $v = Get-JsonDotted $m $Field
-    if ($null -eq $v) {
-        # A field the kit renamed is still read under its old name, with a notice (ADR-001).
-        $id = Get-KitIdentity
-        foreach ($rename in @($id.legacyManifestFields.PSObject.Properties | Where-Object { $_.Value -eq $Field })) {
-            $v = Get-JsonDotted $m $rename.Name
-            if ($null -ne $v) { Write-KitDeprecation "$($id.manifestFilename): $($rename.Name)" $Field; break }
-        }
-    }
-    if ($null -eq $v) { return $Default }
-    return [string]$v
+    # A scalar manifest field: the manifest's value, else -Default when given, else the declared
+    # convention default, else "".
+    param([string]$Field, [string]$Default)
+    $v = Get-KitContextValue "field:$Field"
+    if ($null -ne $v) { return $v }
+    if ($PSBoundParameters.ContainsKey('Default')) { return $Default }
+    $d = Get-KitContextValue "default:$Field"
+    if ($null -ne $d) { return $d }
+    return ""
 }
 
-function Get-JsonDotted {
-    param($Object, [string]$Dotted)
-    $v = $Object
-    foreach ($p in ($Dotted -split '\.')) {
-        if ($null -eq $v) { return $null }
-        $prop = $v.PSObject.Properties[$p]
-        if (-not $prop) { return $null }
-        $v = $prop.Value
-    }
-    return $v
+function Get-ManifestList {
+    # An array-valued manifest field, one item per element (empty when absent).
+    param([Parameter(Mandatory = $true)][string]$Field)
+    Get-KitContextLines "list:$Field"
 }
 
 function Get-OpsPackageRoot {
-    if ($env:OPS_PACKAGE_ROOT) { return $env:OPS_PACKAGE_ROOT }
-    $proj = Get-ProjectRootFromManifest
-    $rel = Get-ManifestField "package"
-    return (Resolve-Path (Join-Path $proj $rel)).Path
+    Get-KitContextValue 'packageRoot'
 }
 
 function Get-OpsToolkitPowerShellRoot {
@@ -162,33 +139,26 @@ function Get-OpsToolkitPowerShellRoot {
 
 function Get-ManifestModulePath {
     param([Parameter(Mandatory = $true)][string]$ModuleId)
-    $proj = Get-ProjectRootFromManifest
-    if (-not $proj) { throw "$((Get-KitIdentity).manifestFilename) not found" }
-    $rel = Get-ManifestField "modules.$ModuleId.path"
-    if (-not $rel) { throw "manifest modules.$ModuleId.path missing" }
-    Join-Path $proj ($rel -replace '/', '\')
+    if (-not (Get-ProjectRootFromManifest)) { throw "$((Get-KitIdentity).manifestFilename) not found" }
+    $p = Get-KitContextValue "module:$($ModuleId):path"
+    if (-not $p) { throw "module '$ModuleId' declares no path" }
+    return $p
 }
 
 function Get-ModuleSecretsFolder {
     param([Parameter(Mandatory = $true)][string]$ModuleId)
-    $sm = Get-ManifestField "modules.$ModuleId.secretsModule"
-    if (-not $sm) { $sm = $ModuleId }
-    return $sm
+    $f = Get-KitContextValue "module:$($ModuleId):secretsFolder"
+    if ($f) { return $f }
+    return $ModuleId
 }
 
 function Get-ModuleIdByDriverType {
     param([Parameter(Mandatory = $true)][string]$DriverType)
-    $mf = Get-ProjectManifestPath
-    if (-not $mf) { return $null }
-    $data = Get-Content $mf -Raw | ConvertFrom-Json
-    foreach ($p in $data.modules.PSObject.Properties) {
-        if ($p.Value.type -eq $DriverType) { return [string]$p.Name }
-    }
-    return $null
+    Get-KitContextLines "type:$DriverType" | Select-Object -First 1
 }
 
 function Get-SecretsConfigRel {
-    (Get-ManifestField "secrets") -replace '\\', '/'
+    Get-KitContextValue 'secretsRel'
 }
 
 function Get-ModuleEnvPathLabels {
@@ -205,204 +175,52 @@ function Get-DeployEnvPathLabel {
 }
 
 function Get-ListedSecretsModuleFolders {
-    $mf = Get-ProjectManifestPath
-    if (-not $mf) {
-        $sc = Get-ScaffoldManifestPath
-        if (-not (Test-Path $sc)) { return @() }
-        $data = Get-Content $sc -Raw | ConvertFrom-Json
-        $seen = @{}
-        $out = [System.Collections.ArrayList]@()
-        foreach ($p in $data.modules.PSObject.Properties) {
-            $folder = if ($p.Value.secretsModule) { [string]$p.Value.secretsModule } else { [string]$p.Name }
-            if (-not $seen[$folder]) { $seen[$folder] = $true; [void]$out.Add($folder) }
-        }
-        return $out.ToArray()
-    }
-    $data = Get-Content $mf -Raw | ConvertFrom-Json
-    $seen = @{}
-    $out = [System.Collections.ArrayList]@()
-    foreach ($p in $data.modules.PSObject.Properties) {
-        $folder = if ($p.Value.secretsModule) { [string]$p.Value.secretsModule } else { [string]$p.Name }
-        if (-not $seen[$folder]) {
-            $seen[$folder] = $true
-            [void]$out.Add($folder)
-        }
-    }
-    return $out.ToArray()
+    Get-KitContextLines 'secretsFolders'
 }
 
 function Get-StackComposeDirFromManifest {
-    $proj = Get-ProjectRootFromManifest
-    if (-not $proj) { throw "$((Get-KitIdentity).manifestFilename) not found" }
-    $rel = Get-ManifestField "stack.composeDir"
-    Join-Path $proj ($rel -replace '/', '\')
+    if (-not (Get-ProjectRootFromManifest)) { throw "$((Get-KitIdentity).manifestFilename) not found" }
+    Get-KitContextValue 'path:stackComposeDir'
 }
 
 function Get-InfraComposeDirFromManifest {
-    $proj = Get-ProjectRootFromManifest
-    if (-not $proj) { throw "$((Get-KitIdentity).manifestFilename) not found" }
-    $rel = Get-ManifestField "stack.infraComposeDir" "ops/compose/infra"
-    Join-Path $proj ($rel -replace '/', '\')
+    if (-not (Get-ProjectRootFromManifest)) { throw "$((Get-KitIdentity).manifestFilename) not found" }
+    Get-KitContextValue 'path:infraComposeDir'
 }
 
 function Get-ManifestInfraServices {
-    $mf = Get-ProjectManifestPath
-    if (-not $mf) { return @() }
-    $m = Get-Content $mf -Raw | ConvertFrom-Json
-    if ($m.stack.infra -and $m.stack.infra.services) {
-        $arr = $m.stack.infra.services
-    }
-    else {
-        $arr = $m.stack.infraProfiles
-    }
-    if ($null -eq $arr) { return @() }
-    if ($arr -is [string]) { return @($arr) }
-    return @($arr | ForEach-Object { [string]$_ } | Where-Object { $_ })
-}
-
-function Get-ManifestInfraComposeFileOverride {
-    $mf = Get-ProjectManifestPath
-    if (-not $mf) { return @() }
-    $m = Get-Content $mf -Raw | ConvertFrom-Json
-    if ($m.stack.infra -and $m.stack.infra.composeFiles) {
-        $arr = $m.stack.infra.composeFiles
-    }
-    else {
-        $arr = $m.stack.infraComposeFiles
-    }
-    if ($null -eq $arr) { return @() }
-    return @($arr | ForEach-Object { [string]$_ } | Where-Object { $_ })
+    @(Invoke-KitResolver -Arguments @('infra-services') | Where-Object { $_ })
 }
 
 function Get-InfraComposeIncludeFiles {
-    $dir = Get-InfraComposeDirFromManifest
-    $override = Get-ManifestInfraComposeFileOverride
-    if ($override.Count -gt 0) {
-        foreach ($rel in $override) {
-            $full = Join-Path $dir ($rel -replace '/', '\')
-            if (-not (Test-Path $full)) {
-                throw "stack.infra.composeFiles missing: $full"
-            }
-        }
-        return $override
-    }
-    $base = "docker-compose.base.yml"
-    $monolith = "docker-compose.yml"
-    $services = Get-ManifestInfraServices
-    $list = [System.Collections.ArrayList]@()
-    if (Test-Path (Join-Path $dir $base)) {
-        [void]$list.Add($base)
-        foreach ($svc in $services) {
-            $frag = "services/$svc.yml"
-            $full = Join-Path $dir $frag
-            if (-not (Test-Path $full)) {
-                throw "stack.infra.services: missing fragment $frag (add yaml or override stack.infra.composeFiles)"
-            }
-            [void]$list.Add($frag)
-        }
-        return @($list)
-    }
-    if (Test-Path (Join-Path $dir $monolith)) {
-        return @($monolith)
-    }
-    throw "No docker-compose.base.yml or docker-compose.yml under $dir"
+    @(Invoke-KitResolver -Arguments @('infra-compose-files') | Where-Object { $_ })
 }
 
 function Add-InfraComposeFileArgs {
     param([System.Collections.ArrayList]$Target)
-    $files = Get-InfraComposeIncludeFiles
-    foreach ($rel in $files) {
-        [void]$Target.Add("-f")
-        [void]$Target.Add($rel)
+    foreach ($a in (Invoke-KitResolver -Arguments @('infra-compose-args'))) {
+        if ($a) { [void]$Target.Add($a) }
     }
-    if ($files.Count -eq 1 -and $files[0] -eq "docker-compose.yml") {
-        foreach ($svc in (Get-ManifestInfraServices)) {
-            [void]$Target.Add("--profile")
-            [void]$Target.Add($svc)
-        }
-    }
-}
-
-function Get-InfraCatalogFilePaths {
-    $paths = [System.Collections.ArrayList]@()
-    $kitRoot = if ($env:STACK_KIT_KIT_ROOT) { $env:STACK_KIT_KIT_ROOT } else { Get-OpsPackageRoot }
-    $kitCat = Join-Path $kitRoot "compose\infra-catalog.json"
-    if (Test-Path $kitCat) { [void]$paths.Add($kitCat) }
-    $consumerCat = Join-Path (Get-InfraComposeDirFromManifest) "infra-catalog.json"
-    if (Test-Path $consumerCat) { [void]$paths.Add($consumerCat) }
-    return $paths
-}
-
-function Get-InfraMergedCatalogModules {
-    $merged = @{}
-    foreach ($catPath in (Get-InfraCatalogFilePaths)) {
-        $data = Get-Content $catPath -Raw | ConvertFrom-Json
-        foreach ($prop in $data.modules.PSObject.Properties) {
-            $merged[$prop.Name] = $prop.Value
-        }
-    }
-    return $merged
 }
 
 function Get-InfraTunnelForwards {
-    $services = Get-ManifestInfraServices
-    if (-not $services -or $services.Count -eq 0) {
-        throw "stack.infra.services is empty - declare enabled stores in $((Get-KitIdentity).manifestFilename)"
+    foreach ($line in (Invoke-KitResolver -Arguments @('infra-tunnel-forwards'))) {
+        if (-not $line) { continue }
+        $f = $line -split "`t"
+        [pscustomobject]@{ Local = $f[0]; Remote = $f[1]; Service = $f[2]; Env = $f[3] }
     }
-    $modules = Get-InfraMergedCatalogModules
-    $seen = @{}
-    $out = [System.Collections.ArrayList]@()
-    foreach ($sid in $services) {
-        if (-not $modules.ContainsKey($sid)) {
-            throw "stack.infra.services: '$sid' missing in infra-catalog (kit compose/infra-catalog.json or consumer ops/compose/infra/infra-catalog.json)"
-        }
-        $mod = $modules[$sid]
-        if (-not $mod.tunnel) { continue }
-        foreach ($spec in @($mod.tunnel)) {
-            $envKey = if ($spec.PSObject.Properties['env']) { [string]$spec.env } else { [string]$spec }
-            $def = ""
-            if ($spec.PSObject.Properties['default']) { $def = [string]$spec.default }
-            $port = Get-SecretsEnvValue -Module "infra" -Key $envKey
-            if (-not $port) { $port = $def }
-            if (-not $port) {
-                throw "infra tunnel: set $envKey in ops/config/infra/.env.dev (service '$sid')"
-            }
-            if ($seen[$port]) { continue }
-            $seen[$port] = $true
-            [void]$out.Add([pscustomobject]@{ Local = $port; Remote = $port; Service = $sid; Env = $envKey })
-        }
-    }
-    if ($out.Count -eq 0) {
-        throw "No tunnel ports for stack.infra.services - add tunnel[] to catalog modules"
-    }
-    return $out
 }
 
 function Get-InfraSyncRelativePaths {
-    $paths = [System.Collections.ArrayList]@(Get-InfraComposeIncludeFiles)
-    $dir = Get-InfraComposeDirFromManifest
-    $prod = "docker-compose.prod.yml"
-    if ((Test-Path (Join-Path $dir $prod)) -and -not ($paths -contains $prod)) {
-        [void]$paths.Add($prod)
-    }
-    $coexist = "docker-compose.coexist.yml"
-    if ((Test-Path (Join-Path $dir $coexist)) -and -not ($paths -contains $coexist)) {
-        [void]$paths.Add($coexist)
-    }
-    $readme = "README.md"
-    if ((Test-Path (Join-Path $dir $readme)) -and -not ($paths -contains $readme)) {
-        [void]$paths.Add($readme)
-    }
-    return @($paths | Select-Object -Unique)
+    @(Invoke-KitResolver -Arguments @('infra-sync-paths') | Where-Object { $_ })
 }
 
 function Get-DefaultRemoteDeployPathBase {
+    # A secrets folder's remote base: its DEPLOY_PATH, else {server base}/{project slug}/{folder};
+    # $null when neither can be known.
     param([Parameter(Mandatory = $true)][string]$SecretsFolder)
-    $base = Get-SecretsEnvValue -Module $SecretsFolder -Key "DEPLOY_PATH"
-    if ($base) { return $base.Trim().TrimEnd('/') }
-    $sb = Get-DeployServerBase
-    if ($sb) {
-        return "$sb/$(Get-ProjectSlug)/$SecretsFolder"
-    }
-    return $null
+    Invoke-KitResolver -Arguments @('deploy-base', $SecretsFolder) -Optional -Quiet | Select-Object -First 1
 }
+
+# Resolved at load: former variables are carried to their current names before anything reads them.
+$null = Get-KitContext

@@ -51,14 +51,8 @@ function Write-DevLog {
 }
 
 function Get-BootOrder {
-    $mf = Get-ProjectManifestPath
-    if ($mf) {
-        $data = Get-Content $mf -Raw | ConvertFrom-Json
-        if ($data.dev -and $data.dev.bootOrder) {
-            $declared = @($data.dev.bootOrder | ForEach-Object { [string]$_ })
-            if ($declared.Count -gt 0) { return $declared }
-        }
-    }
+    $declared = @(Get-ManifestList "dev.bootOrder")
+    if ($declared.Count -gt 0) { return $declared }
     return $DefaultBootOrder
 }
 
@@ -115,14 +109,7 @@ function Show-DevHelp {
 function Resolve-DevTarget {
     param([string]$Raw)
     if ($Raw -eq "all") { return "all" }
-    $aliases = Get-CliAliasesFromManifest
-    if ($aliases.ContainsKey($Raw)) { return $aliases[$Raw] }
-    $mf = Get-ProjectManifestPath
-    if ($mf) {
-        $data = Get-Content $mf -Raw | ConvertFrom-Json
-        if ($data.modules.PSObject.Properties[$Raw]) { return $Raw }
-    }
-    return $null
+    Resolve-CliAlias $Raw
 }
 
 function Get-DevMode {
@@ -166,15 +153,11 @@ function Start-TunnelInNewWindow {
 
 function Get-ModulesInRoleOrder {
     $mods = Get-ProjectModules
-    $mf = Get-ProjectManifestPath
-    $data = Get-Content $mf -Raw | ConvertFrom-Json
     $order = [System.Collections.ArrayList]@()
     $seen  = @{}
     foreach ($role in (Get-BootOrder)) {
         foreach ($mid in $mods) {
-            $r = [string]$data.modules.$mid.role
-            if (-not $r) { $r = Get-DriverDefaultRole ([string]$data.modules.$mid.type) }
-            if ($r -eq $role -and -not $seen[$mid]) {
+            if ((Get-ModuleRole $mid) -eq $role -and -not $seen[$mid]) {
                 [void]$order.Add($mid)
                 $seen[$mid] = $true
             }
