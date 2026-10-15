@@ -1,6 +1,6 @@
 # Package maturity checklist (100% target)
 
-Use this list before tagging a release or declaring geostat-kit **required** for new repos.
+Use this list before tagging a release or declaring stack-kit **required** for new repos.
 
 ## 1. Package boundary
 
@@ -9,16 +9,16 @@ Use this list before tagging a release or declaring geostat-kit **required** for
 | No consumer brands in runtime | `pytest tests/test_toolkit_hardcodes.py` |
 | No hardcoded `ops/config/frontend\|backend` in drivers/toolkit | same |
 | No hardcoded `google-credentials.json` in `toolkit/deploy/` | same |
-| Root = `geostat.ops.json` | `ProjectContext.discover()` |
+| Root = `stack-kit.json` | `ProjectContext.discover()` |
 
 ## 2. Manifest contract
 
 | Check | How |
 |-------|-----|
-| Schema valid | `geostat validate` |
+| Schema valid | `stack-kit validate` |
 | Every module has `role`, `type`, `path`, `secretsModule` | validate |
 | Driver types in `drivers/registry.json` | validate |
-| `geostat migrate --apply` for legacy trees | one-time |
+| `stack-kit migrate --apply` for legacy trees | one-time |
 
 ## 3. Credentials (multi-file / multi-module)
 
@@ -34,7 +34,7 @@ Use this list before tagging a release or declaring geostat-kit **required** for
 | Check | How |
 |-------|-----|
 | Project script manifest-driven | `ops/ci/integration-stack.sh` |
-| Package helpers | `kits/geostat-kit/ci/*` |
+| Package helpers | `kits/stack-kit/ci/*` |
 | Golden fixture | `tests/fixtures/golden-consumer/` |
 
 ## 5. Release
@@ -56,7 +56,7 @@ Use this list before tagging a release or declaring geostat-kit **required** for
 
 | Check | How |
 |-------|-----|
-| launch.json + tasks.json | `geostat vscode-gen` |
+| launch.json + tasks.json | `stack-kit vscode-gen` |
 | Paths from `modules.*.path` | [LOCAL-DEBUG.md](LOCAL-DEBUG.md) |
 | Java Extension Pack | Spring breakpoints |
 
@@ -71,23 +71,23 @@ Use this list before tagging a release or declaring geostat-kit **required** for
 ## Dev modes (all variants smoke)
 
 ```powershell
-.\kits\geostat-kit\scripts\dev-modes-verify.ps1
-.\kits\geostat-kit\scripts\dev-modes-verify.ps1 -SkipDocker   # without Docker daemon
+.\kits\stack-kit\scripts\dev-modes-verify.ps1
+.\kits\stack-kit\scripts\dev-modes-verify.ps1 -SkipDocker   # without Docker daemon
 ```
 
 ```bash
-bash kits/geostat-kit/scripts/dev-modes-verify.sh --skip-integration
+bash kits/stack-kit/scripts/dev-modes-verify.sh --skip-integration
 ```
 
 ## Full verification (from consumer repo root)
 
 ```bash
-cd kits/geostat-kit
+cd kits/stack-kit
 PYTHONPATH=. pytest tests -q
 
 cd ../..   # project root
-python3 kits/geostat-kit/lib/validate_manifest.py
-bash kits/geostat-kit/ci/prepare-integration-env.sh
+python3 kits/stack-kit/lib/validate_manifest.py
+bash kits/stack-kit/ci/prepare-integration-env.sh
 # optional if Docker available:
 bash ops/ci/integration-stack.sh
 ```
@@ -95,8 +95,8 @@ bash ops/ci/integration-stack.sh
 PowerShell:
 
 ```powershell
-.\tools\geostat.ps1 validate
-cd kits\geostat-kit; $env:PYTHONPATH='.'; python -m pytest tests -q
+.\tools\stack-kit.ps1 validate
+cd kits\stack-kit; $env:PYTHONPATH='.'; python -m pytest tests -q
 ```
 
 ## Score

@@ -1,20 +1,20 @@
 # Package architecture — manifest-driven boundary
 
-`geostat-kit` is a **reusable ops package**. It must not embed:
+`stack-kit` is a **reusable ops package**. It must not embed:
 
 - Project brand names (any single consumer's product/repo name)
 - Fixed repo trees (`secrets/`, `packages/`, `frontend/`, `deploy/compose/`)
 - Optional artifacts assumed universal (`google-credentials.json`)
 
-Everything resolves through **`geostat.ops.json`** at the **consumer project root**.
+Everything resolves through **`stack-kit.json`** at the **consumer project root**.
 
 ## Convention defaults (single source)
 
-**`scaffold/geostat.ops.json`** is the only inline convention catalog. Runtime code reads defaults via:
+**`scaffold/stack-kit.json`** is the only inline convention catalog. Runtime code reads defaults via:
 
 - Python: `lib/manifest_defaults.py` → `default_field()`, `flatten_defaults()`
 - PowerShell: `Get-ScaffoldManifestField` / `Get-ManifestField` (implicit scaffold default)
-- Bash: `geostat_read_manifest_field` with empty default → Python `default_field`
+- Bash: `stack_kit_read_manifest_field` with empty default → Python `default_field`
 
 No duplicate `DEFAULTS = {...}` dicts in package code.
 
@@ -22,7 +22,7 @@ No duplicate `DEFAULTS = {...}` dicts in package code.
 
 ```text
 ┌─────────────────────────────────────────┐
-│  geostat-kit (this package)             │
+│  stack-kit (this package)             │
 │  lib/project_context.py  ← single API   │
 │  lib/project.sh / env.sh / project.ps1    │
 │  drivers · toolkit · compose engine       │
@@ -30,7 +30,7 @@ No duplicate `DEFAULTS = {...}` dicts in package code.
                    │ reads
 ┌──────────────────▼──────────────────────┐
 │  Project root (consumer repo)          │
-│  geostat.ops.json                       │
+│  stack-kit.json                       │
 │  ops/config/  apps/*  ops/compose/     │
 └─────────────────────────────────────────┘
 ```
@@ -39,7 +39,7 @@ No duplicate `DEFAULTS = {...}` dicts in package code.
 
 | Field | Purpose |
 |-------|---------|
-| `package` | Path to this kit (`kits/geostat-kit`) |
+| `package` | Path to this kit (`kits/stack-kit`) |
 | `secrets` | Config root (`ops/config`) |
 | `compose.catalog` | Compose generator input |
 | `stack.composeDir` | Generated full-stack YAML |
@@ -73,9 +73,9 @@ ctx.resolve_alias("fe")
 **Bash:**
 
 ```bash
-geostat_secrets_dir_for_module backend
-geostat_module_id_for_type node-vite
-geostat_default_remote_deploy_base "$(geostat_secrets_module_name backend)"
+stack_kit_secrets_dir_for_module backend
+stack_kit_module_id_for_type node-vite
+stack_kit_default_remote_deploy_base "$(stack_kit_secrets_module_name backend)"
 ```
 
 **PowerShell:**
@@ -88,9 +88,9 @@ Resolve-CliAlias fe
 
 ## Project root discovery
 
-1. **`GEOSTAT_PROJECT_ROOT`** env
-2. Walk up for **`geostat.ops.json`** (required in normal use)
-3. Legacy (opt-in): **`GEOSTAT_LEGACY_ROOT_DISCOVERY=1`** — `ops/config` or `secrets/` + `kits|packages/geostat-kit`
+1. **`STACK_KIT_PROJECT_ROOT`** env
+2. Walk up for **`stack-kit.json`** (required in normal use)
+3. Legacy (opt-in): **`STACK_KIT_LEGACY_ROOT_DISCOVERY=1`** — `ops/config` or `secrets/` + `kits|packages/stack-kit`
 
 ## CI & init seed
 
@@ -99,7 +99,7 @@ Resolve-CliAlias fe
 | Package | `ci/prepare-integration-env.sh`, `ci/wait-health.sh` | generic seed + HTTP wait |
 | Project | `ci.integration` in manifest (e.g. `ops/ci/integration-stack.sh`) | **api** module via `lib/project.sh` — no hardcoded `apps/backend` |
 
-`geostat init` and `prepare-integration-env` → **`lib/ci_prepare.py`** — loops `manifest.modules`.
+`stack-kit init` and `prepare-integration-env` → **`lib/ci_prepare.py`** — loops `manifest.modules`.
 
 ## Remote deploy path fallback
 
@@ -107,7 +107,7 @@ Resolve-CliAlias fe
 
 ## N-module model (multi-tenant package)
 
-Any number of modules in `geostat.ops.json`:
+Any number of modules in `stack-kit.json`:
 
 | Field | Purpose |
 |-------|---------|
@@ -118,16 +118,16 @@ Any number of modules in `geostat.ops.json`:
 
 **CLI**
 
-- `geostat mod <moduleId> deploy …` — canonical
+- `stack-kit mod <moduleId> deploy …` — canonical
 - `cli.aliases` — e.g. `fe` → `frontend` (consumer-defined)
 - Auto shortcuts when one module per role: `ui`, `api`, `worker` → that module id
 
 **Layout**
 
 ```bash
-geostat layout --all              # every module + server overview
-geostat layout --role api         # all api-role modules
-geostat layout --module web       # one module
+stack-kit layout --all              # every module + server overview
+stack-kit layout --role api         # all api-role modules
+stack-kit layout --module web       # one module
 ```
 
 Deprecated: `--frontend` / `--backend` → use `--role ui` / `--role api`.

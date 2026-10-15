@@ -34,7 +34,7 @@ def _validate_jsonschema(instance: dict[str, Any], schema: dict[str, Any]) -> li
 def _validate_required(instance: dict[str, Any]) -> list[str]:
     errs: list[str] = []
     if instance.get("version", 0) < 2:
-        errs.append("version: must be >= 2 (run: geostat migrate)")
+        errs.append("version: must be >= 2 (run: stack-kit migrate)")
     # compose is optional: a project whose drivers deploy no containers declares none.
     for key in ("package", "secrets", "modules"):
         if key not in instance:

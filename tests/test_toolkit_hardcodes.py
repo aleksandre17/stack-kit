@@ -7,10 +7,10 @@ from pathlib import Path
 PKG = Path(__file__).resolve().parents[1]
 
 FORBIDDEN_IN_RUNTIME = (
-    re.compile(r"packages/geostat"),
+    re.compile(r"packages/stack-kit"),
     re.compile(r"deploy/compose"),
     re.compile(r"\.\./secrets/"),
-    re.compile(r"geostat-chat-bot", re.I),
+    re.compile(r"stack-kit-chat-bot", re.I),
     re.compile(r"Hybrid\s*[④4]", re.I),
     re.compile(r"\bfe\s*\|\s*be\s*\|\s*ret\s*\|\s*ing\b", re.I),
 )
@@ -30,7 +30,7 @@ def _scan_file(path: Path) -> list[str]:
     issues: list[str] = []
     for pat in FORBIDDEN_IN_RUNTIME:
         if pat.search(text) and not (
-            pat.pattern == "packages/geostat" and "GEOSTAT_LEGACY" in text
+            pat.pattern == "packages/stack-kit" and "STACK_KIT_LEGACY" in text
         ):
             issues.append(f"{rel}: legacy pattern {pat.pattern}")
     if "layout/simulate-" in rel:
@@ -40,7 +40,7 @@ def _scan_file(path: Path) -> list[str]:
             return issues
         issues.append(f"{rel}: hardcoded ops/config/frontend|backend")
     if "toolkit/deploy/" in rel and HARDCODED_GCP_FILE.search(text):
-        if "geostat_module_credentials" not in text and "geostat_gcp_" not in text:
+        if "stack_kit_module_credentials" not in text and "stack_kit_gcp_" not in text:
             issues.append(f"{rel}: hardcoded google-credentials.json (use manifest credentials)")
     return issues
 

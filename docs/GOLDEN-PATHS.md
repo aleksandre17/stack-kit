@@ -1,4 +1,4 @@
-﻿# Golden paths — geostat-kit
+﻿# Golden paths — stack-kit
 
 **რეჟიმების  გზამკვლევი (ლოკალური / Docker / remote):** [DEV-MODES.md](DEV-MODES.md).
 
@@ -31,7 +31,7 @@ DEPLOY_PATH_MODE=base
 `static/{container}/` შიგნით ტიპულად:
 
 ```text
-.geostat-deploy.json
+.stack-kit-deploy.json
 .env.runtime.json
 nginx.conf
 dist/
@@ -64,14 +64,14 @@ Driver: `node-vite` (Vite, Angular CLI, Nx — compose dev + volume). დეტ�
 | მიზანი | Golden path | არ გამოიყენო ყოველდღე |
 |--------|-------------|------------------------|
 | **Dev Windows-ზე** (API Linux-ზე OK) | `cd frontend && npm run dev` | `fe deploy watch` |
-| **Dev Docker-ზე იმავე მანქანაზე** (ლაპტოპი ან Linux) | `geostat fe compose up -d` | `fe deploy remote` |
+| **Dev Docker-ზე იმავე მანქანაზე** (ლაპტოპი ან Linux) | `stack-kit fe compose up -d` | `fe deploy remote` |
 | **Dev პირდაპირ Linux-ზე** (იხილე §4) | `npm run dev` ან `fe compose up` | `fe dev watch`, `fe deploy watch` |
 | **Windows რედაქტი → Linux UI** (Vite კონტეინერში) | `fe dev bootstrap` → **`fe dev watch`** | `fe deploy watch`, `fe deploy remote` ყოველ save-ზე |
 
 კონკრეტული ნაკადი `frontend/src/Dockerfile`-ით: **[REMOTE-DEV-DOCKERFILE-FLOW.md](./REMOTE-DEV-DOCKERFILE-FLOW.md)**.
 | **Prod / staging static UI** | `fe deploy dist` → `fe deploy sync` / **`fe deploy watch`** | `fe dev watch`, flat legacy |
-| **Full stack prod** | `geostat stack-deploy --prod` | ხელით არეული რეჟიმები |
-| **ინტეგრაცია ლოკალურად** | `geostat stack up -d --build` | per-module SSH ხე stack-ის ნაცვლად |
+| **Full stack prod** | `stack-kit stack-deploy --prod` | ხელით არეული რეჟიმები |
+| **ინტეგრაცია ლოკალურად** | `stack-kit stack up -d --build` | per-module SSH ხე stack-ის ნაცვლად |
 
 ---
 
@@ -79,9 +79,9 @@ Driver: `node-vite` (Vite, Angular CLI, Nx — compose dev + volume). დეტ�
 
 | ბრძანება | რას აკეთებს | სერვერის path | ყოველ save-ზე |
 |----------|-------------|---------------|----------------|
-| **`geostat fe deploy watch`** | Prod-like **static** | `.../static/{service}/` | `npm build` → `dist/` → nginx reload |
-| **`geostat fe dev watch`** | Remote **dev** (სორსი) | `.../compose/dev/{service}/` | **rsync** მხოლოდ (build არა) |
-| `geostat fe watch` | ძველი alias | → `fe deploy watch` (hint CLI-ში) | იგივე რაც deploy watch |
+| **`stack-kit fe deploy watch`** | Prod-like **static** | `.../static/{service}/` | `npm build` → `dist/` → nginx reload |
+| **`stack-kit fe dev watch`** | Remote **dev** (სორსი) | `.../compose/dev/{service}/` | **rsync** მხოლოდ (build არა) |
+| `stack-kit fe watch` | ძველი alias | → `fe deploy watch` (hint CLI-ში) | იგივე რაც deploy watch |
 
 **წესი:** პრეფიქსი `deploy` = artifact/static; პრეფიქსი `dev` = სორსი + compose dev.
 
@@ -95,11 +95,11 @@ Driver: `node-vite` (Vite, Angular CLI, Nx — compose dev + volume). დეტ�
 
 ### რა რჩება იგივე
 
-- `geostat.ops.json`, `ops/config/`, `kits/geostat-kit`
+- `stack-kit.json`, `ops/config/`, `kits/stack-kit`
 - სერვერის ხე: `static/`, `compose/dev/`, `compose/prod/`
 - Prod UI: `fe deploy dist` / `sync` / `deploy watch`
-- Backend: `geostat be deploy …`
-- Stack: `geostat stack up`, `stack-deploy`
+- Backend: `stack-kit be deploy …`
+- Stack: `stack-kit stack up`, `stack-deploy`
 
 ### რა **არ გჭირდება** Linux-ზე პირდაპირ
 
@@ -114,9 +114,9 @@ Driver: `node-vite` (Vite, Angular CLI, Nx — compose dev + volume). დეტ�
 
 | სიტუაცია | რა გაუშვა |
 |----------|----------|
-| UI dev, ყველაფერი ერთ VM-ზე | `cd frontend && npm run dev` **ან** `geostat fe compose up -d` |
-| UI + API ერთად იმავე მანქანაზე | `geostat stack up -d --build` |
-| Prod static **ამ** სერვერზე | `geostat fe deploy dist` → `sync` / `deploy watch` |
+| UI dev, ყველაფერი ერთ VM-ზე | `cd frontend && npm run dev` **ან** `stack-kit fe compose up -d` |
+| UI + API ერთად იმავე მანქანაზე | `stack-kit stack up -d --build` |
+| Prod static **ამ** სერვერზე | `stack-kit fe deploy dist` → `sync` / `deploy watch` |
 | Linux laptop → **სხვა** remote server | `fe deploy dist`, `be deploy` (SSH იგივე); კოდი სერვერზე — SSH/Remote IDE, არა `dev watch` laptop-დან |
 | კოდი კლონირებულია სერვერზე (`compose/dev/...`) | პირდაპირ იქ `docker compose up` / Vite — **სწორი „Linux-only“ მოდელი**, rsync-ის გარეშე |
 
@@ -126,10 +126,10 @@ Driver: `node-vite` (Vite, Angular CLI, Nx — compose dev + volume). დეტ�
 
 | ვარიანტი | როგორ |
 |----------|------|
-| სრული geostat | დააყენე **`pwsh`**, შემდეგ `./tools/geostat.sh fe …` (delegate → `geostat.ps1`) |
+| სრული stack-kit | დააყენე **`pwsh`**, შემდეგ `./tools/stack-kit.sh fe …` (delegate → `stack-kit.ps1`) |
 | ყოველდღიური dev | `npm` + `docker compose` პირდაპირ — **არქიტექტურა იგივე**, ops CLI გარეშეც |
 
-`geostat stack`, `compose-gen`, `stack-deploy` (bash) Linux-ზე უკვე bash-ით მუშაობს.
+`stack-kit stack`, `compose-gen`, `stack-deploy` (bash) Linux-ზე უკვე bash-ით მუშაობს.
 
 ### შეჯამება (Linux)
 
@@ -147,7 +147,7 @@ Driver: `node-vite` (Vite, Angular CLI, Nx — compose dev + volume). დეტ�
 | `DEPLOY_LAYOUT=flat` (`.../frontend/{container}/` მხოლოდ) | `structured` + `static/` ან `compose/dev/` |
 | `fe deploy remote` ყოველ ცვლილებაზე | `fe dev bootstrap` + `fe dev watch` (მხოლოდ Windows→Linux) |
 | `fe deploy watch` Linux UI dev-ისთვის | `npm run dev` / `fe compose up` / `fe dev watch` მხოლოდ cross-host |
-| `geostat fe watch` | `geostat fe deploy watch` |
+| `stack-kit fe watch` | `stack-kit fe deploy watch` |
 | ორი path ერთ host-ზე (flat + structured) | ერთი structured; ძველი წაშლა migration-ის შემდეგ |
 
 ---
@@ -173,7 +173,7 @@ Driver: `node-vite` (Vite, Angular CLI, Nx — compose dev + volume). დეტ�
 | E1 | `stack-deploy` | server backend + frontend static |
 | L0 | flat legacy | deprecated |
 
-სიმულაცია პროექტში: `geostat layout --frontend` (+ `-OutFile docs/FRONTEND-LAYOUT-SIMULATION-FULL.md`).
+სიმულაცია პროექტში: `stack-kit layout --frontend` (+ `-OutFile docs/FRONTEND-LAYOUT-SIMULATION-FULL.md`).
 
 ---
 
@@ -181,22 +181,22 @@ Driver: `node-vite` (Vite, Angular CLI, Nx — compose dev + volume). დეტ�
 
 ```powershell
 # --- Windows / cross-host: Linux UI dev ---
-.\tools\geostat.ps1 fe dev bootstrap -Environment dev
-.\tools\geostat.ps1 fe dev watch
+.\tools\stack-kit.ps1 fe dev bootstrap -Environment dev
+.\tools\stack-kit.ps1 fe dev watch
 
 # --- Prod static on server ---
-.\tools\geostat.ps1 fe deploy dist -Environment prod
-.\tools\geostat.ps1 fe deploy sync -Environment prod
-.\tools\geostat.ps1 fe deploy watch -Environment prod
+.\tools\stack-kit.ps1 fe deploy dist -Environment prod
+.\tools\stack-kit.ps1 fe deploy sync -Environment prod
+.\tools\stack-kit.ps1 fe deploy watch -Environment prod
 
 # --- Linux same machine: daily dev ---
 cd frontend && npm run dev
 # or
-./tools/geostat.sh fe compose up -d    # needs pwsh for fe alias
+./tools/stack-kit.sh fe compose up -d    # needs pwsh for fe alias
 
 # --- Full stack ---
-./tools/geostat.sh stack up -d --build
-./tools/geostat.sh stack-deploy --prod
+./tools/stack-kit.sh stack up -d --build
+./tools/stack-kit.sh stack-deploy --prod
 ```
 
 ---
@@ -214,7 +214,7 @@ cd frontend && npm run dev
 ## ტესტები (პაკეტის gate — SSH-ის გარეშე)
 
 ```bash
-bash kits/geostat-kit/tests/run-kit-tests.sh
+bash kits/stack-kit/tests/run-kit-tests.sh
 ```
 
 41 ტესტი: paths, registry, `fe watch` redirect, Dockerfile `EXPOSE 80`, compose `HOST:80`, B/D/C გაყოფა. CI: `ops-package-tests`. დეტალი: [tests/README.md](../tests/README.md).

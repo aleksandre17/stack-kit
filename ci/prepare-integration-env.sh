@@ -3,7 +3,7 @@
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
 export PYTHONPATH="${PKG}${PYTHONPATH:+:$PYTHONPATH}"
-if [[ -z "${GEOSTAT_PROJECT_ROOT:-}" ]]; then
-  export GEOSTAT_PROJECT_ROOT="$(cd "$PKG/../.." && pwd)"
+if [[ -z "${STACK_KIT_PROJECT_ROOT:-}" ]]; then
+  export STACK_KIT_PROJECT_ROOT="$(cd "$PKG/../.." && pwd)"
 fi
 exec python3 "$PKG/lib/ci_prepare.py"

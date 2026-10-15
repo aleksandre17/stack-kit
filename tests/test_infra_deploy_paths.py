@@ -19,20 +19,20 @@ class TestResolveInfraDeployPath:
     def test_explicit(self):
         assert (
             resolve_infra_deploy_path(
-                deploy_path="/home/admin/geostat/infra/my-app",
+                deploy_path="/home/admin/app/infra/my-app",
                 server_base=None,
                 global_project=None,
                 consumer_slug="my-app",
             )
-            == "/home/admin/geostat/infra/my-app"
+            == "/home/admin/app/infra/my-app"
         )
 
     def test_explicit_wrong_slug_raises(self):
         with pytest.raises(ValueError, match="/infra/my-app"):
             resolve_infra_deploy_path(
-                deploy_path="/home/admin/geostat/infra/other",
+                deploy_path="/home/admin/app/infra/other",
                 server_base="/home/admin",
-                global_project="geostat",
+                global_project="app",
                 consumer_slug="my-app",
             )
 
@@ -41,10 +41,10 @@ class TestResolveInfraDeployPath:
             resolve_infra_deploy_path(
                 deploy_path=None,
                 server_base="/home/administrator",
-                global_project="geostat",
+                global_project="app",
                 consumer_slug="sample-app-stack",
             )
-            == "/home/administrator/geostat/infra/sample-app-stack"
+            == "/home/administrator/app/infra/sample-app-stack"
         )
 
 
@@ -52,7 +52,7 @@ class TestCandidates:
     def test_one_path(self):
         c = infra_deploy_path_candidates(
             server_base="/home/administrator",
-            global_project="geostat",
+            global_project="app",
             consumer_slug="myshop",
         )
-        assert c == ["/home/administrator/geostat/infra/myshop"]
+        assert c == ["/home/administrator/app/infra/myshop"]

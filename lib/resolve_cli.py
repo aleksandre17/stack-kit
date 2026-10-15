@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve CLI alias → module id (stdout). Used by geostat.sh when PowerShell unavailable."""
+"""Resolve CLI alias → module id (stdout). Used by stack-kit.sh when PowerShell unavailable."""
 from __future__ import annotations
 
 import sys

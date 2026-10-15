@@ -22,21 +22,21 @@ Optional: `ERROR`, `WARN`, `INFO` (grep on log lines). Not applied to `docker` o
 ## Examples
 
 ```bash
-./tools/geostat.sh be manage your-app-api logs errors --prod
-./tools/geostat.sh be manage all logs app ERROR --prod
+./tools/stack-kit.sh be manage your-app-api logs errors --prod
+./tools/stack-kit.sh be manage all logs app ERROR --prod
 ```
 
 ```powershell
 .\frontend\scripts\ps1\manage.ps1 logs errors
-.\tools\geostat.ps1 fe manage your-app-app logs app WARN
+.\tools\stack-kit.ps1 fe manage your-app-app logs app WARN
 ```
 
 ## Implementation
 
 | Module | Role |
 |--------|------|
-| `kits/geostat-kit/toolkit/bash/manage-logs.sh` | Bash dispatch |
-| `kits/geostat-kit/toolkit/bash/manage-remote.sh` | `remote_path`, `remote_logs_path` |
-| `kits/geostat-kit/toolkit/powershell/Manage-Logs.ps1` | PowerShell dispatch |
+| `kits/stack-kit/toolkit/bash/manage-logs.sh` | Bash dispatch |
+| `kits/stack-kit/toolkit/bash/manage-remote.sh` | `remote_path`, `remote_logs_path` |
+| `kits/stack-kit/toolkit/powershell/Manage-Logs.ps1` | PowerShell dispatch |
 
 Backend remote paths always use `remote_path()` — never raw `$REMOTE/$service` when compose service key ≠ directory name.

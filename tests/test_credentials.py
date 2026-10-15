@@ -7,7 +7,7 @@ from pathlib import Path
 from lib.credentials import global_gcp_credentials, module_credentials
 from lib.project_context import ProjectContext
 
-FIXTURE = Path(__file__).resolve().parent / "fixtures" / "golden-consumer" / "geostat.ops.json"
+FIXTURE = Path(__file__).resolve().parent / "fixtures" / "golden-consumer" / "stack-kit.json"
 
 
 def test_golden_consumer_multi_credentials() -> None:

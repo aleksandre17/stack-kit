@@ -13,8 +13,8 @@ from lib.project_context import ProjectContext
 def ctx(repo_root: Path, pkg_root: Path) -> ProjectContext:
     import os
 
-    os.environ["GEOSTAT_PROJECT_ROOT"] = str(repo_root)
-    os.environ["GEOSTAT_KIT_ROOT"] = str(pkg_root)
+    os.environ["STACK_KIT_PROJECT_ROOT"] = str(repo_root)
+    os.environ["STACK_KIT_KIT_ROOT"] = str(pkg_root)
     return ProjectContext.discover(repo_root)
 
 
@@ -74,4 +74,4 @@ def test_legacy_rename_map(ctx: ProjectContext) -> None:
     assert "legacy-app" in ui_sources
     assert "legacy-ui" in ui_sources
     assert "golden-consumer-app" not in ui_sources
-    assert "geostat-system-app" not in ui_sources
+    assert "stack-kit-system-app" not in ui_sources

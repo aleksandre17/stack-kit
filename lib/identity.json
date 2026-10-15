@@ -1,7 +1,15 @@
 {
-  "$comment": "THE kit's identity. Declared here, projected into Python (lib/identity.py), bash (lib/project.sh) and PowerShell (lib/project.ps1). A declaration carries no behaviour, so no language owns it and all three read the same bytes. Renaming the kit is a change to THIS FILE. legacyManifestFilenames is read-with-notice, never written.",
-  "kitName": "geostat",
-  "manifestFilename": "geostat.ops.json",
-  "legacyManifestFilenames": [],
-  "envPrefix": "GEOSTAT"
+  "$comment": "THE kit's identity. Declared here, projected into Python (lib/identity.py), bash (lib/project.sh) and PowerShell (lib/project.ps1). A declaration carries no behaviour, so no language owns it and all three read the same bytes. Renaming the kit is a change to THIS FILE. Every legacy* name is READ with one notice naming its replacement and never written; legacyRemovedIn is the release that stops reading them (ADR-001 decision 1).",
+  "kitName": "stack-kit",
+  "manifestFilename": "stack-kit.json",
+  "envPrefix": "STACK_KIT",
+  "deployMarker": ".stack-kit-deploy.json",
+  "vendorDirs": ["kits/stack-kit", "packages/stack-kit"],
+  "legacyRemovedIn": "2.0.0",
+  "legacyKitName": "geostat",
+  "legacyManifestFilenames": ["geostat.ops.json"],
+  "legacyEnvPrefix": "GEOSTAT",
+  "legacyDeployMarker": ".geostat-deploy.json",
+  "legacyVendorDirs": ["kits/geostat-kit", "packages/geostat-kit"],
+  "legacyManifestFields": {"vscode.geostatScript": "vscode.cliScript"}
 }

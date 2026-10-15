@@ -23,7 +23,7 @@ deploy_step_build() {
 
   local prefix local_build_log
   prefix="${OPS_BUILD_TMP_PREFIX:-ops-build}"
-  local_build_log="/tmp/${prefix}-${GEOSTAT_MODULE_ID}.log"
+  local_build_log="/tmp/${prefix}-${STACK_KIT_MODULE_ID}.log"
   { echo "=== node-api build [$NODE_PKG_FILTER] $(date) ==="; } >"$local_build_log"
 
   if ! command -v pnpm >/dev/null 2>&1; then

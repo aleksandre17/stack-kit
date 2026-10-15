@@ -13,7 +13,7 @@ from lib.manifest_defaults import (
 from lib.project_context import ProjectContext
 
 PKG = Path(__file__).resolve().parents[1]
-SCAFFOLD = PKG / "scaffold" / "geostat.ops.json"
+SCAFFOLD = PKG / "scaffold" / "stack-kit.json"
 
 
 def test_scaffold_manifest_loads() -> None:
@@ -24,7 +24,7 @@ def test_scaffold_manifest_loads() -> None:
 
 def test_flatten_defaults_match_scaffold() -> None:
     d = flatten_defaults()
-    assert d["package"] == "kits/geostat-kit"
+    assert d["package"] == "kits/stack-kit"
     assert d["secrets"] == "ops/config"
     assert "catalog.json" in d["compose.catalog"]
 
@@ -37,8 +37,8 @@ def test_cli_aliases_from_scaffold() -> None:
 
 
 def test_project_context_uses_scaffold_defaults(tmp_path: Path) -> None:
-    mf = tmp_path / "geostat.ops.json"
+    mf = tmp_path / "stack-kit.json"
     mf.write_text('{"version":2,"secrets":"custom/config","modules":{}}', encoding="utf-8")
     ctx = ProjectContext(root=tmp_path, manifest={"version": 2, "secrets": "custom/config", "modules": {}})
-    assert ctx.field("package") == "kits/geostat-kit"
+    assert ctx.field("package") == "kits/stack-kit"
     assert ctx.field("secrets") == "custom/config"

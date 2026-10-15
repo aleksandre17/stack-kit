@@ -16,7 +16,7 @@ def _golden_tree(tmp_path: Path) -> Path:
 
     The fixture's `apps/**` already carry the config-gen golden output and the
     hand-maintained `application-custom.yml`, so validation (which runs config-gen
-    drift checks) passes against a faithful copy. The `kits/geostat-kit` junction
+    drift checks) passes against a faithful copy. The `kits/stack-kit` junction
     is skipped — `package` is rewritten as a relative path to the real kit.
     """
     import os
@@ -28,10 +28,10 @@ def _golden_tree(tmp_path: Path) -> Path:
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns("kits", "__pycache__", ".pytest_cache"),
     )
-    manifest = json.loads((tmp_path / "geostat.ops.json").read_text(encoding="utf-8"))
+    manifest = json.loads((tmp_path / "stack-kit.json").read_text(encoding="utf-8"))
     pkg = Path(__file__).resolve().parents[1]
     manifest["package"] = os.path.relpath(pkg, tmp_path).replace("\\", "/")
-    (tmp_path / "geostat.ops.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (tmp_path / "stack-kit.json").write_text(json.dumps(manifest), encoding="utf-8")
     # deploy.env is gitignored / volatile; synthesize from the committed template.
     template = tmp_path / "ops" / "config" / "deploy.env.fixture"
     if template.is_file():
@@ -49,9 +49,9 @@ def test_validate_golden_consumer_passes(tmp_path: Path) -> None:
 
 
 def test_validate_fails_missing_role(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("GEOSTAT_PROJECT_ROOT", raising=False)
+    monkeypatch.delenv("STACK_KIT_PROJECT_ROOT", raising=False)
     root = _golden_tree(tmp_path)
-    mf = root / "geostat.ops.json"
+    mf = root / "stack-kit.json"
     data = json.loads(mf.read_text(encoding="utf-8"))
     del data["modules"]["api"]["role"]
     mf.write_text(json.dumps(data), encoding="utf-8")

@@ -1,11 +1,11 @@
 #!/bin/bash
 # List deploy modules (backend/ops.modules + compose services)
-# Usage: geostat be modules
+# Usage: stack-kit be modules
 
 # shellcheck source=../_init.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_init.sh"
 
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
 
@@ -41,7 +41,7 @@ fi
 echo ""
 echo "  Deploy examples:"
 for s in "${SERVICES[@]}"; do
-  echo "    geostat be deploy $s --prod"
+  echo "    stack-kit be deploy $s --prod"
 done
-echo "    geostat be deploy all --prod"
+echo "    stack-kit be deploy all --prod"
 echo ""

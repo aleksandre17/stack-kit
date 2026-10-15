@@ -1,5 +1,5 @@
 ﻿# Frontend deploy layout simulation (dry-run, no SSH)
-# Usage: geostat layout --frontend  |  simulate-frontend-layout.ps1 [-Json] [-Markdown]
+# Usage: stack-kit layout --frontend  |  simulate-frontend-layout.ps1 [-Json] [-Markdown]
 
 param(
     [string]$ModuleId = "",
@@ -14,8 +14,8 @@ $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\env.ps1")
 . (Join-Path $PackageRoot "lib\modules.ps1")
 $RepoRoot = Get-ProjectRootFromManifest
-if (-not $RepoRoot) { throw "geostat.ops.json not found" }
-$env:GEOSTAT_PROJECT_ROOT = $RepoRoot
+if (-not $RepoRoot) { throw "stack-kit.json not found" }
+$env:STACK_KIT_PROJECT_ROOT = $RepoRoot
 if (-not $ModuleId) { $ModuleId = Get-ModuleIdByRole "ui" }
 if (-not $ModuleId) { $ModuleId = (Get-ModuleIdsByDriverType "node-vite" | Select-Object -First 1) }
 if (-not $ModuleId) { throw "manifest: no ui / node-vite module" }
@@ -159,7 +159,7 @@ function Get-RepoFrontendSourceTree {
         (New-TreeNode "package-lock.json"),
         (New-TreeNode "vite.config.js" -Note "if present"),
         (New-TreeNode "nginx.conf.template"),
-        (New-TreeNode "nginx.conf" -Note "generated: geostat nginx-gen"),
+        (New-TreeNode "nginx.conf" -Note "generated: stack-kit nginx-gen"),
         (New-TreeNode "docker-compose.yml" -Note "GENERATED"),
         (New-TreeNode "docker-compose.override.yml" -Note "dev: volume .:/app, develop.watch"),
         (New-TreeNode "docker-compose.prod.yml" -Note "prod overlay"),
@@ -187,7 +187,7 @@ function Get-StaticDistTree {
 function Get-ServerStaticTree {
     param([string]$RemoteRoot)
     New-TreeNode $RemoteRoot @(
-        (New-TreeNode ".geostat-deploy.json" -Note "manifest: kind=static, deployMode"),
+        (New-TreeNode ".stack-kit-deploy.json" -Note "manifest: kind=static, deployMode"),
         (New-TreeNode ".env.runtime.json" -Note "VITE_API_URL, environment, deployedAt"),
         (New-TreeNode "nginx.conf" -Note "from nginx-gen / module root"),
         (Get-StaticDistTree)
@@ -197,7 +197,7 @@ function Get-ServerStaticTree {
 function Get-ServerComposeDevTree {
     param([string]$RemoteRoot)
     New-TreeNode $RemoteRoot @(
-        (New-TreeNode ".geostat-deploy.json" -Note "kind=compose-dev"),
+        (New-TreeNode ".stack-kit-deploy.json" -Note "kind=compose-dev"),
         (New-TreeNode ".env.dev" -Note "merged secrets upload"),
         (New-TreeNode "docker-compose.yml"),
         (New-TreeNode "docker-compose.override.yml"),
@@ -272,7 +272,7 @@ $scenarios["A1-local-npm"] = [PSCustomObject]@{
         "3. Browser → http://localhost:5173 (or configured port)"
     )
     DockerUpdate = @(
-        "Save src/** → Vite HMR instant (no Docker, no geostat)"
+        "Save src/** → Vite HMR instant (no Docker, no stack-kit)"
     )
     Gaps = @("Port may differ from DEPLOY_HOST_PORT=5177 used in Docker modes.")
     Senior = @("Fastest inner loop when API is reachable from Windows.")
@@ -282,7 +282,7 @@ $scenarios["A2-local-compose-dev"] = [PSCustomObject]@{
     Id = "A2"
     Group = "Local (developer machine)"
     Title = "Docker compose - dev (module)"
-    Command = ".\tools\geostat.ps1 fe compose up -d"
+    Command = ".\tools\stack-kit.ps1 fe compose up -d"
     Host = "(localhost)"
     Root = $feRoot
     EnvFiles = @($script:FeEnvDevLbl, $script:DeployEnvLbl)
@@ -298,7 +298,7 @@ $scenarios["A2-local-compose-dev"] = [PSCustomObject]@{
         ))
     )
     DockerStart = @(
-        "1. geostat compose-gen (if needed)",
+        "1. stack-kit compose-gen (if needed)",
         "2. cd frontend; docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build",
         "3. Container: development stage, port 5177:5177"
     )
@@ -307,7 +307,7 @@ $scenarios["A2-local-compose-dev"] = [PSCustomObject]@{
         "compose develop.watch: sync src/ → /app/src in container",
         "package.json change → watch action rebuild image"
     )
-    Gaps = @("GENERATED yaml - run geostat compose-gen after catalog change.")
+    Gaps = @("GENERATED yaml - run stack-kit compose-gen after catalog change.")
     Senior = @("Parity test before D1 remote dev.")
 }
 
@@ -315,7 +315,7 @@ $scenarios["A3-local-compose-prod"] = [PSCustomObject]@{
     Id = "A3"
     Group = "Local (developer machine)"
     Title = "Docker compose - prod overlay (local smoke)"
-    Command = ".\tools\geostat.ps1 fe compose -Prod up -d --build"
+    Command = ".\tools\stack-kit.ps1 fe compose -Prod up -d --build"
     Host = "(localhost)"
     Root = $feRoot
     EnvFiles = @($script:FeEnvProdLbl, $script:DeployEnvLbl)
@@ -347,7 +347,7 @@ $scenarios["A4-local-stack"] = [PSCustomObject]@{
     Id = "A4"
     Group = "Local (developer machine)"
     Title = "Full stack - API + UI (stack compose)"
-    Command = ".\tools\geostat.ps1 stack up -d --build"
+    Command = ".\tools\stack-kit.ps1 stack up -d --build"
     Host = "(localhost)"
     Root = $stackDir
     EnvFiles = @(
@@ -372,7 +372,7 @@ $scenarios["A4-local-stack"] = [PSCustomObject]@{
         (Get-RepoFrontendSourceTree -FeRoot $feRoot)
     )
     DockerStart = @(
-        "1. geostat stack up -d --build",
+        "1. stack-kit stack up -d --build",
         "2. Backend container(s) + frontend $container on shared network"
     )
     DockerUpdate = @(
@@ -386,7 +386,7 @@ $scenarios["A5-local-deploy-local"] = [PSCustomObject]@{
     Id = "A5"
     Group = "Local (developer machine)"
     Title = "deploy local - production image on laptop"
-    Command = ".\tools\geostat.ps1 fe deploy local -Environment dev|prod"
+    Command = ".\tools\stack-kit.ps1 fe deploy local -Environment dev|prod"
     Host = "(localhost)"
     Root = $feRoot
     EnvFiles = @("$($script:FeSecretsFolder)/.env.{profile}", "VITE_API_URL, DEPLOY_HOST_PORT")
@@ -401,7 +401,7 @@ $scenarios["A5-local-deploy-local"] = [PSCustomObject]@{
         ))
     )
     DockerStart = @(
-        "1. geostat nginx-gen",
+        "1. stack-kit nginx-gen",
         "2. docker build --target production --build-arg VITE_API_URL=... -t frontend",
         "3. docker run -d --name frontend -p 5177:80 frontend"
     )
@@ -417,7 +417,7 @@ $scenarios["B1-server-dist"] = [PSCustomObject]@{
     Id = "B1"
     Group = "Server - static (nginx + dist)"
     Title = "deploy dist (dev or prod profile)"
-    Command = ".\tools\geostat.ps1 fe deploy dist -Environment dev|prod"
+    Command = ".\tools\stack-kit.ps1 fe deploy dist -Environment dev|prod"
     Host = $meta.Server
     Root = $remoteStatic
     EnvFiles = @("$($script:FeSecretsFolder)/.env.{profile}", ".env.deploy", "server: .env.runtime.json")
@@ -449,7 +449,7 @@ $scenarios["B2-server-sync"] = [PSCustomObject]@{
     Id = "B2"
     Group = "Server - static (nginx + dist)"
     Title = "deploy sync (+ nginx reload)"
-    Command = ".\tools\geostat.ps1 fe deploy sync -Environment dev|prod"
+    Command = ".\tools\stack-kit.ps1 fe deploy sync -Environment dev|prod"
     Host = $meta.Server
     Root = $remoteStatic
     EnvFiles = @("same as B1")
@@ -470,7 +470,7 @@ $scenarios["B3-server-watch"] = [PSCustomObject]@{
     Id = "B3"
     Group = "Server - static (nginx + dist)"
     Title = "deploy watch - static dist loop (NOT dev watch)"
-    Command = ".\tools\geostat.ps1 fe deploy watch -Environment dev|prod"
+    Command = ".\tools\stack-kit.ps1 fe deploy watch -Environment dev|prod"
     Host = $meta.Server
     Root = $remoteStatic
     EnvFiles = @("same as B1")
@@ -493,7 +493,7 @@ $scenarios["C1-server-remote-dev"] = [PSCustomObject]@{
     Id = "C1"
     Group = "Server - compose (full tar)"
     Title = "deploy remote dev (tar + server build)"
-    Command = ".\tools\geostat.ps1 fe deploy remote -Environment dev"
+    Command = ".\tools\stack-kit.ps1 fe deploy remote -Environment dev"
     Host = $meta.Server
     Root = $remoteComposeDev
     EnvFiles = @("server: .env.dev (uploaded bundle)", "deploy.env")
@@ -520,7 +520,7 @@ $scenarios["D1-dev-bootstrap"] = [PSCustomObject]@{
     Id = "D1"
     Group = "Server - remote dev (SPA rsync)"
     Title = "dev bootstrap (rsync + compose up --build)"
-    Command = ".\tools\geostat.ps1 fe dev bootstrap -Environment dev"
+    Command = ".\tools\stack-kit.ps1 fe dev bootstrap -Environment dev"
     Host = $meta.Server
     Root = $remoteComposeDev
     EnvFiles = @("server: .env.dev", $script:FeEnvDevLbl)
@@ -551,7 +551,7 @@ $scenarios["D2-dev-watch"] = [PSCustomObject]@{
     Id = "D2"
     Group = "Server - remote dev (SPA rsync)"
     Title = "dev watch (debounced rsync only)"
-    Command = ".\tools\geostat.ps1 fe dev watch -Environment dev"
+    Command = ".\tools\stack-kit.ps1 fe dev watch -Environment dev"
     Host = $meta.Server
     Root = $remoteComposeDev
     Docker = "container keeps running; Vite HMR + volume"
@@ -578,7 +578,7 @@ $scenarios["D3-dev-sync"] = [PSCustomObject]@{
     Id = "D3"
     Group = "Server - remote dev (SPA rsync)"
     Title = "dev sync (one-shot rsync)"
-    Command = ".\tools\geostat.ps1 fe dev sync"
+    Command = ".\tools\stack-kit.ps1 fe dev sync"
     Host = $meta.Server
     Root = $remoteComposeDev
     Docker = "no restart"
@@ -594,7 +594,7 @@ $scenarios["D4-dev-restart"] = [PSCustomObject]@{
     Id = "D4"
     Group = "Server - remote dev (SPA rsync)"
     Title = "dev restart (compose restart)"
-    Command = ".\tools\geostat.ps1 fe dev restart -Environment dev"
+    Command = ".\tools\stack-kit.ps1 fe dev restart -Environment dev"
     Host = $meta.Server
     Root = $remoteComposeDev
     Docker = "docker compose restart (no rebuild)"
@@ -610,14 +610,14 @@ $scenarios["C2-server-remote-prod"] = [PSCustomObject]@{
     Id = "C2"
     Group = "Server - compose (full tar)"
     Title = "deploy remote prod"
-    Command = ".\tools\geostat.ps1 fe deploy remote -Environment prod"
+    Command = ".\tools\stack-kit.ps1 fe deploy remote -Environment prod"
     Host = $meta.Server
     Root = $remoteComposeProd
     EnvFiles = @("server: .env.prod", "deploy.env")
     Docker = "compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build"
     Runtime = "production target in container on server"
     Tree = New-TreeNode $remoteComposeProd @(
-        (New-TreeNode ".geostat-deploy.json"),
+        (New-TreeNode ".stack-kit-deploy.json"),
         (New-TreeNode ".env.prod"),
         (New-TreeNode "docker-compose.yml"),
         (New-TreeNode "docker-compose.prod.yml"),
@@ -633,8 +633,8 @@ $scenarios["C2-server-remote-prod"] = [PSCustomObject]@{
 $scenarios["E1-stack-deploy"] = [PSCustomObject]@{
     Id = "E1"
     Group = "Stack (backend + frontend)"
-    Title = "stack-deploy (geostat.ops.json steps)"
-    Command = ".\tools\geostat.ps1 stack-deploy --prod"
+    Title = "stack-deploy (stack-kit.json steps)"
+    Command = ".\tools\stack-kit.ps1 stack-deploy --prod"
     Host = $meta.Server
     Root = "$($meta.ServerBase)/$($meta.Project)"
     EnvFiles = @("backend secrets", "frontend .env.prod", "deploy.env")
@@ -654,8 +654,8 @@ $scenarios["E1-stack-deploy"] = [PSCustomObject]@{
         (New-TreeNode "deploy-staging/")
     )
     DockerStart = @(
-        "1. geostat be deploy all (backend modules)",
-        "2. geostat fe deploy dist -Environment prod"
+        "1. stack-kit be deploy all (backend modules)",
+        "2. stack-kit fe deploy dist -Environment prod"
     )
     DockerUpdate = @("Re-run stack-deploy; not incremental")
     Gaps = @()
@@ -713,7 +713,7 @@ if ($Markdown -or $OutFile) {
     $md = [System.Collections.ArrayList]@()
     [void]$md.Add("# Frontend deploy - full layout simulation")
     [void]$md.Add("")
-    [void]$md.Add('> Dry-run from `ops/config` + `geostat.ops.json`. Regenerate: geostat layout --frontend -Markdown -OutFile docs/FRONTEND-LAYOUT-SIMULATION-FULL.md')
+    [void]$md.Add('> Dry-run from `ops/config` + `stack-kit.json`. Regenerate: stack-kit layout --frontend -Markdown -OutFile docs/FRONTEND-LAYOUT-SIMULATION-FULL.md')
     [void]$md.Add("")
     [void]$md.Add("## Resolved paths (this project)")
     [void]$md.Add("")
@@ -850,6 +850,6 @@ foreach ($row in $scenarios["_summary"].Matrix) {
     Write-Host ('  | {0,-22} | {1,-17} | {2,-9} |' -f $row.Use, $row.Mode, $row.Server) -ForegroundColor Gray
 }
 Write-Host ""
-Write-Host '  Full MD: geostat layout --frontend -Markdown -OutFile docs/FRONTEND-LAYOUT-SIMULATION-FULL.md' -ForegroundColor DarkGray
+Write-Host '  Full MD: stack-kit layout --frontend -Markdown -OutFile docs/FRONTEND-LAYOUT-SIMULATION-FULL.md' -ForegroundColor DarkGray
 Write-Host '  Docs: docs/FRONTEND-DEPLOY-LAYOUTS.md' -ForegroundColor DarkGray
 Write-Host ""

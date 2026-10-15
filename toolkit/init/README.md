@@ -1,29 +1,29 @@
-# geostat init
+# stack-kit init
 
 ერთი ბრძანება — სრული ops bootstrap ახალი ან ნაწილობრივ მოწყობილი repo-სთვის.
 
-**პროექტის დოკუმენტაცია (სრული):** [GEOSTAT-INIT.md](../../../../docs/GEOSTAT-INIT.md) (repo `docs/`)
+**პროექტის დოკუმენტაცია (სრული):** [STACK_KIT-INIT.md](../../../../docs/STACK_KIT-INIT.md) (repo `docs/`)
 
 ## გაშვება
 
 ```powershell
 # repo root-დან (ან ცარიელი ფოლდერიდან, სადაც გინდა პროექტი)
-.\tools\geostat.ps1 init
+.\tools\stack-kit.ps1 init
 
 # მხოლოდ API (worker-ის გარეშე) catalog
-.\tools\geostat.ps1 init -MinimalCatalog
+.\tools\stack-kit.ps1 init -MinimalCatalog
 
 # არსებული env-ების გადაწერა examples-დან
-.\tools\geostat.ps1 init -ForceExamples
+.\tools\stack-kit.ps1 init -ForceExamples
 ```
 
 ```bash
-./tools/geostat.sh init
+./tools/stack-kit.sh init
 ```
 
 ## რას აკეთებს
 
-1. **apply-scaffold** — `tools/`, `ops/config/*.example`, `apps/*`, `ops/compose/`, `geostat.ops.json`
+1. **apply-scaffold** — `tools/`, `ops/config/*.example`, `apps/*`, `ops/compose/`, `stack-kit.json`
 2. **catalog** — `catalog.full.json` → `infra/compose/catalog.json` (სრული FE+BE+stack; `-MinimalCatalog` — მხოლოდ API)
 3. **seed** — `.example` → `deploy.env`, `.env.dev`, `.env.prod`, `.env.deploy`, `nginx.env`
 4. **.gitignore** — scaffold წესების დამატება

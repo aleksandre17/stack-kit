@@ -9,8 +9,8 @@ $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\env.ps1")
 . (Join-Path $PackageRoot "lib\modules.ps1")
 $RepoRoot = Get-ProjectRootFromManifest
-if (-not $RepoRoot) { throw "geostat.ops.json not found" }
-$env:GEOSTAT_PROJECT_ROOT = $RepoRoot
+if (-not $RepoRoot) { throw "stack-kit.json not found" }
+$env:STACK_KIT_PROJECT_ROOT = $RepoRoot
 $script:FeModuleId = Get-ModuleIdByRole "ui"
 if (-not $script:FeModuleId) { $script:FeModuleId = (Get-ModuleIdsByDriverType "node-vite" | Select-Object -First 1) }
 $script:BeModuleId = Get-ModuleIdByRole "api"
@@ -141,7 +141,7 @@ foreach ($envName in @("dev", "prod")) {
     }
 
     $scenarios["backend-$envName"] = [PSCustomObject]@{
-        Title = "Backend deploy - $envName (geostat be deploy --$envName)"
+        Title = "Backend deploy - $envName (stack-kit be deploy --$envName)"
         Host = $meta.Server
         Root = $beDeployBase
         Docker = "docker compose -f docker-compose.$envName.yml --env-file ./.env.$envName up --build -d"

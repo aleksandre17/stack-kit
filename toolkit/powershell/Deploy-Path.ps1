@@ -77,13 +77,18 @@ function Set-DeployPathForMode {
 function Update-DeployPathFromServer {
     if (-not $script:SERVER) { return }
     $manifestPath = ""
-    foreach ($candidate in (Get-DeployPathCandidates -ContainerName $script:APP_NAME)) {
-        $check = Invoke-SSHCapture "test -f '$candidate/.geostat-deploy.json' && echo '$candidate'"
-        $line = ($check | Where-Object { $_ -match '\S' } | Select-Object -Last 1)
-        if ($line -and $line.Trim()) {
-            $script:DEPLOY_PATH = $line.Trim()
-            $manifestPath = "$($script:DEPLOY_PATH)/.geostat-deploy.json"
-            break
+    # The current marker first; one an older deploy left is still found, with a notice (ADR-001).
+    $id = Get-KitIdentity
+    :found foreach ($candidate in (Get-DeployPathCandidates -ContainerName $script:APP_NAME)) {
+        foreach ($marker in @($id.deployMarker, $id.legacyDeployMarker) | Where-Object { $_ }) {
+            $check = Invoke-SSHCapture "test -f '$candidate/$marker' && echo '$candidate'"
+            $line = ($check | Where-Object { $_ -match '\S' } | Select-Object -Last 1)
+            if ($line -and $line.Trim()) {
+                $script:DEPLOY_PATH = $line.Trim()
+                $manifestPath = "$($script:DEPLOY_PATH)/$marker"
+                if ($marker -ne $id.deployMarker) { Write-KitDeprecation $marker $id.deployMarker }
+                break found
+            }
         }
     }
     if (-not $manifestPath) {
@@ -203,10 +208,10 @@ function Write-RemoteDeployManifest {
         deployPath  = $script:DEPLOY_PATH
         updatedAt   = (Get-Date).ToUniversalTime().ToString("o")
     } | ConvertTo-Json -Compress
-    $local = Join-Path $env:TEMP "geostat-deploy-manifest.json"
+    $local = Join-Path $env:TEMP "stack-kit-deploy-manifest.json"
     Set-Content -Path $local -Value $manifest -Encoding UTF8 -NoNewline
-    $null = & ssh @(Get-GeostatSshExtraArgs) $script:SERVER "mkdir -p $($script:DEPLOY_PATH)"
-    $rc = Invoke-SCP -Source $local -Dest "$($script:DEPLOY_PATH)/.geostat-deploy.json"
+    $null = & ssh @(Get-StackKitSshExtraArgs) $script:SERVER "mkdir -p $($script:DEPLOY_PATH)"
+    $rc = Invoke-SCP -Source $local -Dest "$($script:DEPLOY_PATH)/$((Get-KitIdentity).deployMarker)"
     Remove-Item $local -ErrorAction SilentlyContinue
     if ($rc -ne 0) { Log "manifest upload failed (non-fatal)" "WARN" }
 }
@@ -215,10 +220,10 @@ function Publish-RemoteEnvFiles {
     param(
         [ValidateSet("dev", "prod")][string]$Environment
     )
-    $bundle = Join-Path $env:TEMP "geostat-fe-stack-$Environment.env"
+    $bundle = Join-Path $env:TEMP "stack-kit-fe-stack-$Environment.env"
     $lines = [System.Collections.ArrayList]@()
-    [void]$lines.Add("# Generated for remote compose - geostat deploy")
-    [void]$lines.Add("GEOSTAT_ENVIRONMENT=$Environment")
+    [void]$lines.Add("# Generated for remote compose - stack-kit deploy")
+    [void]$lines.Add("STACK_KIT_ENVIRONMENT=$Environment")
     foreach ($f in (Get-SecretsEnvFiles -Module $OpsSecretsModule -Profile $Environment)) {
         [void]$lines.Add("")
         [void]$lines.Add("# from $f")
@@ -247,7 +252,7 @@ function Sync-StaticArtifactsToServer {
         [ValidateSet("dev", "prod")][string]$Environment,
         [ValidateSet("dist", "sync")][string]$DeployMode
     )
-    & ssh @(Get-GeostatSshExtraArgs) $script:SERVER "mkdir -p $($script:DEPLOY_PATH)/dist" | Out-Null
+    & ssh @(Get-StackKitSshExtraArgs) $script:SERVER "mkdir -p $($script:DEPLOY_PATH)/dist" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "mkdir on server failed" }
 
     $rc = Invoke-SCP -Source $DistDir -Dest "$($script:DEPLOY_PATH)/" -Recurse
@@ -264,12 +269,12 @@ function Sync-StaticArtifactsToServer {
         environment   = $Environment
         deployedAt    = (Get-Date).ToUniversalTime().ToString("o")
     } | ConvertTo-Json
-    $rtLocal = Join-Path $env:TEMP "geostat-runtime.json"
+    $rtLocal = Join-Path $env:TEMP "stack-kit-runtime.json"
     Set-Content -Path $rtLocal -Value $runtime -Encoding UTF8
     $null = Invoke-SCP -Source $rtLocal -Dest "$($script:DEPLOY_PATH)/.env.runtime.json"
     Remove-Item $rtLocal -ErrorAction SilentlyContinue
 
-    & ssh @(Get-GeostatSshExtraArgs) $script:SERVER "chmod -R 755 $($script:DEPLOY_PATH)/dist" | Out-Null
+    & ssh @(Get-StackKitSshExtraArgs) $script:SERVER "chmod -R 755 $($script:DEPLOY_PATH)/dist" | Out-Null
 
     if ($WriteManifest) {
         Write-RemoteDeployManifest -Environment $Environment -DeployMode $DeployMode -Kind "static"
@@ -277,7 +282,7 @@ function Sync-StaticArtifactsToServer {
 }
 
 # Requires Invoke-NginxGen from deploy.ps1 scope or define stub
-function Get-GeostatPythonArgs {
+function Get-StackKitPythonArgs {
     if (Get-Command py -ErrorAction SilentlyContinue) {
         & py -3 -c "import sys" 2>$null | Out-Null
         if ($LASTEXITCODE -eq 0) { return @("py", "-3") }
@@ -291,17 +296,17 @@ function Get-GeostatPythonArgs {
 }
 
 function Invoke-NginxGen {
-    $py = Join-Path $env:GEOSTAT_KIT_ROOT "adapters\render_nginx.py"
+    $py = Join-Path $env:STACK_KIT_KIT_ROOT "adapters\render_nginx.py"
     if (-not (Test-Path $py)) {
         Log "render_nginx.py missing - using existing nginx.conf" "WARN"
         return
     }
-    $pyArgs = Get-GeostatPythonArgs
+    $pyArgs = Get-StackKitPythonArgs
     if (-not $pyArgs) {
         Log "Python not found - using existing nginx.conf" "WARN"
         return
     }
-    $env:GEOSTAT_PROJECT_ROOT = Get-MonorepoRoot
+    $env:STACK_KIT_PROJECT_ROOT = Get-MonorepoRoot
     if ($pyArgs.Count -gt 1) {
         & $pyArgs[0] $pyArgs[1] $py
     } else {

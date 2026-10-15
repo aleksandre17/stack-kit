@@ -1,4 +1,4 @@
-"""geostat init toolkit — smoke tests."""
+"""stack-kit init toolkit — smoke tests."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,6 +21,6 @@ def test_catalog_templates_in_scaffold(pkg_root: Path) -> None:
 
 
 def test_cli_documents_init(pkg_root: Path) -> None:
-    cli = (pkg_root / "cli" / "geostat.ps1").read_text(encoding="utf-8")
+    cli = (pkg_root / "cli" / "stack-kit.ps1").read_text(encoding="utf-8")
     assert "init" in cli
     assert "Invoke-ProjectInit.ps1" in cli

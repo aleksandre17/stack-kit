@@ -45,9 +45,9 @@ node_upload_service() {
   } | ssh "$SERVER" "cat >> '$srv_log'/upload.log"
 
   local prefix="${OPS_BUILD_TMP_PREFIX:-ops-build}"
-  if [ -f "/tmp/${prefix}-${GEOSTAT_MODULE_ID}.log" ]; then
-    scp "/tmp/${prefix}-${GEOSTAT_MODULE_ID}.log" "$SERVER:$srv_log/build.log" >/dev/null 2>&1
-    rm -f "/tmp/${prefix}-${GEOSTAT_MODULE_ID}.log"
+  if [ -f "/tmp/${prefix}-${STACK_KIT_MODULE_ID}.log" ]; then
+    scp "/tmp/${prefix}-${STACK_KIT_MODULE_ID}.log" "$SERVER:$srv_log/build.log" >/dev/null 2>&1
+    rm -f "/tmp/${prefix}-${STACK_KIT_MODULE_ID}.log"
   fi
 
   # Manifest-declared credentials (same contract as java-boot upload.sh).
@@ -59,7 +59,7 @@ node_upload_service() {
       scp "$f" "$SERVER:$rp/$(basename "$cred_file")" 2>/dev/null
       echo "  [cred] $(basename "$cred_file") (manifest)"
     fi
-  done < <(geostat_module_credentials_lines "$s")
+  done < <(stack_kit_module_credentials_lines "$s")
 
   for pattern in $CRED_PATTERNS; do
     for f in "$SECRETS_DIR/"$pattern; do

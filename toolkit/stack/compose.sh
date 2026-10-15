@@ -3,11 +3,11 @@
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/../.." && pwd)"
 ROOT="$(cd "$PKG/../.." && pwd)"
-export GEOSTAT_PROJECT_ROOT="$ROOT"
+export STACK_KIT_PROJECT_ROOT="$ROOT"
 # shellcheck source=../../lib/env.sh
 source "$PKG/lib/env.sh"
 
-COMPOSE_REL="$(geostat_read_manifest_field stack.composeDir ops/compose/stack)"
+COMPOSE_REL="$(stack_kit_read_manifest_field stack.composeDir ops/compose/stack)"
 COMPOSE_DIR="$ROOT/$COMPOSE_REL"
 
 PROD=0
@@ -30,10 +30,10 @@ fi
 ENV_ARGS=()
 while IFS= read -r f; do
   [[ -n "$f" ]] && ENV_ARGS+=(--env-file "$f")
-done < <(geostat_stack_env_files "$PROFILE")
+done < <(stack_kit_stack_env_files "$PROFILE")
 
 cd "$COMPOSE_DIR"
-STACK_NAME="$(geostat_deploy_env_value COMPOSE_PROJECT_NAME "$(basename "$ROOT")")"
+STACK_NAME="$(stack_kit_deploy_env_value COMPOSE_PROJECT_NAME "$(basename "$ROOT")")"
 echo ""
 echo "  $STACK_NAME stack ($PROFILE)"
 PY="$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)"

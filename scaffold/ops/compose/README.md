@@ -3,7 +3,7 @@
 Edit `catalog.json`, then:
 
 ```powershell
-.\tools\geostat.ps1 compose-gen
+.\tools\stack-kit.ps1 compose-gen
 ```
 
 Default from scaffold: `catalog.minimal.json` (API only, `worker: false`).  

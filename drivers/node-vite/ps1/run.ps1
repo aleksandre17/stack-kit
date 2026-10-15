@@ -1,10 +1,10 @@
 # node-vite — local run via manifest (host + secrets .env.dev)
-if (-not $env:GEOSTAT_MODULE_ID) {
-    throw 'GEOSTAT_MODULE_ID required - run: geostat {alias} run | geostat hybrid boot {alias}'
+if (-not $env:STACK_KIT_MODULE_ID) {
+    throw 'STACK_KIT_MODULE_ID required - run: stack-kit {alias} run | stack-kit hybrid boot {alias}'
 }
 $DriverRoot = Split-Path $PSScriptRoot -Parent
 $PackageRoot = Split-Path (Split-Path $DriverRoot -Parent) -Parent
-$env:GEOSTAT_KIT_ROOT = $PackageRoot
+$env:STACK_KIT_KIT_ROOT = $PackageRoot
 
-& (Join-Path $PackageRoot "toolkit\hybrid\Invoke-HybridRun.ps1") -ModuleId $env:GEOSTAT_MODULE_ID
+& (Join-Path $PackageRoot "toolkit\hybrid\Invoke-HybridRun.ps1") -ModuleId $env:STACK_KIT_MODULE_ID
 exit $LASTEXITCODE

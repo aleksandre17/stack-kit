@@ -1,4 +1,4 @@
-# geostat-kit package tests — last run
+# stack-kit package tests — last run
 
 | Field | Value |
 |-------|--------|
@@ -15,11 +15,11 @@ cd stack-kit
 py -3 -m pytest tests -q
 ```
 
-No `GEOSTAT_PROJECT_ROOT` is required: the suite runs against a synthetic,
+No `STACK_KIT_PROJECT_ROOT` is required: the suite runs against a synthetic,
 self-contained reference consumer that the kit owns. `conftest.py` materialises
-the two volatile bits at session start (a `kits/geostat-kit` junction back to the
+the two volatile bits at session start (a `kits/stack-kit` junction back to the
 real kit, and `ops/config/deploy.env` from `deploy.env.fixture`). Set
-`GEOSTAT_PROJECT_ROOT` only to smoke-test the kit against a *real* consumer repo.
+`STACK_KIT_PROJECT_ROOT` only to smoke-test the kit against a *real* consumer repo.
 
 ## The one failure — declared, not hidden
 
@@ -31,7 +31,7 @@ it is taken). The test is correct and the tree is honestly red until that lands.
 
 ## Why a synthetic fixture
 
-The suite used to point `repo_root` at whatever `geostat.ops.json` sat at the
+The suite used to point `repo_root` at whatever `stack-kit.json` sat at the
 real project root, asserting one adopting project's module ids. When that
 consumer's module set changed, dozens of tests failed — the suite was testing the
 consumer, not the kit. The kit is a reusable package, so its tests now run

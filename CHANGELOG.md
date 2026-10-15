@@ -1,6 +1,41 @@
-# Changelog — geostat-kit
+# Changelog — stack-kit
 
 ## 1.2.0-dev — unreleased
+
+### Identity — the kit names no consumer (ADR-001 K1)
+
+The package, command, manifest and environment are renamed; every former name is still READ for
+the whole 1.x line, each read printing one line naming its replacement, once per process tree
+(`STACK_KIT_NO_DEPRECATION_NOTICE=1` silences it). 2.0.0 stops reading them. All of it is declared
+once, in `lib/identity.json`.
+
+| Former | Current |
+|---|---|
+| package `geostat-kit`, vendored at `kits/geostat-kit` | `stack-kit`, `kits/stack-kit` |
+| command `cli/geostat.ps1`, `cli/geostat.sh` | `cli/stack-kit.ps1`, `cli/stack-kit.sh` (the former paths remain as shims) |
+| manifest `geostat.ops.json` | `stack-kit.json` |
+| variables `GEOSTAT_*` | `STACK_KIT_*` — the same suffix, so `GEOSTAT_KIT_ROOT` is `STACK_KIT_KIT_ROOT` |
+| manifest field `vscode.geostatScript` | `vscode.cliScript` |
+| server marker `.geostat-deploy.json` | `.stack-kit-deploy.json` (a former marker is still found) |
+| scaffolded launchers `tools/geostat.*`, `ops/cli/geostat.*` | `tools/stack-kit.*`, `ops/cli/stack-kit.*` |
+
+**To move a host:** `stack-kit migrate` (dry run), then `stack-kit migrate --apply`. It renames the
+manifest file and the renamed fields, refuses a host holding both manifest names, and PRINTS — never
+rewrites — every line of the host's own files that still spells a former name.
+
+Behaviour changes a host may notice:
+
+- The variables are adopted inward only: a former variable set by an operator or CI is read; the kit
+  no longer exports former names to the processes it starts.
+- The java-boot pre-flight check names no integration of its own. A module declares what it checks in
+  `modules.<id>.check.requiredEnv` / `optionalEnv` (the search, speech and model keys it used to
+  name for one consumer's `chat-api` are gone).
+- The primary API module is `stack.primaryApiModule` when declared, else the first module whose role is
+  `api`; the module ids `backend` and `chat-api` are no longer privileged.
+- Generated Spring defaults use the user `app` and password `app-dev-change-me` (were the consumer's
+  name); the default database is `app`. Each remains overridable by its environment variable.
+- `compose/build.py` and `compose/sync_ops_modules.py` resolve the project through the one discovery in
+  `lib/project_context.py` instead of their own copies; `cli/stack-kit.sh` sources `lib/project.sh`.
 
 ### Agnosticism
 

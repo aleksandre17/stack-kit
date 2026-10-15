@@ -49,14 +49,14 @@ def test_mode4_hybrid_compound_and_tunnel_task(repo_root: Path, manifest: dict) 
     compounds = launch.get("compounds") or []
     hybrid = next((c for c in compounds if c.get("preLaunchTask")), None)
     assert hybrid is not None, "expected hybrid compound with preLaunchTask"
-    assert hybrid["preLaunchTask"] == "geostat: infra tunnel"
+    assert hybrid["preLaunchTask"] == "stack-kit: infra tunnel"
     assert len(hybrid.get("configurations") or []) >= 2
 
     tasks = build_tasks_json(ctx)
-    tunnel = next(t for t in tasks["tasks"] if t["label"] == "geostat: infra tunnel")
+    tunnel = next(t for t in tasks["tasks"] if t["label"] == "stack-kit: infra tunnel")
     assert tunnel.get("isBackground") is True
     assert "infra" in json.dumps(tunnel["args"])
-    assert "geostat: infra remote up" in [t["label"] for t in tasks["tasks"]]
+    assert "stack-kit: infra remote up" in [t["label"] for t in tasks["tasks"]]
 
 
 def test_java_launch_env_file_from_secrets(repo_root: Path, manifest: dict) -> None:
@@ -80,7 +80,7 @@ def test_mode2_local_docker_tasks(repo_root: Path, manifest: dict) -> None:
     ctx = ProjectContext(root=repo_root, manifest=manifest)
     tasks = build_tasks_json(ctx)
     labels = [t["label"] for t in tasks["tasks"]]
-    assert "geostat: stack dev" in labels
+    assert "stack-kit: stack dev" in labels
     aliases = infer_cli_aliases(manifest)
     for _alias, mid in aliases.items():
         if manifest["modules"][mid]["type"] == "node-vite":

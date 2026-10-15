@@ -1,4 +1,4 @@
-# geostat-kit — package principles
+# stack-kit — package principles
 
 The kit is a **growth-oriented ops framework**, not a fixed product stack.
 
@@ -9,7 +9,7 @@ The kit is a **growth-oriented ops framework**, not a fixed product stack.
 | **Agnostic** | Drivers do not assume postgres, redis, or any named app |
 | **Open/closed** | Extend via manifest + consumer compose files; avoid editing kit for new stores |
 | **Single responsibility** | Kit = run/sync/paths/CLI; consumer = which services exist |
-| **Manifest contract** | `geostat.ops.json` declares intent; no duplicate env toggles |
+| **Manifest contract** | `stack-kit.json` declares intent; no duplicate env toggles |
 | **Dynamic** | Add services by adding yaml + manifest entries |
 
 ## Infra (example of the split)
@@ -19,7 +19,7 @@ The kit is a **growth-oriented ops framework**, not a fixed product stack.
 | **Kit** `toolkit/infra/Invoke-Infra.ps1` | Remote path, rsync, `docker compose` invocation, tunnel |
 | **Kit** `compose/infra-catalog.json` | Reference module list (documentation + scaffold source) |
 | **Consumer** `ops/compose/infra/` | Base network + `services/*.yml` fragments |
-| **Consumer** `geostat.ops.json` | `stack.infra.services`: which fragments to merge |
+| **Consumer** `stack-kit.json` | `stack.infra.services`: which fragments to merge |
 
 **Not used:** `INFRA_PROFILES` or other env-based service toggles (violates single source of truth).
 
@@ -31,7 +31,7 @@ The kit is a **growth-oriented ops framework**, not a fixed product stack.
 |-------|------|
 | **Kit** `toolkit/stack/compose.ps1` / `compose.sh` | Runs `docker compose`; prints endpoint lines before/up |
 | **Kit** `compose/stack-catalog.json` | Per-role port env keys, defaults, health URL path |
-| **Consumer** `geostat.ops.json` `modules.*` | Which apps exist (`role`: `ui`, `api`, `worker`, …) |
+| **Consumer** `stack-kit.json` `modules.*` | Which apps exist (`role`: `ui`, `api`, `worker`, …) |
 | **Consumer** `ops/config/<secretsModule>/` | Port values (`API_PORT`, `RETRIEVAL_PORT`, …) |
 
 **Not used:** hardcoded `frontend` / `backend` URLs in the kit runner.
@@ -64,7 +64,7 @@ Optional filter: `stack.modules` — list of module ids to show (default: all ma
 
 | Source | Owns |
 |--------|------|
-| **`stack.composeModules`** | Default module list for `geostat stack-deploy` (same as compose-gen) |
+| **`stack.composeModules`** | Default module list for `stack-kit stack-deploy` (same as compose-gen) |
 | **`stackDeploy.modules`** | Optional override of that list |
 | **`stackDeploy.steps`** | Explicit steps only when auto-generated plan is insufficient |
 | **`lib/stack_deploy.py`** | Role order: api → worker → gateway → data → ui; per-type args (`java-boot` → `deploy all`, `node-vite` → `deploy dist`) |
@@ -77,14 +77,14 @@ Inspect: `modules_cli.py stack-deploy-steps [dev|prod]`.
 
 | Source | Owns |
 |--------|------|
-| **`geostat.ops.json` `modules.*`** | Service keys: `{slug}-api` (backend), `{slug}-retrieval`, `{slug}-ingestion`, `{slug}-app` (ui), … |
+| **`stack-kit.json` `modules.*`** | Service keys: `{slug}-api` (backend), `{slug}-retrieval`, `{slug}-ingestion`, `{slug}-app` (ui), … |
 | **`lib/compose_identity.py`** | Same rules for `compose-gen`, deploy paths, `ProjectContext.compose_service_names()` |
 | **`deploy.env` `COMPOSE_*`** | Optional **legacy overrides** for primary api/ui/worker only (old servers). Not required for new projects. |
 | **`deploy.env`** | `COMPOSE_PROJECT_NAME`, `DOCKER_NETWORK`, `DEPLOY_*` — shared identity |
 
 **Not used:** duplicating every module name in `deploy.env` when manifest already declares `target` / `role`.
 
-Inspect names: `geostat` → `modules_cli.py compose-names` (JSON) or after `compose-gen` read GENERATED `docker-compose.yml`.
+Inspect names: `stack-kit` → `modules_cli.py compose-names` (JSON) or after `compose-gen` read GENERATED `docker-compose.yml`.
 
 ## CI health matrix
 
@@ -92,38 +92,38 @@ Inspect names: `geostat` → `modules_cli.py compose-names` (JSON) or after `com
 |-------|------|
 | **Kit** `lib/ci_health.py` | Health URLs from `stack.composeModules` (or `ci.healthModules`) + `stack-catalog.json` roles |
 | **Kit** `ci/wait-stack-health.sh` | Waits all targets via `modules_cli.py stack-health` |
-| **Consumer** `geostat.ops.json` `ci.healthModules` | Optional subset (e.g. skip `frontend` in Docker CI) |
+| **Consumer** `stack-kit.json` `ci.healthModules` | Optional subset (e.g. skip `frontend` in Docker CI) |
 | **Kit** `compose/stack-catalog.json` | Per-role `urlPath`, `healthExpect`, `ciHealth` |
 
 **Not used:** hardcoded single API URL in `integration-stack.sh` when N modules exist.
 
 Inspect: `modules_cli.py stack-health` (TSV: module, url, expect).
 
-## Hybrid local run (`geostat hybrid boot` / `<alias> run`)
+## Hybrid local run (`stack-kit hybrid boot` / `<alias> run`)
 
 | Layer | Owns |
 |-------|------|
 | **Kit** `toolkit/hybrid/Invoke-HybridRun.ps1` | Load secrets `.env.dev`, Gradle bootRun / npm per driver type |
 | **Kit** `drivers/*/ps1/run.ps1` | Thin delegate; `run` in `drivers/registry.json` |
-| **Kit** `cli/geostat.ps1` | `hybrid boot <alias\|moduleId>` → module driver `run` |
-| **Consumer** `geostat.ops.json` `modules.*.hybrid` | `springProfiles`, `gradleWrapper`, `gradleProject`, `npmScript` |
+| **Kit** `cli/stack-kit.ps1` | `hybrid boot <alias\|moduleId>` → module driver `run` |
+| **Consumer** `stack-kit.json` `modules.*.hybrid` | `springProfiles`, `gradleWrapper`, `gradleProject`, `npmScript` |
 | **Consumer** `cli.aliases` | Short names (`fe`, `be`, …) — project-specific, not in kit help text |
 
-**Not used:** consumer repo path (`kits/geostat-kit`), product aliases, or dev-mode labels in kit runtime strings.
+**Not used:** consumer repo path (`kits/stack-kit`), product aliases, or dev-mode labels in kit runtime strings.
 
 ## App config generation (config-gen)
 
 | Layer | Owns |
 |-------|------|
 | **Kit** `lib/config_gen.py`, `config/config-catalog.json` | Profile boilerplate templates |
-| **Kit** `geostat config-gen`, validate drift | Generate / check |
+| **Kit** `stack-kit config-gen`, validate drift | Generate / check |
 | **Consumer** `modules.*.datastores`, `modules.*.spring` | Postgres schema, profile groups |
 | **Consumer** `application-custom.yml` | Domain config — generator never touches |
 
 ## Adding a new data store
 
 1. Add `ops/compose/infra/services/my-store.yml` in the consumer repo.
-2. Add `"my-store"` to `stack.infra.services` in `geostat.ops.json`.
+2. Add `"my-store"` to `stack.infra.services` in `stack-kit.json`.
 3. Optionally document the module in consumer catalog or upstream kit `infra-catalog.json`.
 
 No kit release required for project-specific stores.

@@ -1,6 +1,6 @@
 ﻿# SSH — სად ჩასვა გასაღები (clone-ის შემდეგ)
 
-Deploy (`geostat fe/be deploy`, `manage`, `dev`) იყენებს **OpenSSH**-ს (`ssh` / `scp`).  
+Deploy (`stack-kit fe/be deploy`, `manage`, `dev`) იყენებს **OpenSSH**-ს (`ssh` / `scp`).  
 პრივატული გასაღები **არასოდეს** არ უნდა იყოს git-ში.
 
 ## სწრაფი არჩევანი
@@ -9,7 +9,7 @@ Deploy (`geostat fe/be deploy`, `manage`, `dev`) იყენებს **OpenSSH
 |--------|--------------|-------------------------------------|
 | **A — სტანდარტული (რეკომენდებული)** | `~/.ssh/id_ed25519` (ან `id_rsa`) | `DEPLOY_SERVER=user@host` |
 | **B — პროექტის ფოლდერი** | `ops/config/ssh/id_ed25519` (gitignored) | `DEPLOY_SERVER=user@host` + `DEPLOY_SSH_IDENTITY_FILE=ops/config/ssh/id_ed25519` |
-| **C — SSH config alias** | `ops/config/ssh/config` (gitignored) | `DEPLOY_SERVER=geostat-deploy` + `DEPLOY_SSH_CONFIG_FILE=ops/config/ssh/config` |
+| **C — SSH config alias** | `ops/config/ssh/config` (gitignored) | `DEPLOY_SERVER=stack-kit-deploy` + `DEPLOY_SSH_CONFIG_FILE=ops/config/ssh/config` |
 
 ## A — `~/.ssh`
 
@@ -26,7 +26,7 @@ ssh-copy-id user@YOUR_SERVER
 
 ## C — config alias
 
-`copy config.example config` → შეავსე → `DEPLOY_SSH_CONFIG_FILE=ops/config/ssh/config`, `DEPLOY_SERVER=geostat-deploy`.
+`copy config.example config` → შეავსე → `DEPLOY_SSH_CONFIG_FILE=ops/config/ssh/config`, `DEPLOY_SERVER=stack-kit-deploy`.
 
 ## Ops ცვლადები
 
@@ -36,4 +36,4 @@ ssh-copy-id user@YOUR_SERVER
 | `DEPLOY_SSH_IDENTITY_FILE` | optional |
 | `DEPLOY_SSH_CONFIG_FILE` | optional |
 
-სრული adoption: [kits/geostat-kit/docs/ADOPTION-LINE.md](../../docs/ADOPTION-LINE.md)
+სრული adoption: [kits/stack-kit/docs/ADOPTION-LINE.md](../../docs/ADOPTION-LINE.md)

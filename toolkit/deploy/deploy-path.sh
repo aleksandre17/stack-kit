@@ -5,18 +5,18 @@
 
 deploy_path_load_config() {
   local deploy_base_module
-  deploy_base_module="$(geostat_read_manifest_field stack.deployBaseSecretsModule backend)"
-  DEPLOY_PATH_BASE="${DEPLOY_PATH_BASE:-$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_PATH "")}"
+  deploy_base_module="$(stack_kit_read_manifest_field stack.deployBaseSecretsModule backend)"
+  DEPLOY_PATH_BASE="${DEPLOY_PATH_BASE:-$(stack_kit_env_value "$OPS_SECRETS_MODULE" DEPLOY_PATH "")}"
   if [[ -z "$DEPLOY_PATH_BASE" && -n "${OPS_SECRETS_MODULE:-}" && "$OPS_SECRETS_MODULE" != "$deploy_base_module" ]]; then
-    DEPLOY_PATH_BASE="$(geostat_env_value "$deploy_base_module" DEPLOY_PATH "")"
+    DEPLOY_PATH_BASE="$(stack_kit_env_value "$deploy_base_module" DEPLOY_PATH "")"
   fi
   if [[ -z "$DEPLOY_PATH_BASE" && -n "${OPS_SECRETS_MODULE:-}" ]]; then
-    DEPLOY_PATH_BASE="$(geostat_default_remote_deploy_base "$OPS_SECRETS_MODULE")"
+    DEPLOY_PATH_BASE="$(stack_kit_default_remote_deploy_base "$OPS_SECRETS_MODULE")"
   fi
   DEPLOY_PATH_BASE="${DEPLOY_PATH_BASE%/}"
-  DEPLOY_LAYOUT="${DEPLOY_LAYOUT:-$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_LAYOUT "")}"
+  DEPLOY_LAYOUT="${DEPLOY_LAYOUT:-$(stack_kit_env_value "$OPS_SECRETS_MODULE" DEPLOY_LAYOUT "")}"
   [[ -n "$DEPLOY_LAYOUT" ]] || DEPLOY_LAYOUT="flat"
-  DEPLOY_PATH_MODE="${DEPLOY_PATH_MODE:-$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_PATH_MODE "base")}"
+  DEPLOY_PATH_MODE="${DEPLOY_PATH_MODE:-$(stack_kit_env_value "$OPS_SECRETS_MODULE" DEPLOY_PATH_MODE "base")}"
   case "$DEPLOY_LAYOUT" in
     structured | flat | legacy) ;;
     *) DEPLOY_LAYOUT="structured" ;;

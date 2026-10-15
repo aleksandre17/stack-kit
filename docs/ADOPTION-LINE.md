@@ -1,39 +1,39 @@
-﻿# geostat-kit — სრული კონფიგურაციის ხაზი
+﻿# stack-kit — სრული კონფიგურაციის ხაზი
 
-ეს არის **ერთი გზამკვლევი** პროექტისთვის, რომელიც გადმოიტანს `kits/geostat-kit` პაკეტს. ნაბიჯ-ნაბიჯ: სად რა ფაილი, რა ჩაწერო, frontend/backend, CI, ახალი driver.
+ეს არის **ერთი გზამკვლევი** პროექტისთვის, რომელიც გადმოიტანს `kits/stack-kit` პაკეტს. ნაბიჯ-ნაბიჯ: სად რა ფაილი, რა ჩაწერო, frontend/backend, CI, ახალი driver.
 
-**სქემა:** [manifest.schema.json](../manifest.schema.json) · **მაგალითი:** [scaffold/geostat.ops.json](../scaffold/geostat.ops.json) · **პაკეტის ჩატვირთვა:** [../../../docs/KITS-PACKAGE.md](../../../docs/KITS-PACKAGE.md)
+**სქემა:** [manifest.schema.json](../manifest.schema.json) · **მაგალითი:** [scaffold/stack-kit.json](../scaffold/stack-kit.json) · **პაკეტის ჩატვირთვა:** [../../../docs/KITS-PACKAGE.md](../../../docs/KITS-PACKAGE.md)
 
 ---
 
 ## 0. რა რჩება პაკეტში vs პროექტში
 
-| პაკეტი (`geostat-kit`) | პროექტი (შენი repo) |
+| პაკეტი (`stack-kit`) | პროექტი (შენი repo) |
 |------------------------|---------------------|
-| `lib/`, `toolkit/`, `drivers/`, `compose/build.py` | `geostat.ops.json` |
-| `cli/geostat.ps1` | `ops/config/` (რეალური env, gitignored) |
+| `lib/`, `toolkit/`, `drivers/`, `compose/build.py` | `stack-kit.json` |
+| `cli/stack-kit.ps1` | `ops/config/` (რეალური env, gitignored) |
 | `contracts/`, `ci/wait-health.sh` | `ops/compose/catalog.json` |
 | `scaffold/` მაგალითები | `apps/frontend/`, `apps/backend/` აპლიკაცია |
-| — | `tools/geostat.ps1` (1 ხაზი delegate) |
+| — | `tools/stack-kit.ps1` (1 ხაზი delegate) |
 | — | `ops/ci/` (პროექტის ინტეგრაცია) |
 | — | გენერირებული `docker-compose*.yml`, `apps/backend/ops.modules` |
 | `toolkit/infra/Invoke-Infra.ps1` | `ops/compose/infra/*.yml` + `ops/config/infra/.env.*` (პროექტის compose/პორტები) |
 
 წესი: დომენური სახელი, API key, ბიზნეს-ლოგიკა → **პროექტი**. SSH/Docker/Gradle/npm ოპს ხელსაწყო → **პაკეტი**.  
-`geostat infra` = **პაკეტი** (agnostic driver); consumer `services/*.yml` + manifest `stack.infra.services`; remote path `{DEPLOY_PROJECT}/infra/{INFRA_SLUG}/`. იხ. `docs/PACKAGE-PRINCIPLES.md`.
+`stack-kit infra` = **პაკეტი** (agnostic driver); consumer `services/*.yml` + manifest `stack.infra.services`; remote path `{DEPLOY_PROJECT}/infra/{INFRA_SLUG}/`. იხ. `docs/PACKAGE-PRINCIPLES.md`.
 
 ---
 
 ## 1. საბოლოო ხე (target layout)
 
 ```text
-your-app/                          ← repo root (GEOSTAT_PROJECT_ROOT)
-├── geostat.ops.json               ← კონტრაქტი (აუცილებელი)
+your-app/                          ← repo root (STACK_KIT_PROJECT_ROOT)
+├── stack-kit.json               ← კონტრაქტი (აუცილებელი)
 ├── tools/
-│   ├── geostat.ps1                ← delegate → kits/geostat-kit/cli/
-│   └── geostat.sh                 ← optional (Linux/Git Bash)
+│   ├── stack-kit.ps1                ← delegate → kits/stack-kit/cli/
+│   └── stack-kit.sh                 ← optional (Linux/Git Bash)
 ├── kits/
-│   └── geostat-kit/               ← პაკეტი (submodule | copy) — იხ. docs/KITS-PACKAGE.md
+│   └── stack-kit/               ← პაკეტი (submodule | copy) — იხ. docs/KITS-PACKAGE.md
 ├── ops/
 │   ├── config/                    ← env + SSH (gitignored values)
 │   │   ├── deploy.env
@@ -42,7 +42,7 @@ your-app/                          ← repo root (GEOSTAT_PROJECT_ROOT)
 │   ├── compose/
 │   │   ├── catalog.json
 │   │   └── stack/                 ← GENERATED full-stack compose
-│   ├── cli/                       ← geostat.ps1 (canonical)
+│   ├── cli/                       ← stack-kit.ps1 (canonical)
 │   └── ci/
 ├── apps/frontend/                 ← UI მოდული
 │   ├── ops.config.ps1
@@ -75,48 +75,48 @@ your-app/                          ← repo root (GEOSTAT_PROJECT_ROOT)
 
 ```powershell
 # მაგალითი: copy
-xcopy /E /I vendor\geostat-kit kits\geostat-kit
+xcopy /E /I vendor\stack-kit kits\stack-kit
 
 # ან git submodule
-git submodule add <repo-url> kits/geostat-kit
+git submodule add <repo-url> kits/stack-kit
 ```
 
 არაფერი საიდუმლო არ ჩაიდოს პაკეტში: არა `deploy.env`, არა production keys.
 
 ---
 
-## 3b. ნაბიჯი 2 — Project bootstrap (`geostat init`)
+## 3b. ნაბიჯი 2 — Project bootstrap (`stack-kit init`)
 
 **რეკომენდებული** — ერთი ბრძანება: scaffold + seed env + full catalog + compose-gen + checklist:
 
 ```powershell
-.\tools\geostat.ps1 init
+.\tools\stack-kit.ps1 init
 ```
 
 ```bash
-./tools/geostat.sh init
+./tools/stack-kit.sh init
 ```
 
-რას აკეთებს: `tools/`, `ops/ci/`, `ops/config/*.example` → რეალური env (თუ არ არსებობს), `ops/compose/catalog.json` (full stack), `ops/compose/stack/`, `frontend|backend/ops.config*`, `geostat.ops.json`, `.gitignore` merge, `compose-gen`, optional `nginx-gen`.
+რას აკეთებს: `tools/`, `ops/ci/`, `ops/config/*.example` → რეალური env (თუ არ არსებობს), `ops/compose/catalog.json` (full stack), `ops/compose/stack/`, `frontend|backend/ops.config*`, `stack-kit.json`, `.gitignore` merge, `compose-gen`, optional `nginx-gen`.
 
 სრული სია / flags: [toolkit/init/README.md](../toolkit/init/README.md) · [scaffold/README.md](../scaffold/README.md).
 
 **არ გადაწერს** არსებულ `deploy.env`, `.env.dev`, SSH keys (გარდა `init -ForceExamples`).
 
-ხელით scaffold-ისთვის: `kits/geostat-kit/scaffold/apply-scaffold.ps1`
+ხელით scaffold-ისთვის: `kits/stack-kit/scaffold/apply-scaffold.ps1`
 
 ---
 
-## 4. ნაბიჯი 3 — `geostat.ops.json` (root)
+## 4. ნაბიჯი 3 — `stack-kit.json` (root)
 
-ფაილი repo root-ში. `apply-scaffold` ქმნის მას [scaffold/geostat.ops.json](../scaffold/geostat.ops.json)-დან, ან დააკოპირე ხელით და შეცვალე.
+ფაილი repo root-ში. `apply-scaffold` ქმნის მას [scaffold/stack-kit.json](../scaffold/stack-kit.json)-დან, ან დააკოპირე ხელით და შეცვალე.
 
 ### ველების ახსნა
 
 | ველი | რა ჩაწერო |
 |------|-----------|
 | `version` | `1` |
-| `package` | `"kits/geostat-kit"` — ფარდობითი გზა root-დან |
+| `package` | `"kits/stack-kit"` — ფარდობითი გზა root-დან |
 | `secrets` | `"secrets"` |
 | `compose.catalog` | `"ops/compose/catalog.json"` |
 | `compose.syncModules` | `"apps/backend/ops.modules"` — მხოლოდ `java-boot` multi-module-ისთვის |
@@ -129,16 +129,16 @@ git submodule add <repo-url> kits/geostat-kit
 | `modules.<id>.target` | SSH deploy target: `backend` \| `frontend` |
 | `adapters.nginx` | template/output/env paths (ოფციური) |
 | `ci.integration` | `"ops/ci/integration-stack.sh"` |
-| `ci.prepareEnv` | `"kits/geostat-kit/ci/prepare-integration-env.sh"` |
-| `ci.waitHealth` | `"kits/geostat-kit/ci/wait-health.sh"` |
+| `ci.prepareEnv` | `"kits/stack-kit/ci/prepare-integration-env.sh"` |
+| `ci.waitHealth` | `"kits/stack-kit/ci/wait-health.sh"` |
 
 ### მინიმალური მაგალითი (Java API + Vite UI)
 
 ```json
 {
-  "$schema": "./kits/geostat-kit/manifest.schema.json",
+  "$schema": "./kits/stack-kit/manifest.schema.json",
   "version": 1,
-  "package": "kits/geostat-kit",
+  "package": "kits/stack-kit",
   "secrets": "secrets",
   "compose": {
     "catalog": "ops/compose/catalog.json",
@@ -170,8 +170,8 @@ git submodule add <repo-url> kits/geostat-kit
   },
   "ci": {
     "integration": "ops/ci/integration-stack.sh",
-    "prepareEnv": "kits/geostat-kit/ci/prepare-integration-env.sh",
-    "waitHealth": "kits/geostat-kit/ci/wait-health.sh"
+    "prepareEnv": "kits/stack-kit/ci/prepare-integration-env.sh",
+    "waitHealth": "kits/stack-kit/ci/wait-health.sh"
   }
 }
 ```
@@ -182,35 +182,35 @@ git submodule add <repo-url> kits/geostat-kit
 
 ## 5. ნაბიჯი 3 — CLI შესვლა (`tools/`)
 
-### `tools/geostat.ps1`
+### `tools/stack-kit.ps1`
 
 ```powershell
 $Root = Split-Path $PSScriptRoot -Parent
-& (Join-Path $Root "kits\geostat-kit\cli\geostat.ps1") -Command $Command -Args $Args
+& (Join-Path $Root "kits\stack-kit\cli\stack-kit.ps1") -Command $Command -Args $Args
 exit $LASTEXITCODE
 ```
 
-(პარამეტრები: `Command`, `Args` — იხ. reference repo `tools/geostat.ps1`.)
+(პარამეტრები: `Command`, `Args` — იხ. reference repo `tools/stack-kit.ps1`.)
 
-### `tools/geostat.sh` (optional)
+### `tools/stack-kit.sh` (optional)
 
 ```bash
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-export GEOSTAT_PROJECT_ROOT="$ROOT"
-exec bash "$ROOT/kits/geostat-kit/cli/geostat.sh" "$@"
+export STACK_KIT_PROJECT_ROOT="$ROOT"
+exec bash "$ROOT/kits/stack-kit/cli/stack-kit.sh" "$@"
 ```
 
 ### ბრძანებები
 
 | ბრძანება | დანიშნულება |
 |----------|-------------|
-| `geostat help` | მოდულები + driver types |
-| `geostat compose-gen` | catalog + manifest (`stack.composeModules`) → docker-compose ფაილები |
-| `geostat stack up -d --build` | local API+UI |
-| `geostat mod <moduleId> deploy …` | ნებისმიერი მოდული |
-| `geostat be deploy all --prod` | alias → `modules.backend` |
-| `geostat fe deploy dist -Environment prod` | alias → `modules.frontend` |
-| `geostat stack-deploy --prod` | `stack.composeModules` → auto steps (or `stackDeploy.steps`) |
+| `stack-kit help` | მოდულები + driver types |
+| `stack-kit compose-gen` | catalog + manifest (`stack.composeModules`) → docker-compose ფაილები |
+| `stack-kit stack up -d --build` | local API+UI |
+| `stack-kit mod <moduleId> deploy …` | ნებისმიერი მოდული |
+| `stack-kit be deploy all --prod` | alias → `modules.backend` |
+| `stack-kit fe deploy dist -Environment prod` | alias → `modules.frontend` |
+| `stack-kit stack-deploy --prod` | `stack.composeModules` → auto steps (or `stackDeploy.steps`) |
 
 ---
 
@@ -218,7 +218,7 @@ exec bash "$ROOT/kits/geostat-kit/cli/geostat.sh" "$@"
 
 ```powershell
 mkdir ops\config\frontend, ops\config\backend
-copy kits\geostat-kit\scaffold\ops\config\deploy.env.example ops\config\deploy.env
+copy kits\stack-kit\scaffold\ops\config\deploy.env.example ops\config\deploy.env
 copy ops\config\.env.example ops\config\frontend\.env.example   # თუ გაქვს root contract
 # თითო მოდულის .env.example → .env.dev / .env.prod (ლოკალურად)
 ```
@@ -251,7 +251,7 @@ Legacy სერვერი: [scaffold/profiles/legacy-server.env.example](../s
 **არ შეცვალო ხელით** ფაილებს, რომლებც იწყება `# GENERATED` — მხოლოდ `compose-gen`.
 
 ```powershell
-.\tools\geostat.ps1 compose-gen
+.\tools\stack-kit.ps1 compose-gen
 ```
 
 გენერირდება ჩვეულებრივ: `apps/backend/docker-compose.*.yml`, `apps/frontend/docker-compose*.yml`, `ops/compose/stack/*.yml`, `apps/backend/ops.modules`.
@@ -287,14 +287,14 @@ $OpsComposeFile     = "docker-compose.yml"
 ### ოპერაციები
 
 ```powershell
-.\tools\geostat.ps1 fe compose up -d
-.\tools\geostat.ps1 fe deploy dist -Environment prod
-.\tools\geostat.ps1 fe dev bootstrap -Environment dev   # source -> Linux compose/dev (Vite/Angular)
-.\tools\geostat.ps1 fe dev watch                        # rsync on save, no npm build
+.\tools\stack-kit.ps1 fe compose up -d
+.\tools\stack-kit.ps1 fe deploy dist -Environment prod
+.\tools\stack-kit.ps1 fe dev bootstrap -Environment dev   # source -> Linux compose/dev (Vite/Angular)
+.\tools\stack-kit.ps1 fe dev watch                        # rsync on save, no npm build
 # static prod loop: fe deploy sync / fe deploy watch  (see GOLDEN-PATHS.md, repo docs/FE-WATCH.md)
 # Linux-ზე პირდაპირ dev: npm run dev ან fe compose up — არა fe dev watch (იხილე GOLDEN-PATHS.md §4)
-.\tools\geostat.ps1 fe manage status
-.\tools\geostat.ps1 fe check
+.\tools\stack-kit.ps1 fe manage status
+.\tools\stack-kit.ps1 fe check
 ```
 
 ### CI-ში
@@ -342,12 +342,12 @@ your-app-worker=your-app:worker
 ### ოპერაციები
 
 ```powershell
-.\tools\geostat.ps1 be compose up --build
-.\tools\geostat.ps1 be deploy your-app-api --prod
-.\tools\geostat.ps1 be deploy all --prod
-.\tools\geostat.ps1 be manage api status --prod
-.\tools\geostat.ps1 be modules
-.\tools\geostat.ps1 be check
+.\tools\stack-kit.ps1 be compose up --build
+.\tools\stack-kit.ps1 be deploy your-app-api --prod
+.\tools\stack-kit.ps1 be deploy all --prod
+.\tools\stack-kit.ps1 be manage api status --prod
+.\tools\stack-kit.ps1 be modules
+.\tools\stack-kit.ps1 be check
 ```
 
 ### CI-ში
@@ -363,7 +363,7 @@ your-app-worker=your-app:worker
 
 | Job | რა ამოწმებს |
 |-----|-------------|
-| `compose-catalog` | `python3 kits/geostat-kit/compose/build.py` + `git diff` GENERATED yaml |
+| `compose-catalog` | `python3 kits/stack-kit/compose/build.py` + `git diff` GENERATED yaml |
 | `ops-scripts` | Python compile, `shellcheck` drivers/toolkit, catalog JSON valid |
 | `frontend-build` | `npm ci && npm run build` |
 | `backend-build` | `./gradlew build` |
@@ -377,9 +377,9 @@ your-app-worker=your-app:worker
 #!/bin/bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-PKG="$ROOT/kits/geostat-kit"
+PKG="$ROOT/kits/stack-kit"
 BE="$ROOT/backend"
-export GEOSTAT_PROJECT_ROOT="$ROOT"
+export STACK_KIT_PROJECT_ROOT="$ROOT"
 
 bash "$PKG/ci/prepare-integration-env.sh"
 python3 "$PKG/compose/build.py"
@@ -393,15 +393,15 @@ bash "$PKG/ci/wait-health.sh" "http://127.0.0.1:${API_PORT:-8090}/health" "UP" 1
 docker compose "${ENV_ARGS[@]}" -f docker-compose.dev.yml down -v
 ```
 
-`geostat.ops.json` → `ci.*` ბილიკები უნდა ემთხვეოდეს.
+`stack-kit.json` → `ci.*` ბილიკები უნდა ემთხვეოდეს.
 
 ### 10.3 PR-ის წინ (ლოკალურად)
 
 ```powershell
-.\tools\geostat.ps1 compose-gen
+.\tools\stack-kit.ps1 compose-gen
 git diff --exit-code **/docker-compose*.yml
-.\tools\geostat.ps1 be check
-.\tools\geostat.ps1 fe check
+.\tools\stack-kit.ps1 be check
+.\tools\stack-kit.ps1 fe check
 # თუ Docker ჩართულია:
 bash ops/ci/integration-stack.sh
 ```
@@ -410,23 +410,23 @@ bash ops/ci/integration-stack.sh
 
 ## 11. ნაბიჯი 9 — შემოწმების checklist
 
-- [ ] `geostat.ops.json` root-ში, `$schema` მითითებული
-- [ ] `tools/geostat.ps1` მუშაობს: `.\tools\geostat.ps1 help`
+- [ ] `stack-kit.json` root-ში, `$schema` მითითებული
+- [ ] `tools/stack-kit.ps1` მუშაობს: `.\tools\stack-kit.ps1 help`
 - [ ] `ops/config/deploy.env` არსებობს ლოკალურად (არა commit)
 - [ ] `ops/compose/catalog.json` valid JSON
 - [ ] `compose-gen` გაშვებული, GENERATED ფაილები commit-ში
 - [ ] `frontend/ops.config.ps1`, `backend/ops.config.sh`
-- [ ] `.\tools\geostat.ps1 stack up -d --build` — UI + API ლოკალურად
+- [ ] `.\tools\stack-kit.ps1 stack up -d --build` — UI + API ლოკალურად
 - [ ] CI workflow დამატებული
 
 ---
 
 ## 12. Remote deploy (production)
 
-1. სერვერზე ერთხელ: `.\tools\geostat.ps1 infra`
-2. Full stack: `.\tools\geostat.ps1 stack-deploy --prod`  
+1. სერვერზე ერთხელ: `.\tools\stack-kit.ps1 infra`
+2. Full stack: `.\tools\stack-kit.ps1 stack-deploy --prod`  
    → იკითხავს `stackDeploy.steps` manifest-იდან.
-3. ცალკე: `geostat be deploy …`, `geostat fe deploy dist …`
+3. ცალკე: `stack-kit be deploy …`, `stack-kit fe deploy dist …`
 
 `stackDeploy` placeholder-ები: `{environment}` → `dev` | `prod`; deploy ნაბიჯებზე ავტომატურად ემატება `--dev` / `--prod`.
 
@@ -459,13 +459,13 @@ drivers/_template/  →  drivers/go-api/   (სახელი = registry key)
 
 | ფაილი | რა უნდა გააკეთოს |
 |-------|------------------|
-| `_init.sh` ან `_init.ps1` | `GEOSTAT_MODULE_ID`, `ops.config`, toolkit `_common` |
+| `_init.sh` ან `_init.ps1` | `STACK_KIT_MODULE_ID`, `ops.config`, toolkit `_common` |
 | `deploy.*` | build artifact → SSH → server compose |
 | `manage.*` | stop/start/logs/status |
 | `compose.*` | local `docker compose` + env files |
 | `check.*` | prereqs, build smoke |
 
-გამოიყენე `kits/geostat-kit/toolkit/` — არ გადააწერო SSH/env ლოგიკა driver-ში თავიდან.
+გამოიყენე `kits/stack-kit/toolkit/` — არ გადააწერო SSH/env ლოგიკა driver-ში თავიდან.
 
 **3.** `drivers/registry.json`:
 
@@ -485,7 +485,7 @@ drivers/_template/  →  drivers/go-api/   (სახელი = registry key)
 
 `runtime`: `bash` | `powershell` — როგორც გაუშვებ driver სკრიპტებს.
 
-**4.** `geostat.ops.json`:
+**4.** `stack-kit.json`:
 
 ```json
 "modules": {
@@ -509,9 +509,9 @@ drivers/_template/  →  drivers/go-api/   (სახელი = registry key)
 **7.** შემოწმება:
 
 ```powershell
-.\tools\geostat.ps1 help
-.\tools\geostat.ps1 mod backend check
-.\tools\geostat.ps1 mod backend deploy api --prod
+.\tools\stack-kit.ps1 help
+.\tools\stack-kit.ps1 mod backend check
+.\tools\stack-kit.ps1 mod backend deploy api --prod
 ```
 
 ### 13.3 რამდენიმე API ერთ პროექტში
@@ -524,8 +524,8 @@ drivers/_template/  →  drivers/go-api/   (სახელი = registry key)
 ```
 
 ```powershell
-.\tools\geostat.ps1 mod legacy-api deploy all --prod
-.\tools\geostat.ps1 mod gateway deploy --prod
+.\tools\stack-kit.ps1 mod legacy-api deploy all --prod
+.\tools\stack-kit.ps1 mod gateway deploy --prod
 ```
 
 ### 13.4 Node backend vs Vite frontend
@@ -557,7 +557,7 @@ drivers/_template/  →  drivers/go-api/   (სახელი = registry key)
 | `Unknown driver type` | დაამატე `registry.json` + `drivers/<type>/` |
 | `modules.*.type is required` | manifest-ში დაწერე `type` |
 | `compose-gen` ვერ მუშაობს | დააყენე Python; გაუშვი repo root-დან |
-| GENERATED drift CI-ში | `geostat compose-gen` + commit |
+| GENERATED drift CI-ში | `stack-kit compose-gen` + commit |
 | `Git Bash required` | დააყენე Git for Windows (`java-boot`) |
 | Backend deploy ცარიელი modules | შეამოწმე `ops.modules` + `compose.syncModules` |
 

@@ -8,7 +8,7 @@ from conftest import run_kit_cli
 
 def _run_api(repo: Path, pkg: Path, *args: str) -> str:
     # repo/pkg are accepted for call-site compatibility; the cwd + env (PYTHONPATH,
-    # GEOSTAT_PROJECT_ROOT -> synthetic fixture, GEOSTAT_KIT_ROOT) are owned by the
+    # STACK_KIT_PROJECT_ROOT -> synthetic fixture, STACK_KIT_KIT_ROOT) are owned by the
     # centralized run_kit_cli harness so the child resolves `lib` and the fixture
     # manifest deterministically regardless of the cwd pytest was launched from.
     return run_kit_cli(*args).stdout.strip()

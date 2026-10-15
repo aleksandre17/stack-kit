@@ -21,7 +21,7 @@ from lib.compose_identity import resolve_module_service_name  # noqa: E402
 def _fixture_manifest() -> dict:
     return {
         "version": 2,
-        "package": "kits/geostat-kit",
+        "package": "kits/stack-kit",
         "secrets": "ops/config",
         "stack": {
             "composeModules": ["backend", "retrieval", "ingestion", "frontend"],
@@ -64,8 +64,8 @@ def _fixture_manifest() -> dict:
 @pytest.fixture()
 def mini_project(tmp_path: Path) -> ProjectContext:
     root = tmp_path / "proj"
-    (root / "kits" / "geostat-kit").mkdir(parents=True)
-    (root / "geostat.ops.json").write_text(json.dumps(_fixture_manifest()), encoding="utf-8")
+    (root / "kits" / "stack-kit").mkdir(parents=True)
+    (root / "stack-kit.json").write_text(json.dumps(_fixture_manifest()), encoding="utf-8")
     for mid, sub in [
         ("backend", "apps/backend"),
         ("retrieval", "apps/retrieval-service"),

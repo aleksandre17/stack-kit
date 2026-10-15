@@ -97,7 +97,7 @@ dev_publish_workspace_env() {
       remote_name="$(basename "${mount:-$cred_file}")"
       scp "$cred" "$SERVER:$rp/$remote_name" || return 1
     fi
-  done < <(geostat_module_credentials_lines "$s")
+  done < <(stack_kit_module_credentials_lines "$s")
 }
 
 dev_gradle_task_for() {
@@ -170,7 +170,7 @@ dev_compose_credential_env_yaml() {
   while IFS=$'\t' read -r cred_file mount env_var; do
     [[ -n "$env_var" ]] || continue
     printf '      %s: %s\n' "$env_var" "$mount"
-  done < <(geostat_module_credentials_lines "$module_id")
+  done < <(stack_kit_module_credentials_lines "$module_id")
 }
 
 dev_write_workspace_compose() {
@@ -256,7 +256,7 @@ dev_write_workspace_manifest() {
   cname="$(container_name_for "$s")"
   local ts
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)"
-  ssh -n "$SERVER" "cat > '$rp/.geostat-deploy.json'" <<JSON
+  ssh -n "$SERVER" "cat > '$rp/.stack-kit-deploy.json'" <<JSON
 {"version":1,"module":"backend","service":"${cname}","deployMode":"dev-bootstrap","kind":"workspace","environment":"dev","deployPath":"${rp}","updatedAt":"${ts}"}
 JSON
 }

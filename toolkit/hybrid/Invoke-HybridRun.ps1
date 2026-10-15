@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$PackageRoot = if ($env:GEOSTAT_KIT_ROOT) { $env:GEOSTAT_KIT_ROOT } else {
+$PackageRoot = if ($env:STACK_KIT_KIT_ROOT) { $env:STACK_KIT_KIT_ROOT } else {
     Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 }
 . (Join-Path $PackageRoot "lib\project.ps1")
@@ -15,7 +15,7 @@ $PackageRoot = if ($env:GEOSTAT_KIT_ROOT) { $env:GEOSTAT_KIT_ROOT } else {
 . (Join-Path $PackageRoot "lib\module-manifest.ps1")
 
 $root = Get-ProjectRootFromManifest
-if (-not $root) { throw "geostat.ops.json not found" }
+if (-not $root) { throw "stack-kit.json not found" }
 
 $entry = Get-ModuleManifestEntry $ModuleId
 if (-not $entry) { throw "Unknown module: $ModuleId" }
@@ -24,7 +24,7 @@ $modPath = Get-ModuleProjectPath $ModuleId
 $secretsModule = Get-ModuleSecretsFolder $ModuleId
 $envDev = Join-Path (Get-SecretsModuleDir $secretsModule) ".env.dev"
 
-function Import-GeostatDotEnv {
+function Import-StackKitDotEnv {
     param([string]$Path, [switch]$SkipEmptyValues)
     if (-not (Test-Path $Path)) { return }
     Get-Content $Path | ForEach-Object {
@@ -36,8 +36,8 @@ function Import-GeostatDotEnv {
 }
 
 $envProd = Join-Path (Get-SecretsModuleDir $secretsModule) ".env.prod"
-Import-GeostatDotEnv $envProd
-Import-GeostatDotEnv $envDev -SkipEmptyValues
+Import-StackKitDotEnv $envProd
+Import-StackKitDotEnv $envDev -SkipEmptyValues
 
 $driverType = Get-ModuleType $ModuleId
 Write-Host "[hybrid] boot $ModuleId ($driverType) env=$envDev" -ForegroundColor Cyan
@@ -45,10 +45,10 @@ Write-Host "[hybrid] boot $ModuleId ($driverType) env=$envDev" -ForegroundColor 
 switch ($driverType) {
     "java-boot" {
         . (Join-Path $PSScriptRoot "Invoke-HybridJarBoot.ps1")
-        if (Test-GeostatPreferHybridJar -ModuleId $ModuleId) {
-            $jar = Get-GeostatHybridBootJar -Root $root -ModuleId $ModuleId -ModPath $modPath
+        if (Test-StackKitPreferHybridJar -ModuleId $ModuleId) {
+            $jar = Get-StackKitHybridBootJar -Root $root -ModuleId $ModuleId -ModPath $modPath
             if ($jar -and (Test-Path $jar)) {
-                Invoke-GeostatHybridJarBoot -Root $root -ModuleId $ModuleId -ModPath $modPath
+                Invoke-StackKitHybridJarBoot -Root $root -ModuleId $ModuleId -ModPath $modPath
             } else {
                 Write-Host "[hybrid] JAR not found - falling back to gradle bootRun (run a build first, or set hybrid.bootJar)" -ForegroundColor Yellow
             }
@@ -67,7 +67,7 @@ switch ($driverType) {
             }
         }
         if (-not $wrapperRel) {
-            throw "No Gradle wrapper found; set modules.$ModuleId.hybrid.gradleWrapper in geostat.ops.json"
+            throw "No Gradle wrapper found; set modules.$ModuleId.hybrid.gradleWrapper in stack-kit.json"
         }
 
         $wrapper = Join-Path $root ($wrapperRel -replace '/', '\')
@@ -90,7 +90,7 @@ switch ($driverType) {
     }
     "node-api" {
         # pnpm-workspace Node service: run the module's dev/start script via pnpm so
-        # workspace deps (e.g. @geostat/engine) resolve. Same npm-script contract as
+        # workspace deps (e.g. @app/engine) resolve. Same npm-script contract as
         # node-vite, pnpm instead of npm (the api lives in a pnpm workspace).
         $npmScript = Get-ModuleNpmScript $ModuleId
         if (-not $npmScript) { $npmScript = "dev" }

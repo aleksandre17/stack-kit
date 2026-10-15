@@ -12,7 +12,7 @@ import conftest
 
 
 def test_the_suite_writes_into_a_disposable_copy_never_the_tracked_fixture():
-    if os.environ.get("GEOSTAT_PROJECT_ROOT"):
+    if os.environ.get("STACK_KIT_PROJECT_ROOT"):
         return  # an explicit adoption smoke-test against a real project, by the operator's choice
     assert conftest.REPO == conftest.WORKING_ROOT
     assert conftest.FIXTURE_ROOT not in conftest.REPO.parents and conftest.REPO != conftest.FIXTURE_ROOT

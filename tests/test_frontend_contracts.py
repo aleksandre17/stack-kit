@@ -56,7 +56,7 @@ class TestDeployScriptModes:
         assert "Invoke-DevRsyncToRemote" in text
 
     def test_cli_redirects_fe_watch_to_deploy(self, pkg_root: Path):
-        text = _read(pkg_root / "cli" / "geostat.ps1")
+        text = _read(pkg_root / "cli" / "stack-kit.ps1")
         assert 'sub -eq "watch"' in text
         assert "node-vite" in text
         assert "deploy" in text

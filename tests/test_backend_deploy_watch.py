@@ -8,7 +8,7 @@ from lib.deploy_paths import resolve_backend_deploy_path
 
 def test_deploy_watch_targets_runtime(pkg_root: Path) -> None:
     p = resolve_backend_deploy_path(
-        base="/home/u/geostat/backend",
+        base="/home/u/stack-kit/backend",
         container_name="test-app-api",
         kind="runtime",
         layout="structured",

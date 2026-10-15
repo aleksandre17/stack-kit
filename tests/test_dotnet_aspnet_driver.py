@@ -126,10 +126,10 @@ class TestCliReportsDriverFailure:
         (tmp_path / "ops" / "config" / "api").mkdir(parents=True)
         manifest = _manifest()
         manifest["package"] = os.path.relpath(PKG, tmp_path)
-        (tmp_path / "geostat.ops.json").write_text(json.dumps(manifest), encoding="utf-8")
-        env = {**os.environ, "GEOSTAT_PROJECT_ROOT": str(tmp_path)}
+        (tmp_path / "stack-kit.json").write_text(json.dumps(manifest), encoding="utf-8")
+        env = {**os.environ, "STACK_KIT_PROJECT_ROOT": str(tmp_path)}
         proc = subprocess.run(
-            [pwsh, "-NoProfile", "-File", str(PKG / "cli" / "geostat.ps1"), "mod", "api", "check", "unexpected-positional"],
+            [pwsh, "-NoProfile", "-File", str(PKG / "cli" / "stack-kit.ps1"), "mod", "api", "check", "unexpected-positional"],
             capture_output=True, text=True, env=env, cwd=tmp_path, timeout=120,
         )
         assert proc.returncode == 1, proc.stdout + proc.stderr

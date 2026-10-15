@@ -1,13 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "geostat.ops project manifest",
+  "title": "stack-kit.ops project manifest",
   "type": "object",
   "required": ["version", "package", "secrets", "modules"],
   "properties": {
     "version": { "type": "integer", "minimum": 2 },
     "package": {
       "type": "string",
-      "description": "Relative path from project root to geostat-kit package"
+      "description": "Relative path from project root to stack-kit package"
     },
     "secrets": { "type": "string" },
     "compose": {
@@ -41,6 +41,10 @@
           "type": "string",
           "description": "Default Docker network for stack + infra (overridable via DOCKER_NETWORK in deploy.env)"
         },
+        "primaryApiModule": {
+          "type": "string",
+          "description": "The module id the stack's API is (default: the first module whose role is api)"
+        },
         "composeModules": {
           "type": "array",
           "items": { "type": "string" },
@@ -53,7 +57,7 @@
         "modules": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Optional filter for stack endpoint hints only (geostat stack up URLs); default: all catalog roles"
+          "description": "Optional filter for stack endpoint hints only (stack-kit stack up URLs); default: all catalog roles"
         },
         "composeNaming": {
           "type": "string",
@@ -62,7 +66,7 @@
         },
         "infra": {
           "type": "object",
-          "description": "Data-store modules for geostat infra (agnostic; consumer owns yaml)",
+          "description": "Data-store modules for stack-kit infra (agnostic; consumer owns yaml)",
           "properties": {
             "services": {
               "type": "array",
@@ -121,6 +125,15 @@
         "type": "object",
         "required": ["type", "path", "secretsModule", "role"],
         "properties": {
+          "check": {
+            "type": "object",
+            "description": "Environment variables the module's pre-flight check requires or reports as optional; the project names its own integrations (ADR-001)",
+            "properties": {
+              "requiredEnv": { "type": "array", "items": { "type": "string" } },
+              "optionalEnv": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          },
           "type": {
             "type": "string",
             "description": "Driver id from drivers/registry.json (e.g. java-boot, node-vite)"
@@ -205,7 +218,7 @@
           },
           "hybrid": {
             "type": "object",
-            "description": "Local host run (geostat hybrid boot / module run); springProfiles, gradleWrapper, npmScript",
+            "description": "Local host run (stack-kit hybrid boot / module run); springProfiles, gradleWrapper, npmScript",
             "properties": {
               "springProfiles": {
                 "type": "string",
@@ -388,7 +401,7 @@
       "type": "object",
       "properties": {
         "folder": { "type": "string" },
-        "geostatScript": { "type": "string" },
+        "cliScript": { "type": "string" },
         "hybrid": {
           "type": "object",
           "description": "P0-infra-07 hybrid compound (tunnel preLaunch + API + UI)",
@@ -429,7 +442,7 @@
     },
     "dev": {
       "type": "object",
-      "description": "Development orchestration declarations (geostat dev up)",
+      "description": "Development orchestration declarations (stack-kit dev up)",
       "properties": {
         "bootOrder": {
           "type": "array",

@@ -17,7 +17,7 @@ param(
 )
 
 . "$PSScriptRoot\_common.ps1"
-$OpsPkg = Join-Path $env:GEOSTAT_KIT_ROOT "toolkit\powershell"
+$OpsPkg = Join-Path $env:STACK_KIT_KIT_ROOT "toolkit\powershell"
 . (Join-Path $OpsPkg "Get-ComposeServices.ps1")
 . (Join-Path $OpsPkg "Manage-Logs.ps1")
 
@@ -237,7 +237,8 @@ elseif ($Command -eq "config") {
     Write-Host ""
     Invoke-SSHCapture "echo '--- config.json ---'; cat '$DEPLOY_PATH/dist/config.json' 2>/dev/null || echo '(not found)'"
     Invoke-SSHCapture "echo '--- .env.runtime.json ---'; cat '$DEPLOY_PATH/.env.runtime.json' 2>/dev/null || echo '(not found)'"
-    Invoke-SSHCapture "echo '--- .geostat-deploy.json ---'; cat '$DEPLOY_PATH/.geostat-deploy.json' 2>/dev/null || echo '(not found)'"
+    $id = Get-KitIdentity
+    Invoke-SSHCapture "echo '--- $($id.deployMarker) ---'; cat '$DEPLOY_PATH/$($id.deployMarker)' 2>/dev/null || cat '$DEPLOY_PATH/$($id.legacyDeployMarker)' 2>/dev/null || echo '(not found)'"
     Write-Host ""
     LogDone $startTime
 }

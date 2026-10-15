@@ -6,7 +6,7 @@ $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\env.ps1")
 . (Join-Path $PackageRoot "lib\modules.ps1")
 $Root = Get-ProjectRootFromManifest
-if (-not $Root) { throw "geostat.ops.json not found" }
+if (-not $Root) { throw "stack-kit.json not found" }
 
 $composeRel = Get-ManifestField "stack.composeDir" "ops/compose/stack"
 $ComposeDir = Join-Path $Root $composeRel

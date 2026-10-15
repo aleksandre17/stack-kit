@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI for PowerShell: module roles / lists (GEOSTAT_PROJECT_ROOT required)."""
+"""CLI for PowerShell: module roles / lists (STACK_KIT_PROJECT_ROOT required)."""
 from __future__ import annotations
 
 import sys

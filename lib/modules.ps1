@@ -1,25 +1,25 @@
 # N-module manifest helpers (roles, types, layout routing)
 
 . (Join-Path $PSScriptRoot "project.ps1")
-. (Join-Path $PSScriptRoot "geostat-python.ps1")
+. (Join-Path $PSScriptRoot "stack-kit-python.ps1")
 . (Join-Path $PSScriptRoot "drivers.ps1")
 
-function Invoke-GeostatModulesApi {
+function Invoke-StackKitModulesApi {
     param([string[]]$ApiArgs)
-    $pyArgs = Get-GeostatPythonArgs
+    $pyArgs = Get-StackKitPythonArgs
     if (-not $pyArgs) { throw "Python not found (tried py -3, python3, python)" }
     $script = Join-Path (Get-OpsPackageRoot) "lib\modules_cli.py"
-    Invoke-GeostatPythonExe $pyArgs $script @ApiArgs
+    Invoke-StackKitPythonExe $pyArgs $script @ApiArgs
 }
 
 function Get-ModuleRole {
     param([Parameter(Mandatory = $true)][string]$ModuleId)
-    Invoke-GeostatModulesApi @("role", $ModuleId)
+    Invoke-StackKitModulesApi @("role", $ModuleId)
 }
 
 function Get-ModuleIdsByRole {
     param([Parameter(Mandatory = $true)][string]$Role)
-    $out = Invoke-GeostatModulesApi @("by-role", $Role)
+    $out = Invoke-StackKitModulesApi @("by-role", $Role)
     if ($out) { return $out -split "`n" | Where-Object { $_ } }
     return @()
 }
@@ -71,7 +71,7 @@ function Get-InferredCliAliases {
 
 function Get-ModuleComposeServiceName {
     param([Parameter(Mandatory = $true)][string]$ModuleId)
-    $out = Invoke-GeostatModulesApi @("compose-service", $ModuleId)
+    $out = Invoke-StackKitModulesApi @("compose-service", $ModuleId)
     if ($out) { return $out.Trim() }
     return $null
 }
@@ -85,7 +85,7 @@ function Get-ComposeAppServiceName {
 }
 
 function Write-StackEndpointHints {
-    $lines = Invoke-GeostatModulesApi @("stack-endpoints")
+    $lines = Invoke-StackKitModulesApi @("stack-endpoints")
     if (-not $lines) { return }
     foreach ($line in ($lines -split "`n")) {
         $t = $line.Trim()

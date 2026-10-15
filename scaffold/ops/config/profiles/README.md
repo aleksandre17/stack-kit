@@ -5,4 +5,4 @@
 | Legacy server names | [legacy-server.env.example](legacy-server.env.example) |
 | Worker disabled | [worker-disabled.md](worker-disabled.md) |
 
-Then: `.\tools\geostat.ps1 compose-gen`
+Then: `.\tools\stack-kit.ps1 compose-gen`

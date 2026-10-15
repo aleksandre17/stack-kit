@@ -112,11 +112,11 @@ def _launch_java(
     return cfg
 
 
-def _geostat_script_rel(ctx: ProjectContext) -> str:
-    custom = read_nested(ctx.manifest, "vscode.geostatScript", "")
+def _stack_kit_script_rel(ctx: ProjectContext) -> str:
+    custom = read_nested(ctx.manifest, "vscode.cliScript", "")
     if custom:
         return custom.replace("\\", "/")
-    return default_field("vscode.geostatScript") or "tools/geostat.ps1"
+    return default_field("vscode.cliScript") or "tools/stack-kit.ps1"
 
 
 def _stack_infra_services(ctx: ProjectContext) -> list[str]:
@@ -158,12 +158,12 @@ def _find_launch_name_for_module(
     return None
 
 
-TUNNEL_TASK_LABEL = "geostat: infra tunnel"
+TUNNEL_TASK_LABEL = "stack-kit: infra tunnel"
 TUNNEL_READY_PATTERN = "Set INFRA_HOST=127.0.0.1"
 
 
 def _infra_tunnel_task(ctx: ProjectContext) -> dict[str, Any]:
-    gs = _geostat_script_rel(ctx)
+    gs = _stack_kit_script_rel(ctx)
     wf = "${workspaceFolder}"
     return {
         "label": TUNNEL_TASK_LABEL,
@@ -181,7 +181,7 @@ def _infra_tunnel_task(ctx: ProjectContext) -> dict[str, Any]:
         "isBackground": True,
         "presentation": {"reveal": "silent", "panel": "dedicated", "focus": False},
         "problemMatcher": {
-            "owner": "geostat-infra-tunnel",
+            "owner": "stack-kit-infra-tunnel",
             "pattern": {"regexp": "^.*$"},
             "background": {
                 "activeOnStart": True,
@@ -272,11 +272,11 @@ def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
         if read_nested(ctx.manifest, f"modules.{mid}.role", "") in ("ui", "api", "worker"):
             compounds_members.append(cfg["name"])
 
-    gs = _geostat_script_rel(ctx)
+    gs = _stack_kit_script_rel(ctx)
     configs.extend(
         [
             {
-                "name": "geostat: stack (compose dev)",
+                "name": "stack-kit: stack (compose dev)",
                 "type": "node-terminal",
                 "request": "launch",
                 "command": f'powershell -ExecutionPolicy Bypass -File "${{workspaceFolder}}/{gs}" stack up -d --build',
@@ -287,7 +287,7 @@ def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
     for alias, _target in sorted(aliases.items()):
         configs.append(
             {
-                "name": f"geostat: {alias} check",
+                "name": f"stack-kit: {alias} check",
                 "type": "node-terminal",
                 "request": "launch",
                 "command": f'powershell -ExecutionPolicy Bypass -File "${{workspaceFolder}}/{gs}" {alias} check',
@@ -340,7 +340,7 @@ def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
 
 
 def build_tasks_json(ctx: ProjectContext) -> dict[str, Any]:
-    gs = _geostat_script_rel(ctx)
+    gs = _stack_kit_script_rel(ctx)
     wf = "${workspaceFolder}"
     ps = "powershell"
     aliases = infer_cli_aliases(ctx.manifest)
@@ -356,22 +356,22 @@ def build_tasks_json(ctx: ProjectContext) -> dict[str, Any]:
         }
 
     tasks: list[dict[str, Any]] = [
-        _task("geostat: stack dev", ["stack", "up", "-d", "--build"]),
-        _task("geostat: stack prod", ["stack", "-Prod", "up", "-d", "--build"]),
-        _task("geostat: stack down", ["stack", "down"]),
-        _task("geostat: compose-gen", ["compose-gen"]),
-        _task("geostat: validate", ["validate"]),
+        _task("stack-kit: stack dev", ["stack", "up", "-d", "--build"]),
+        _task("stack-kit: stack prod", ["stack", "-Prod", "up", "-d", "--build"]),
+        _task("stack-kit: stack down", ["stack", "down"]),
+        _task("stack-kit: compose-gen", ["compose-gen"]),
+        _task("stack-kit: validate", ["validate"]),
     ]
     if _stack_infra_services(ctx):
         tasks.append(_infra_tunnel_task(ctx))
-        tasks.append(_task("geostat: infra remote up", ["infra", "remote", "up"]))
-        tasks.append(_task("geostat: infra remote status", ["infra", "remote", "status"]))
+        tasks.append(_task("stack-kit: infra remote up", ["infra", "remote", "up"]))
+        tasks.append(_task("stack-kit: infra remote status", ["infra", "remote", "status"]))
     for alias in sorted(set(aliases.values()), key=lambda x: aliases.get(x, x)):
         short = next((k for k, v in aliases.items() if v == alias), alias)
-        tasks.append(_task(f"geostat: {short} check", [short, "check"]))
+        tasks.append(_task(f"stack-kit: {short} check", [short, "check"]))
         tasks.append(
             _task(
-                f"geostat: {short} compose up",
+                f"stack-kit: {short} compose up",
                 [short, "compose", "up", "-d", "--build"],
             )
         )
@@ -379,7 +379,7 @@ def build_tasks_json(ctx: ProjectContext) -> dict[str, Any]:
         # declares none simply gets none, and a new driver needs no generator edit.
         driver_id = read_nested(ctx.manifest, f"modules.{alias}.type", "")
         for _name, argv in sorted(_driver_watch_tasks(driver_id).items()):
-            tasks.append(_task(f"geostat: {short} {' '.join(argv)}", [short, *argv]))
+            tasks.append(_task(f"stack-kit: {short} {' '.join(argv)}", [short, *argv]))
 
     return {"version": "2.0.0", "tasks": tasks}
 

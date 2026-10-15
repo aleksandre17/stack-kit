@@ -7,11 +7,11 @@
 ## გენერაცია
 
 ```powershell
-.\tools\geostat.ps1 vscode-gen          # მხოლოდ აკლებული ფაილები
-.\tools\geostat.ps1 vscode-gen --force  # გადაწერა
+.\tools\stack-kit.ps1 vscode-gen          # მხოლოდ აკლებული ფაილები
+.\tools\stack-kit.ps1 vscode-gen --force  # გადაწერა
 ```
 
-`geostat init` — ავტომატურად უშვებს `vscode-gen` (თუ `.vscode` ფაილები არ არსებობს).
+`stack-kit init` — ავტომატურად უშვებს `vscode-gen` (თუ `.vscode` ფაილები არ არსებობს).
 
 ## რა იქმნება
 
@@ -19,19 +19,19 @@
 |--------|---------------|-----------|
 | `node-vite` | `npm run dev` | Vite ლოკალურად (`modules.<id>.path`) |
 | `java-boot` | Java: Spring Boot | `mainClass` + `projectName` (ან auto-detect) |
-| — | `geostat: stack` | compose stack dev |
-| — | `geostat: <alias> check` | ops smoke |
+| — | `stack-kit: stack` | compose stack dev |
+| — | `stack-kit: <alias> check` | ops smoke |
 
 **Compound:** `Full stack (local)` — API + UI ერთად (Run and Debug → compound).
 
-**Hybrid ④:** `Hybrid: infra tunnel + API + UI` — `preLaunchTask` = SSH tunnel (`stack.infra.services` manifest-ში); საჭიროა `ops/config/deploy.env` + `ops/config/infra/.env.dev`. Remote infra: `geostat infra remote up` (task ან ხელით).
+**Hybrid ④:** `Hybrid: infra tunnel + API + UI` — `preLaunchTask` = SSH tunnel (`stack.infra.services` manifest-ში); საჭიროა `ops/config/deploy.env` + `ops/config/infra/.env.dev`. Remote infra: `stack-kit infra remote up` (task ან ხელით).
 
 ## Manifest (ოფციური დეტალები)
 
 ```json
 "vscode": {
   "folder": ".vscode",
-  "geostatScript": "tools/geostat.ps1"
+  "cliScript": "tools/stack-kit.ps1"
 },
 "modules": {
   "api": {
@@ -62,7 +62,7 @@
 
 ## Tasks პანელი
 
-`tasks.json` — `geostat stack`, `compose-gen`, `validate`, `<alias> compose up`, checks.
+`tasks.json` — `stack-kit stack`, `compose-gen`, `validate`, `<alias> compose up`, checks.
 
 გაშვება: **Terminal → Run Task** ან launch-ში preLaunchTask (თუ ხელით დაამატებ).
 
@@ -71,9 +71,9 @@
 | რეჟიმი | Run and Debug (launch) | Tasks Panel |
 |--------|------------------------|-------------|
 | ① ლოკალური, Docker-ის გარეშე | `<ui-module>: npm run dev`, `<api-module>: Spring Boot`, **Full stack (local)** | — |
-| ② ლოკალური Docker | `geostat: stack (compose dev)` | `geostat: stack dev`, `geostat: <alias> compose up` |
-| ③ Remote + Docker | **launch-ში არ არის** | `geostat: <alias> dev watch`, `geostat: dev up <alias> --mode remote` |
-| ④ Hybrid | **Hybrid: infra tunnel + API + UI** | `geostat: dev up <alias>`, `geostat: infra tunnel`, `geostat: infra remote up` |
+| ② ლოკალური Docker | `stack-kit: stack (compose dev)` | `stack-kit: stack dev`, `stack-kit: <alias> compose up` |
+| ③ Remote + Docker | **launch-ში არ არის** | `stack-kit: <alias> dev watch`, `stack-kit: dev up <alias> --mode remote` |
+| ④ Hybrid | **Hybrid: infra tunnel + API + UI** | `stack-kit: dev up <alias>`, `stack-kit: infra tunnel`, `stack-kit: infra remote up` |
 
 სრული ცხრილი, commands და `dev watch` vs `deploy watch`: **[DEV-MODES.md](DEV-MODES.md)**.
 

@@ -2,11 +2,11 @@
 # Backend remote dev — Windows edit → Linux workspace + Gradle bootRun
 #
 # Usage:
-#   geostat be dev bootstrap [service] [--no-build]
-#   geostat be dev sync [service]
-#   geostat be dev watch [service] [--debounce-ms 1500] [--no-restart]
-#   geostat be dev restart [service]
-#   geostat be dev help
+#   stack-kit be dev bootstrap [service] [--no-build]
+#   stack-kit be dev sync [service]
+#   stack-kit be dev watch [service] [--debounce-ms 1500] [--no-restart]
+#   stack-kit be dev restart [service]
+#   stack-kit be dev help
 
 # shellcheck source=../_init.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_init.sh"
@@ -37,7 +37,7 @@ for arg in "$@"; do
   esac
 done
 
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
 # shellcheck source=../../toolkit/deploy/dev-remote.sh
@@ -61,8 +61,8 @@ if [[ "$SUB" == "help" || "$SUB" == "-h" || "$SUB" == "--help" ]]; then
   echo "  NOT the same as: be deploy (JAR → runtime/)"
   echo ""
   echo "  Example:"
-  echo "    geostat be dev bootstrap <compose-api-service>"
-  echo "    geostat be dev watch"
+  echo "    stack-kit be dev bootstrap <compose-api-service>"
+  echo "    stack-kit be dev watch"
   echo ""
   exit 0
 fi
@@ -114,7 +114,7 @@ case "$SUB" in
     dev_write_workspace_manifest "$SERVICE"
     port_var="$(dev_port_var_for "$SERVICE")"
     def_port="$(dev_default_port_for "$SERVICE")"
-    echo "  [OK] bootRun on server — check logs: geostat be manage $SERVICE logs --dev"
+    echo "  [OK] bootRun on server — check logs: stack-kit be manage $SERVICE logs --dev"
     echo "  API URL from ${SECRETS_DIR:-<secrets>}/.env.dev (\$$port_var default $def_port)"
     ;;
 

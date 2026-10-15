@@ -27,7 +27,7 @@ function Start-FeStaticDeployWatch {
         exit 1
     }
 
-    $global:geostatStaticWatchLastChange = $null
+    $global:stackKitStaticWatchLastChange = $null
     $script:staticWatchBusy = $false
     $script:staticWatchQueued = $false
 
@@ -46,7 +46,7 @@ function Start-FeStaticDeployWatch {
             $script:staticWatchBusy = $false
             if ($script:staticWatchQueued) {
                 $script:staticWatchQueued = $false
-                $global:geostatStaticWatchLastChange = Get-Date
+                $global:stackKitStaticWatchLastChange = Get-Date
             }
         }
     }
@@ -67,10 +67,10 @@ function Start-FeStaticDeployWatch {
         $w.NotifyFilter = [IO.NotifyFilters]'FileName, LastWrite, DirectoryName'
         $w.EnableRaisingEvents = $true
         foreach ($evt in @("Changed", "Created", "Deleted", "Renamed")) {
-            Register-ObjectEvent -InputObject $w -EventName $evt -SourceIdentifier "geostat-static-watch-$($Collect.Count)-$evt" -Action {
+            Register-ObjectEvent -InputObject $w -EventName $evt -SourceIdentifier "stack-kit-static-watch-$($Collect.Count)-$evt" -Action {
                 $p = $Event.SourceEventArgs.FullPath
                 if ($p -match '[\\/](dist|node_modules|\.git)([\\/]|$)') { return }
-                $global:geostatStaticWatchLastChange = Get-Date
+                $global:stackKitStaticWatchLastChange = Get-Date
             } | Out-Null
         }
         [void]$Collect.Add($w)
@@ -84,7 +84,7 @@ function Start-FeStaticDeployWatch {
 
     Write-Host ""
     Write-Host "  Mode: npm build -> dist/ -> nginx reload on server (NOT source rsync)." -ForegroundColor DarkGray
-    Write-Host "  Remote dev (save -> rsync only):  geostat fe dev watch" -ForegroundColor DarkGray
+    Write-Host "  Remote dev (save -> rsync only):  stack-kit fe dev watch" -ForegroundColor DarkGray
     Write-Host ""
 
     if (-not $NoInitialSync) { Invoke-StaticWatchPublish }
@@ -98,14 +98,14 @@ function Start-FeStaticDeployWatch {
     try {
         while ($true) {
             Start-Sleep -Milliseconds 250
-            if ($null -eq $global:geostatStaticWatchLastChange) { continue }
-            $elapsed = ((Get-Date) - $global:geostatStaticWatchLastChange).TotalMilliseconds
+            if ($null -eq $global:stackKitStaticWatchLastChange) { continue }
+            $elapsed = ((Get-Date) - $global:stackKitStaticWatchLastChange).TotalMilliseconds
             if ($elapsed -lt $DebounceMs) { continue }
-            $global:geostatStaticWatchLastChange = $null
+            $global:stackKitStaticWatchLastChange = $null
             Invoke-StaticWatchPublish
         }
     } finally {
-        Get-EventSubscriber | Where-Object { $_.SourceIdentifier -like 'geostat-static-watch-*' } |
+        Get-EventSubscriber | Where-Object { $_.SourceIdentifier -like 'stack-kit-static-watch-*' } |
             ForEach-Object { Unregister-Event -SubscriptionId $_.SubscriptionId -ErrorAction SilentlyContinue }
         foreach ($w in $watchers) {
             $w.EnableRaisingEvents = $false

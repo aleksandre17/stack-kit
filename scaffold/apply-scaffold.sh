@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copy geostat-kit/scaffold → project root (merge; do not overwrite real secrets)
+# Copy stack-kit/scaffold → project root (merge; do not overwrite real secrets)
 set -euo pipefail
 SCAFFOLD="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${1:-$(cd "$SCAFFOLD/../../.." && pwd)}"
@@ -9,7 +9,7 @@ never_overwrite() {
   local f="$TARGET/$rel"
   [[ -f "$f" ]] || return 1
   case "$rel" in
-    ops/config/deploy.env|geostat.ops.json) return 0 ;;
+    ops/config/deploy.env|stack-kit.json) return 0 ;;
     ops/config/frontend/.env.dev|ops/config/frontend/.env.prod|ops/config/frontend/.env.deploy|ops/config/frontend/nginx.env) return 0 ;;
     ops/config/backend/.env.dev|ops/config/backend/.env.prod|ops/config/backend/.env.deploy|ops/config/backend/google-credentials.json) return 0 ;;
     ops/config/ssh/id_rsa|ops/config/ssh/id_ed25519|ops/config/ssh/config) return 0 ;;
@@ -51,10 +51,10 @@ if [[ ! -f "$TARGET/ops/compose/catalog.json" && -f "$SCAFFOLD/ops/compose/catal
 fi
 
 echo ""
-echo "  geostat-kit scaffold → $TARGET"
+echo "  stack-kit scaffold → $TARGET"
 echo ""
 copy_tree "$SCAFFOLD"
 echo ""
-echo "  Next: .\tools\geostat.ps1 init   (recommended)"
-echo "  See kits/geostat-kit/scaffold/README.md"
+echo "  Next: .\tools\stack-kit.ps1 init   (recommended)"
+echo "  See kits/stack-kit/scaffold/README.md"
 echo ""

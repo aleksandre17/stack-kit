@@ -1,4 +1,4 @@
-# DEPRECATED top-level command — use: geostat fe deploy watch
+# DEPRECATED top-level command — use: stack-kit fe deploy watch
 # Kept so old scripts/docs get a clear redirect (registry may omit "watch").
 
 param(
@@ -10,8 +10,8 @@ param(
 
 Write-Host ""
 Write-Host "  fe watch was renamed for clarity:" -ForegroundColor Yellow
-Write-Host "    geostat fe deploy watch   # static: npm build + dist + nginx reload" -ForegroundColor White
-Write-Host "    geostat fe dev watch      # remote dev: rsync source only (no build)" -ForegroundColor White
+Write-Host "    stack-kit fe deploy watch   # static: npm build + dist + nginx reload" -ForegroundColor White
+Write-Host "    stack-kit fe dev watch      # remote dev: rsync source only (no build)" -ForegroundColor White
 Write-Host ""
 
 $deployScript = Join-Path $PSScriptRoot "deploy.ps1"

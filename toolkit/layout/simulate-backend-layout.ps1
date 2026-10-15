@@ -1,5 +1,5 @@
 ﻿# Backend deploy layout simulation (dry-run, no SSH)
-# Usage: geostat layout --backend  |  -Markdown -OutFile docs/BACKEND-LAYOUT-SIMULATION-FULL.md
+# Usage: stack-kit layout --backend  |  -Markdown -OutFile docs/BACKEND-LAYOUT-SIMULATION-FULL.md
 
 param(
     [string]$ModuleId = "",
@@ -14,8 +14,8 @@ $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\env.ps1")
 . (Join-Path $PackageRoot "lib\modules.ps1")
 $RepoRoot = Get-ProjectRootFromManifest
-if (-not $RepoRoot) { throw "geostat.ops.json not found" }
-$env:GEOSTAT_PROJECT_ROOT = $RepoRoot
+if (-not $RepoRoot) { throw "stack-kit.json not found" }
+$env:STACK_KIT_PROJECT_ROOT = $RepoRoot
 if (-not $ModuleId) { $ModuleId = Get-ModuleIdByRole "api" }
 if (-not $ModuleId) { $ModuleId = (Get-ModuleIdsByDriverType "java-boot" | Select-Object -First 1) }
 if (-not $ModuleId) { throw "manifest: no api / java-boot module" }
@@ -106,7 +106,7 @@ $scenarios = [ordered]@{}
 $scenarios["L0-local"] = @{
     Id = "L0"
     Title = "Local dev (no SSH)"
-    Command = "./gradlew bootRun  |  geostat be compose up --build"
+    Command = "./gradlew bootRun  |  stack-kit be compose up --build"
     Host = "(localhost)"
     Root = $beRoot
     PathKind = "repo"
@@ -124,7 +124,7 @@ $scenarios["L0-local"] = @{
 $scenarios["R1-deploy-dev"] = @{
     Id = "R1"
     Title = "be deploy --dev (JAR -> runtime/)"
-    Command = "geostat be deploy $cname --dev"
+    Command = "stack-kit be deploy $cname --dev"
     Host = $meta.Server
     Root = $runtimeApi
     PathKind = "runtime"
@@ -143,7 +143,7 @@ $scenarios["R1-deploy-dev"] = @{
 $scenarios["R2-deploy-prod"] = @{
     Id = "R2"
     Title = "be deploy --prod (JAR + versions/)"
-    Command = "geostat be deploy $cname --prod"
+    Command = "stack-kit be deploy $cname --prod"
     Host = $meta.Server
     Root = $runtimeApi
     PathKind = "runtime"
@@ -161,7 +161,7 @@ $scenarios["R2-deploy-prod"] = @{
 $scenarios["R3-deploy-watch"] = @{
     Id = "R3"
     Title = "be deploy watch (Gradle loop -> runtime/)"
-    Command = "geostat be deploy watch $cname --dev"
+    Command = "stack-kit be deploy watch $cname --dev"
     Host = $meta.Server
     Root = $runtimeApi
     PathKind = "runtime"
@@ -176,7 +176,7 @@ $scenarios["R3-deploy-watch"] = @{
 $scenarios["W1-dev-bootstrap"] = @{
     Id = "W1"
     Title = "be dev bootstrap (rsync -> workspace/)"
-    Command = "geostat be dev bootstrap $cname"
+    Command = "stack-kit be dev bootstrap $cname"
     Host = $meta.Server
     Root = $workspaceApi
     PathKind = "workspace"
@@ -194,7 +194,7 @@ $scenarios["W1-dev-bootstrap"] = @{
 $scenarios["W2-dev-watch"] = @{
     Id = "W2"
     Title = "be dev watch (rsync only; DevTools reload)"
-    Command = "geostat be dev watch $cname  # add --restart to force compose restart"
+    Command = "stack-kit be dev watch $cname  # add --restart to force compose restart"
     Host = $meta.Server
     Root = $workspaceApi
     PathKind = "workspace"
@@ -212,7 +212,7 @@ if ($worker) {
     $scenarios["R1-worker"] = @{
         Id = "R1w"
         Title = "be deploy worker --dev"
-        Command = "geostat be deploy $($worker.Service) --dev"
+        Command = "stack-kit be deploy $($worker.Service) --dev"
         Host = $meta.Server
         Root = (Resolve-BePath $meta $wc "runtime")
         PathKind = "runtime"
@@ -224,7 +224,7 @@ if ($worker) {
 $scenarios["MIG-flat"] = @{
     Id = "MIG"
     Title = "Migration flat -> structured"
-    Command = "bash kits/geostat-kit/toolkit/deploy/migrate-backend-layout.sh --dry-run"
+    Command = "bash kits/stack-kit/toolkit/deploy/migrate-backend-layout.sh --dry-run"
     Host = $meta.Server
     Root = $meta.DeployPath
     PathKind = "migrate"
@@ -244,7 +244,7 @@ if ($Json) {
 $md = [System.Text.StringBuilder]::new()
 [void]$md.AppendLine("# Backend deploy - full layout simulation")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("> Dry-run from ``ops/config`` + ``geostat.ops.json``. Regenerate: ``geostat layout --backend -Markdown -OutFile docs/BACKEND-LAYOUT-SIMULATION-FULL.md``")
+[void]$md.AppendLine("> Dry-run from ``ops/config`` + ``stack-kit.json``. Regenerate: ``stack-kit layout --backend -Markdown -OutFile docs/BACKEND-LAYOUT-SIMULATION-FULL.md``")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("## Resolved paths (this project)")
 [void]$md.AppendLine("")

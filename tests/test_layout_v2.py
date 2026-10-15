@@ -9,7 +9,7 @@ import pytest
 
 # Runtime / config files that must not reference pre-v2 layout paths
 CRITICAL_GLOBS = (
-    "geostat.ops.json",
+    "stack-kit.json",
     "apps/**/*.yml",
     "apps/**/*.yaml",
     "apps/**/*.js",
@@ -18,13 +18,13 @@ CRITICAL_GLOBS = (
     "ops/compose/catalog.json",
     "ops/compose/stack/*.yml",
     "ops/cli/*.ps1",
-    "tools/geostat.ps1",
+    "tools/stack-kit.ps1",
     ".github/workflows/*.yml",
 )
 
 LEGACY_PATH_FRAGMENTS = (
-    "packages/geostat-kit",
-    "packages/geostat-ops",
+    "packages/stack-kit",
+    "packages/stack-kit-ops",
     "infra/compose/catalog",
     "deploy/compose/",
     "../secrets/",
@@ -34,7 +34,7 @@ LEGACY_PATH_FRAGMENTS = (
 # Match only path-like usage (env_file, import, context), not substring in apps/backend/...
 LEGACY_PATH_REGEX = re.compile(
     r"(?:env_file|import|context|file:)[^\n]*"
-    r"(?:\.\./secrets/|secrets/(?:backend|frontend)/|packages/geostat)",
+    r"(?:\.\./secrets/|secrets/(?:backend|frontend)/|packages/stack-kit)",
     re.IGNORECASE,
 )
 
@@ -45,7 +45,7 @@ OPTIONAL_LEGACY_STUBS = ("frontend", "backend")  # empty stubs at root — shoul
 
 def _manifest_paths(manifest: dict, repo_root: Path) -> list[tuple[str, Path]]:
     out: list[tuple[str, Path]] = []
-    pkg = manifest.get("package", "kits/geostat-kit")
+    pkg = manifest.get("package", "kits/stack-kit")
     out.append(("package", repo_root.joinpath(*pkg.split("/"))))
     sec = manifest.get("secrets", "ops/config")
     out.append(("secrets", repo_root.joinpath(*sec.split("/"))))
@@ -85,7 +85,7 @@ class TestManifestV2:
         assert manifest.get("version") == 2
 
     def test_package_path_is_kits(self, manifest: dict) -> None:
-        assert manifest.get("package") == "kits/geostat-kit"
+        assert manifest.get("package") == "kits/stack-kit"
 
     def test_all_manifest_paths_exist(self, repo_root: Path, manifest: dict) -> None:
         missing = []
@@ -227,27 +227,32 @@ class TestComposeCatalogAndStack:
 
 class TestCliChain:
     def test_tools_shim_delegates_to_ops_cli(self, repo_root: Path) -> None:
-        text = (repo_root / "tools" / "geostat.ps1").read_text(encoding="utf-8")
+        text = (repo_root / "tools" / "stack-kit.ps1").read_text(encoding="utf-8")
         assert "ops" in text and "cli" in text
 
     def test_ops_cli_delegates_to_kit(self, repo_root: Path, manifest: dict) -> None:
-        text = (repo_root / "ops" / "cli" / "geostat.ps1").read_text(encoding="utf-8")
+        text = (repo_root / "ops" / "cli" / "stack-kit.ps1").read_text(encoding="utf-8")
         assert manifest["package"].replace("/", "\\") in text or manifest["package"] in text
 
     def test_kit_cli_exists(self, pkg_root: Path) -> None:
-        assert (pkg_root / "cli" / "geostat.ps1").is_file()
+        assert (pkg_root / "cli" / "stack-kit.ps1").is_file()
 
 
 class TestKitPackageIntegrity:
     def test_compose_build_finds_repo_via_manifest(self, repo_root: Path, pkg_root: Path) -> None:
-        build_py = (pkg_root / "compose" / "build.py").read_text(encoding="utf-8")
-        assert "geostat.ops.json" in build_py
-        assert "kits" in build_py or "ops/config" in build_py
+        # Behaviour, not spelling: compose-gen resolves the project the one discovery resolves.
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("compose_build", pkg_root / "compose" / "build.py")
+        build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build)
+        assert build.find_project_root().resolve() == repo_root.resolve()
+        assert build.load_manifest(repo_root)["modules"]
 
     def test_project_sh_defaults_from_scaffold(self, pkg_root: Path) -> None:
         text = (pkg_root / "lib" / "project.sh").read_text(encoding="utf-8")
         assert "manifest_defaults" in text or "default_field" in text
-        assert "GEOSTAT_LEGACY_ROOT_DISCOVERY" in text
+        assert "STACK_KIT_LEGACY_ROOT_DISCOVERY" in text
 
     def test_scaffold_v2_tree(self, pkg_root: Path) -> None:
         sc = pkg_root / "scaffold"

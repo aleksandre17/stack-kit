@@ -1,13 +1,13 @@
 #!/bin/bash
-# Backend SSH deploy — orchestrator (kits/geostat-kit/toolkit/deploy/)
+# Backend SSH deploy — orchestrator (kits/stack-kit/toolkit/deploy/)
 #
 # Usage:
-#   geostat be deploy [service] [--dev|--prod] [--no-build] [--skip-checks] [backend|frontend]
+#   stack-kit be deploy [service] [--dev|--prod] [--no-build] [--skip-checks] [backend|frontend]
 
 # shellcheck source=../_init.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_init.sh"
 
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
 
@@ -125,5 +125,5 @@ for s in "${SERVICES[@]}"; do
   [ "$SERVICE" != "all" ] && [ "$SERVICE" != "$s" ] && continue
   echo "  DONE $s — logs: $(remote_path_for_service "$s")/logs/"
 done
-echo "  Manage:  geostat mod $GEOSTAT_MODULE_ID manage $SERVICE status --$ENVIRONMENT"
+echo "  Manage:  stack-kit mod $STACK_KIT_MODULE_ID manage $SERVICE status --$ENVIRONMENT"
 echo ""

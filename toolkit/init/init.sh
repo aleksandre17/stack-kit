@@ -1,5 +1,5 @@
 ﻿#!/usr/bin/env bash
-# geostat init — bash entry (calls PowerShell implementation when available)
+# stack-kit init — bash entry (calls PowerShell implementation when available)
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/../.." && pwd)"
 TARGET="${1:-}"
@@ -17,16 +17,16 @@ fi
 SCAFFOLD="$PKG/scaffold"
 ROOT="${TARGET:-$(pwd)}"
 while [[ -n "$ROOT" && "$ROOT" != "/" ]]; do
-  [[ -f "$ROOT/geostat.ops.json" ]] && break
+  [[ -f "$ROOT/stack-kit.json" ]] && break
   ROOT="$(dirname "$ROOT")"
 done
-[[ -f "$ROOT/geostat.ops.json" ]] || ROOT="$(cd "$PKG/../.." && pwd)"
+[[ -f "$ROOT/stack-kit.json" ]] || ROOT="$(cd "$PKG/../.." && pwd)"
 
-export GEOSTAT_PROJECT_ROOT="$ROOT"
-export GEOSTAT_KIT_ROOT="$PKG"
+export STACK_KIT_PROJECT_ROOT="$ROOT"
+export STACK_KIT_KIT_ROOT="$PKG"
 
 echo ""
-echo "  geostat init (bash) → $ROOT"
+echo "  stack-kit init (bash) → $ROOT"
 bash "$SCAFFOLD/apply-scaffold.sh" "$ROOT"
 
 copy_seed() {
@@ -41,7 +41,7 @@ copy_seed() {
 echo ""
 echo "  ▸ Seed ops/config (manifest modules)"
 export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"
-python3 "$PKG/lib/ci_prepare.py" || py -3 "$PKG/lib/ci_prepare.py" || echo "  [warn] seed failed — run: python3 kits/geostat-kit/lib/ci_prepare.py"
+python3 "$PKG/lib/ci_prepare.py" || py -3 "$PKG/lib/ci_prepare.py" || echo "  [warn] seed failed — run: python3 kits/stack-kit/lib/ci_prepare.py"
 
 if [[ ! -f "$ROOT/ops/compose/catalog.json" && -f "$SCAFFOLD/ops/compose/catalog.full.json" ]]; then
   mkdir -p "$ROOT/ops/compose"
@@ -54,5 +54,5 @@ echo "  ▸ compose-gen"
 python3 "$PKG/compose/build.py" || echo "  [warn] compose-gen failed"
 
 echo ""
-echo "  Next: edit ops/config/deploy.env, then: ./tools/geostat.sh compose-gen"
+echo "  Next: edit ops/config/deploy.env, then: ./tools/stack-kit.sh compose-gen"
 echo ""

@@ -1,6 +1,6 @@
 ﻿# Remote dev — `src/Dockerfile` (Windows → Linux)
 
-კონკრეტული ქეისი: `frontend/src/Dockerfile` არსებობს Windows-ზე, გუნდი აშვებს **`geostat fe dev bootstrap`** + **`geostat fe dev watch`**.
+კონკრეტული ქეისი: `frontend/src/Dockerfile` არსებობს Windows-ზე, გუნდი აშვებს **`stack-kit fe dev bootstrap`** + **`stack-kit fe dev watch`**.
 
 ზოგადი golden paths: [GOLDEN-PATHS.md](./GOLDEN-PATHS.md). პროექტი: repo `docs/DEV-REMOTE.md`.
 
@@ -52,7 +52,7 @@ volumes:
 
 ---
 
-## ეტაპი 1: `geostat fe dev bootstrap -Environment dev`
+## ეტაპი 1: `stack-kit fe dev bootstrap -Environment dev`
 
 ### 1) rsync (Windows → Linux)
 
@@ -94,7 +94,7 @@ Compose იღებს **`development`** target-ს. Build:
 
 ---
 
-## ეტაპი 2: `geostat fe dev watch`
+## ეტაპი 2: `stack-kit fe dev watch`
 
 Windows-ზე ცვლილება, მაგ. `src/components/chatbot/ChatWidget.jsx`.
 
@@ -114,7 +114,7 @@ Windows-ზე ცვლილება, მაგ. `src/components/chatbot/Chat
 | მოქმედება | შედეგი |
 |-----------|--------|
 | მხოლოდ `fe dev watch` | ფაილი სერვერზე განახლდება; **გაშვებული image იგივეა** — CMD/stages არ იცვლება |
-| სწორი განახლება | **`geostat fe dev bootstrap`** (საჭიროა `--build`) |
+| სწორი განახლება | **`stack-kit fe dev bootstrap`** (საჭიროა `--build`) |
 
 საჭიროა rebuild მაგალითად თუ შეცვალე: `CMD`, `EXPOSE`, base image, dev stage-ის `RUN`/`COPY` ლოგიკა.
 
@@ -159,10 +159,10 @@ fe dev watch: rsync src/... → Vite reload (Dockerfile ცვლილება
 
 ```powershell
 # ერთხელ (ან Dockerfile / package.json სტრუქტურის ცვლილების შემდეგ)
-.\tools\geostat.ps1 fe dev bootstrap -Environment dev
+.\tools\stack-kit.ps1 fe dev bootstrap -Environment dev
 
 # ყოველდღე
-.\tools\geostat.ps1 fe dev watch -Environment dev
+.\tools\stack-kit.ps1 fe dev watch -Environment dev
 ```
 
 ---
@@ -174,5 +174,5 @@ fe dev watch: rsync src/... → Vite reload (Dockerfile ცვლილება
 | `frontend/src/Dockerfile` | multi-stage; dev = `development` |
 | `apps/frontend/docker-compose.yml` | `dockerfile: src/Dockerfile` |
 | `apps/frontend/docker-compose.override.yml` | `target: development`, volumes |
-| `kits/geostat-kit/toolkit/powershell/Dev-Remote.ps1` | rsync + compose up |
-| `kits/geostat-kit/drivers/node-vite/ps1/dev.ps1` | bootstrap / watch |
+| `kits/stack-kit/toolkit/powershell/Dev-Remote.ps1` | rsync + compose up |
+| `kits/stack-kit/drivers/node-vite/ps1/dev.ps1` | bootstrap / watch |

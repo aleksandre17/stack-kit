@@ -37,7 +37,7 @@ CATALOG = {
 def _manifest(modules: dict, **extra) -> dict:
     base = {
         "version": 2,
-        "package": "kits/geostat-kit",
+        "package": "kits/stack-kit",
         "secrets": "ops/config",
         "modules": modules,
     }
@@ -47,11 +47,11 @@ def _manifest(modules: dict, **extra) -> dict:
 
 def _write_project(tmp: Path, manifest: dict, env_by_folder: dict[str, dict[str, str]]) -> ProjectContext:
     root = tmp / "proj"
-    (root / "kits" / "geostat-kit" / "compose").mkdir(parents=True)
-    (root / "kits" / "geostat-kit" / "compose" / "stack-catalog.json").write_text(
+    (root / "kits" / "stack-kit" / "compose").mkdir(parents=True)
+    (root / "kits" / "stack-kit" / "compose" / "stack-catalog.json").write_text(
         json.dumps(CATALOG), encoding="utf-8"
     )
-    (root / "geostat.ops.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (root / "stack-kit.json").write_text(json.dumps(manifest), encoding="utf-8")
     secrets = root / "ops" / "config"
     for folder, vals in env_by_folder.items():
         d = secrets / folder

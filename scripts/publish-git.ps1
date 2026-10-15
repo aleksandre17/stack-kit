@@ -1,4 +1,4 @@
-# Prepare geostat-kit for first push to a new remote (run from package root)
+# Prepare stack-kit for first push to a new remote (run from package root)
 param(
     [string]$RemoteUrl = "",
     [string]$Tag = "",
@@ -20,7 +20,7 @@ if (-not $SkipCommit) {
         Write-Host "  git add + commit" -ForegroundColor Cyan
         git add -A
         $ver = (Get-Content VERSION -Raw).Trim()
-        git commit -m "chore: geostat-kit v$ver"
+        git commit -m "chore: stack-kit v$ver"
     } else {
         Write-Host "  [skip] working tree clean" -ForegroundColor DarkGray
     }
@@ -42,7 +42,7 @@ if ($RemoteUrl) {
 }
 
 if ($Tag) {
-    git tag -a $Tag -m "geostat-kit $Tag" -f 2>$null
+    git tag -a $Tag -m "stack-kit $Tag" -f 2>$null
     if ($RemoteUrl -or (git remote get-url origin 2>$null)) {
         git push origin $Tag
     }
@@ -50,6 +50,6 @@ if ($Tag) {
 
 Write-Host ""
 Write-Host "  Next: create empty repo on GitHub, then:" -ForegroundColor Yellow
-Write-Host "    .\scripts\publish-git.ps1 -RemoteUrl https://github.com/USER/geostat-kit.git"
+Write-Host "    .\scripts\publish-git.ps1 -RemoteUrl https://github.com/USER/stack-kit.git"
 Write-Host "  See README + docs/INSTALL.md for consumers."
 Write-Host ""

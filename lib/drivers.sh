@@ -1,20 +1,20 @@
 #!/bin/bash
 # Module driver resolution — delegates to lib/driver_api.py (manifest + registry)
-# geostat_python — from project.sh (Windows-safe)
+# stack_kit_python — from project.sh (Windows-safe)
 
-geostat_driver_api() {
-  geostat_python "$(geostat_kit_package_root)/lib/driver_api.py" "$@"
+stack_kit_driver_api() {
+  stack_kit_python "$(stack_kit_kit_package_root)/lib/driver_api.py" "$@"
 }
 
-geostat_driver_registry() {
-  echo "$(geostat_kit_package_root)/drivers/registry.json"
+stack_kit_driver_registry() {
+  echo "$(stack_kit_kit_package_root)/drivers/registry.json"
 }
 
-geostat_module_config() {
+stack_kit_module_config() {
   local id="$1" key="$2" default="${3:-}"
-  geostat_python -c "
+  stack_kit_python -c "
 import json, os, sys
-root = os.environ.get('GEOSTAT_PROJECT_ROOT', '')
+root = os.environ.get('STACK_KIT_PROJECT_ROOT', '')
 decl = os.path.join(os.path.dirname(os.path.abspath(sys.argv[4])), 'identity.json')
 d = json.load(open(decl, encoding='utf-8'))
 names = [d['manifestFilename'], *d.get('legacyManifestFilenames', [])]
@@ -28,31 +28,31 @@ print(v if v is not None else '')
 " "$id" "$key" "$default" "${BASH_SOURCE[0]}"
 }
 
-geostat_module_type() {
-  geostat_driver_api type "$1"
+stack_kit_module_type() {
+  stack_kit_driver_api type "$1"
 }
 
-geostat_module_project_dir() {
+stack_kit_module_project_dir() {
   local id="$1" rel
-  rel="$(geostat_module_config "$id" "path" "$id")"
-  echo "$GEOSTAT_PROJECT_ROOT/$rel"
+  rel="$(stack_kit_module_config "$id" "path" "$id")"
+  echo "$STACK_KIT_PROJECT_ROOT/$rel"
 }
 
-geostat_driver_root() {
+stack_kit_driver_root() {
   local id="$1" typ
-  typ="$(geostat_module_type "$id")"
-  echo "$(geostat_kit_package_root)/drivers/$typ"
+  typ="$(stack_kit_module_type "$id")"
+  echo "$(stack_kit_kit_package_root)/drivers/$typ"
 }
 
-geostat_driver_command_path() {
+stack_kit_driver_command_path() {
   local id="$1" cmd="$2"
-  geostat_driver_api path "$id" "$cmd"
+  stack_kit_driver_api path "$id" "$cmd"
 }
 
-geostat_driver_capabilities() {
-  geostat_driver_api caps "$1"
+stack_kit_driver_capabilities() {
+  stack_kit_driver_api caps "$1"
 }
 
-geostat_cli_resolve_alias() {
-  geostat_driver_api alias "$1"
+stack_kit_cli_resolve_alias() {
+  stack_kit_driver_api alias "$1"
 }

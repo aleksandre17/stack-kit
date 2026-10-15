@@ -60,7 +60,7 @@ def test_default_names_from_manifest_without_compose_env(tmp_path: Path) -> None
 
 def test_deploy_project_does_not_change_compose_slug() -> None:
     manifest = _manifest()
-    deploy = {"DEPLOY_PROJECT": "geostat"}
+    deploy = {"DEPLOY_PROJECT": "app"}
     names = compose_service_names(manifest, deploy, "my-app")
     assert names["compose_slug"] == "my-app"
     assert names["api"] == "my-app-api"

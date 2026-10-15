@@ -1,6 +1,6 @@
 # Infra compose (consumer-owned)
 
-Kit driver is **agnostic** — it merges yaml files you declare in `geostat.ops.json`.
+Kit driver is **agnostic** — it merges yaml files you declare in `stack-kit.json`.
 
 ## Select modules (manifest only)
 
@@ -13,7 +13,7 @@ Kit driver is **agnostic** — it merges yaml files you declare in `geostat.ops.
 }
 ```
 
-`geostat infra up` runs: `-f docker-compose.base.yml -f services/postgres.yml` (+ prod overlay if `-Prod`).
+`stack-kit infra up` runs: `-f docker-compose.base.yml -f services/postgres.yml` (+ prod overlay if `-Prod`).
 
 ## Add a store (open/closed)
 
@@ -21,7 +21,7 @@ Kit driver is **agnostic** — it merges yaml files you declare in `geostat.ops.
 2. Add `"my-store"` to `stack.infra.services`.
 3. Declare volumes/networks in `docker-compose.base.yml` if needed.
 
-Reference modules: `kits/geostat-kit/compose/infra-catalog.json`.
+Reference modules: `kits/stack-kit/compose/infra-catalog.json`.
 
 ## Full manual control
 

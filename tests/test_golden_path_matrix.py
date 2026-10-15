@@ -1,6 +1,6 @@
 """
 Golden path matrix — maps scenario IDs to expected path kinds (no SSH).
-Ensures B/D/C paths stay separated per kits/geostat-kit/docs/GOLDEN-PATHS.md
+Ensures B/D/C paths stay separated per kits/stack-kit/docs/GOLDEN-PATHS.md
 """
 from __future__ import annotations
 

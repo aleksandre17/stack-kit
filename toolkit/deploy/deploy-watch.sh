@@ -12,7 +12,7 @@ deploy_watch_usage() {
   echo ""
   echo "  be deploy watch — Gradle build + upload app.jar + compose up --build on server"
   echo ""
-  echo "  Usage: geostat be deploy watch [service] [--dev|--prod] [--debounce-ms N] [--no-initial]"
+  echo "  Usage: stack-kit be deploy watch [service] [--dev|--prod] [--debounce-ms N] [--no-initial]"
   echo ""
   echo "  Requires: prior be deploy (runtime/ + docker-compose on server)"
   echo "  NOT the same as: be dev watch (source rsync + bootRun in workspace/)"
@@ -36,7 +36,7 @@ deploy_watch_write_manifest() {
   rp="$(remote_path_for_service "$s")"
   cname="$(container_name_for "$s")"
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)"
-  ssh -n "$SERVER" "cat > '$rp/.geostat-deploy.json'" <<JSON
+  ssh -n "$SERVER" "cat > '$rp/.stack-kit-deploy.json'" <<JSON
 {"version":1,"module":"backend","service":"${cname}","deployMode":"deploy-watch","kind":"runtime","environment":"${ENVIRONMENT}","deployPath":"${rp}","updatedAt":"${ts}"}
 JSON
 }
@@ -68,7 +68,7 @@ deploy_watch_assert_runtime_ready() {
   rp="$(remote_path_for_service "$s")"
   if ! ssh -n "$SERVER" "test -f '$rp/docker-compose.${ENVIRONMENT}.yml'" 2>/dev/null; then
     echo "  ERROR: $rp/docker-compose.${ENVIRONMENT}.yml missing" >&2
-    echo "  Run once: geostat be deploy $s --$ENVIRONMENT" >&2
+    echo "  Run once: stack-kit be deploy $s --$ENVIRONMENT" >&2
     return 1
   fi
   return 0
@@ -85,7 +85,7 @@ deploy_watch_poll() {
   echo ""
   echo "  deploy watch: debounce ${debounce_ms}ms. Ctrl+C to stop."
   echo "  Each cycle: ./gradlew bootJar → scp app.jar → docker compose up --build"
-  echo "  Remote dev (rsync only): geostat be dev watch"
+  echo "  Remote dev (rsync only): stack-kit be dev watch"
   echo ""
 
   while true; do

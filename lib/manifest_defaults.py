@@ -20,11 +20,10 @@ def load_scaffold_manifest() -> dict[str, Any]:
 
 
 def read_nested(data: dict[str, Any], dotted: str, default: str = "") -> str:
-    cur: Any = data
-    for key in dotted.split("."):
-        if not isinstance(cur, dict) or key not in cur:
-            return default
-        cur = cur[key]
+    # A field renamed by the kit is still read under its old name, with a notice (ADR-001).
+    from lib.identity import manifest_field
+
+    cur = manifest_field(data, dotted)
     return str(cur) if cur is not None else default
 
 
@@ -72,7 +71,7 @@ def module_by_type(manifest: dict[str, Any], driver_type: str) -> str | None:
 
 
 def legacy_root_discovery_enabled() -> bool:
-    import os
+    from lib.identity import env
 
-    v = os.environ.get("GEOSTAT_LEGACY_ROOT_DISCOVERY", "").strip().lower()
+    v = env("LEGACY_ROOT_DISCOVERY").strip().lower()
     return v in ("1", "true", "yes", "on")

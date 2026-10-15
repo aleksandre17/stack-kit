@@ -2,9 +2,9 @@
 # Dev modes verification — package + consumer (bash/Git Bash)
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
-ROOT="${GEOSTAT_PROJECT_ROOT:-$(cd "$PKG/../.." && pwd)}"
-export GEOSTAT_KIT_ROOT="$PKG"
-export GEOSTAT_PROJECT_ROOT="$ROOT"
+ROOT="${STACK_KIT_PROJECT_ROOT:-$(cd "$PKG/../.." && pwd)}"
+export STACK_KIT_KIT_ROOT="$PKG"
+export STACK_KIT_PROJECT_ROOT="$ROOT"
 export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"
 
 SKIP_DOCKER=0
@@ -23,7 +23,7 @@ ok() { echo "  [PASS] $1"; pass=$((pass + 1)); }
 bad() { echo "  [FAIL] $1 — ${2:-}" >&2; fail=$((fail + 1)); }
 
 echo ""
-echo "=== geostat dev-modes verify ==="
+echo "=== stack-kit dev-modes verify ==="
 echo "  root: $ROOT"
 echo "  kit:  $PKG"
 
@@ -48,9 +48,9 @@ if [[ "$SKIP_DOCKER" -eq 1 ]]; then
 else
   if command -v docker &>/dev/null && docker info &>/dev/null; then
     ok "docker daemon"
-    if [[ -f "$ROOT/tools/geostat.ps1" ]]; then
-      powershell -ExecutionPolicy Bypass -File "$ROOT/tools/geostat.ps1" fe check && ok "fe check" || bad "fe check"
-      powershell -ExecutionPolicy Bypass -File "$ROOT/tools/geostat.ps1" be check && ok "be check" || bad "be check"
+    if [[ -f "$ROOT/tools/stack-kit.ps1" ]]; then
+      powershell -ExecutionPolicy Bypass -File "$ROOT/tools/stack-kit.ps1" fe check && ok "fe check" || bad "fe check"
+      powershell -ExecutionPolicy Bypass -File "$ROOT/tools/stack-kit.ps1" be check && ok "be check" || bad "be check"
     fi
   else
     bad "docker daemon" "not running or not installed"

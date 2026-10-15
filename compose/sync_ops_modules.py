@@ -11,15 +11,16 @@ sys.path.insert(0, str(PACKAGE_ROOT / "compose"))
 from build import find_project_root, global_fmt, load_catalog  # noqa: E402
 from manifest_compose import ops_modules_lines  # noqa: E402
 
-HEADER = "# GENERATED — do not edit. Run: geostat compose-gen\n"
+HEADER = "# GENERATED — do not edit. Run: stack-kit compose-gen\n"
 SHARED = "|shared|library||yes\n"
 
 
 def _shared_module_line(root: Path, manifest: dict) -> str | None:
     """Emit shared Gradle submodule row only when the consumer still has apps/backend/shared."""
     modules = manifest.get("modules") or {}
-    chat = modules.get("chat-api") or modules.get("backend") or {}
-    rel = chat.get("path") or "apps/backend"
+    # The JVM module that may carry a shared gradle module: the first one the manifest declares.
+    jvm = next((m for m in modules.values() if isinstance(m, dict) and m.get("type") == "java-boot"), {})
+    rel = jvm.get("path") or "apps/backend"
     if (root / rel / "shared" / "build.gradle.kts").is_file():
         return SHARED.rstrip()
     return None
@@ -27,8 +28,9 @@ def _shared_module_line(root: Path, manifest: dict) -> str | None:
 
 def main() -> int:
     root = find_project_root()
-    manifest_path = root / "geostat.ops.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else {}
+    from lib.project_context import load_manifest
+
+    manifest = load_manifest(root)
     out_rel = manifest.get("compose", {}).get("syncModules", "apps/backend/ops.modules")
     out = root / out_rel
 

@@ -1,4 +1,4 @@
-# Copy geostat-kit/scaffold → project root (merge; do not overwrite real secrets)
+# Copy stack-kit/scaffold → project root (merge; do not overwrite real secrets)
 param(
     [string]$TargetRoot = "",
     [switch]$ForceExamples
@@ -18,7 +18,7 @@ $neverOverwrite = @(
     "ops\config\backend\.env.dev", "ops\config\backend\.env.prod", "ops\config\backend\.env.deploy",
     "ops\config\backend\google-credentials.json",
     "ops\config\ssh\id_rsa", "ops\config\ssh\id_ed25519", "ops\config\ssh\config",
-    "geostat.ops.json"
+    "stack-kit.json"
 )
 
 function Should-CopyFile([string]$rel) {
@@ -64,12 +64,12 @@ if ((Test-Path $catSrc) -and -not (Test-Path $catDst)) {
 }
 
 Write-Host ""
-Write-Host "  geostat-kit scaffold → $TargetRoot" -ForegroundColor Cyan
+Write-Host "  stack-kit scaffold → $TargetRoot" -ForegroundColor Cyan
 Write-Host ""
 Copy-ScaffoldTree $ScaffoldRoot ""
 Write-Host ""
 Write-Host "  Next:" -ForegroundColor Yellow
-Write-Host "    .\tools\geostat.ps1 init          # full bootstrap (recommended)"
+Write-Host "    .\tools\stack-kit.ps1 init          # full bootstrap (recommended)"
 Write-Host "    — or — copy deploy.env + compose-gen manually"
-Write-Host "    See kits\geostat-kit\scaffold\README.md"
+Write-Host "    See kits\stack-kit\scaffold\README.md"
 Write-Host ""

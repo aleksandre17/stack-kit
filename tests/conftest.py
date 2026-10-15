@@ -1,4 +1,4 @@
-"""pytest fixtures for geostat-kit package tests.
+"""pytest fixtures for stack-kit package tests.
 
 The suite validates the kit's *machinery* (manifest resolution, driver
 registry, compose/config generation, deploy-path logic) against a **synthetic,
@@ -6,7 +6,7 @@ self-contained reference consumer** under ``tests/fixtures/golden-consumer``.
 
 Why a synthetic fixture and not the live consumer manifest:
   * The kit is a reusable package. Coupling its tests to whatever
-    ``geostat.ops.json`` happens to sit at the real project root makes the
+    ``stack-kit.json`` happens to sit at the real project root makes the
     suite break every time the consumer's module set changes (this is exactly
     what produced the long-standing red baseline — the tests asserted one
     adopting project's module ids, which is a consumer brand in kit code).
@@ -22,7 +22,7 @@ ui) and ``svc`` (node-api) — so that every code path stays covered:
 env-profiles config-gen, simple config-gen, postgres datastores, credentials,
 stack-deploy ordering, vscode-gen, layout-v2, migrate-layout.
 
-Override ``GEOSTAT_PROJECT_ROOT`` to point the suite at a real consumer when
+Override ``STACK_KIT_PROJECT_ROOT`` to point the suite at a real consumer when
 you want to smoke-test an adoption (documented in tests/README.md).
 """
 from __future__ import annotations
@@ -52,7 +52,7 @@ if str(PKG) not in sys.path:
     sys.path.insert(0, str(PKG))
 
 # Never collect inside the synthetic consumer fixture. It contains a junction
-# (kits/geostat-kit -> the real kit) that would otherwise make pytest recurse
+# (kits/stack-kit -> the real kit) that would otherwise make pytest recurse
 # infinitely back into this tree. The fixture holds data, not tests.
 collect_ignore = ["fixtures"]
 
@@ -77,21 +77,21 @@ def _disposable_copy(source: Path) -> Path:
 # Allow an explicit override (manual adoption smoke-test); otherwise a disposable copy of the
 # self-contained synthetic consumer is the project root for the suite.
 WORKING_ROOT = _disposable_copy(FIXTURE_ROOT)
-REPO = Path(os.environ["GEOSTAT_PROJECT_ROOT"]).resolve() if os.environ.get(
-    "GEOSTAT_PROJECT_ROOT"
+REPO = Path(os.environ["STACK_KIT_PROJECT_ROOT"]).resolve() if os.environ.get(
+    "STACK_KIT_PROJECT_ROOT"
 ) else WORKING_ROOT
 
 
 def _link_kit_into_fixture(fixture_root: Path, kit_root: Path) -> None:
-    """Materialise ``<fixture>/kits/geostat-kit`` -> the real kit.
+    """Materialise ``<fixture>/kits/stack-kit`` -> the real kit.
 
-    The fixture manifest declares ``"package": "kits/geostat-kit"`` so that the
-    package-boundary tests (``package == "kits/geostat-kit"`` *and* it resolves
+    The fixture manifest declares ``"package": "kits/stack-kit"`` so that the
+    package-boundary tests (``package == "kits/stack-kit"`` *and* it resolves
     to this kit) both hold. The link target is gitignored (junction/symlink),
     so we recreate it at session start — keeps the fixture self-healing without
     committing a platform-specific link.
     """
-    link = fixture_root / "kits" / "geostat-kit"
+    link = fixture_root / "kits" / "stack-kit"
     link.parent.mkdir(parents=True, exist_ok=True)
     if link.exists():
         # Already linked (or a stale real dir) — trust it if it resolves.
@@ -135,8 +135,8 @@ def _fixture_project(request: pytest.FixtureRequest) -> None:
     if REPO == WORKING_ROOT:
         _link_kit_into_fixture(WORKING_ROOT, PKG)
         _write_volatile_secrets(WORKING_ROOT)
-    os.environ.setdefault("GEOSTAT_PROJECT_ROOT", str(REPO))
-    os.environ["GEOSTAT_KIT_ROOT"] = str(PKG)
+    os.environ.setdefault("STACK_KIT_PROJECT_ROOT", str(REPO))
+    os.environ["STACK_KIT_KIT_ROOT"] = str(PKG)
 
 
 def kit_cli_env(extra: dict[str, str] | None = None) -> dict[str, str]:
@@ -148,10 +148,10 @@ def kit_cli_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     * ``PYTHONPATH`` -> the kit root, so the child resolves ``from lib.x import``
       (the scripts import the kit's namespace package; without this the child
       dies with ``ModuleNotFoundError: No module named 'lib'``).
-    * ``GEOSTAT_PROJECT_ROOT`` -> the synthetic fixture, so manifest resolution
-      hits the kit-owned fixture and not whatever ``geostat.ops.json`` happens
+    * ``STACK_KIT_PROJECT_ROOT`` -> the synthetic fixture, so manifest resolution
+      hits the kit-owned fixture and not whatever ``stack-kit.json`` happens
       to sit at the real repo root.
-    * ``GEOSTAT_KIT_ROOT`` -> the kit, so registry/driver-path resolution works.
+    * ``STACK_KIT_KIT_ROOT`` -> the kit, so registry/driver-path resolution works.
 
     Derived entirely from ``PKG``/``REPO`` (file-anchored), never from cwd, so it
     is identical whether pytest is launched from the kit dir or the repo root.
@@ -159,8 +159,8 @@ def kit_cli_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     env = dict(os.environ)
     existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = os.pathsep.join([str(PKG), existing]) if existing else str(PKG)
-    env["GEOSTAT_PROJECT_ROOT"] = str(REPO)
-    env["GEOSTAT_KIT_ROOT"] = str(PKG)
+    env["STACK_KIT_PROJECT_ROOT"] = str(REPO)
+    env["STACK_KIT_KIT_ROOT"] = str(PKG)
     if extra:
         env.update(extra)
     return env
@@ -180,7 +180,7 @@ def run_kit_cli(
     test, owns the invocation contract).
 
     cwd is pinned to the synthetic fixture (the project root the kit is being
-    exercised against); env carries PYTHONPATH/GEOSTAT_* via :func:`kit_cli_env`.
+    exercised against); env carries PYTHONPATH/STACK_KIT_* via :func:`kit_cli_env`.
     """
     cmd = [sys.executable, str(PKG / "lib" / script), *args]
     return subprocess.run(
@@ -234,7 +234,7 @@ def repo_root() -> Path:
 def manifest(repo_root: Path) -> dict:
     import json
 
-    path = repo_root / "geostat.ops.json"
+    path = repo_root / "stack-kit.json"
     with path.open(encoding="utf-8") as f:
         return json.load(f)
 

@@ -1,5 +1,5 @@
 # Infra base — network + shared volumes. Service modules: services/*.yml
-# Manifest: stack.infra.services selects which fragments geostat infra merges.
+# Manifest: stack.infra.services selects which fragments stack-kit infra merges.
 
 name: ${INFRA_COMPOSE_PROJECT:-app-infra}
 

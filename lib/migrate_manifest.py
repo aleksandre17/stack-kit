@@ -77,7 +77,20 @@ def main() -> int:
         return 1
     mf = find_manifest(root) or (root / MANIFEST_FILENAME)
     manifest = load_manifest(root)
-    changes = migrate_manifest(manifest, apply=apply)
+    # The kit's former names first: a host on them is carried to the current ones (ADR-001).
+    from lib.migrate_identity import TwoHomes, host_words, migrate_identity
+
+    try:
+        changes, moved_to = migrate_identity(root, manifest, apply=apply)
+    except TwoHomes as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+    if moved_to is not None and apply:
+        mf = moved_to
+    changes += migrate_manifest(manifest, apply=apply)
+    words = host_words(root, skip={mf, root / MANIFEST_FILENAME})
+    for line in words:
+        print(f"  restate (yours to edit): {line}")
     if not changes:
         print("[migrate] manifest already v2-ready")
         return 0

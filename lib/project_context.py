@@ -8,7 +8,15 @@ from pathlib import Path
 from typing import Any
 
 from lib.credentials import global_gcp_credentials, module_credentials
-from lib.identity import MANIFEST_FILENAME, find_manifest, has_manifest
+from lib.identity import (
+    LEGACY_VENDOR_DIRS,
+    MANIFEST_FILENAME,
+    VENDOR_DIRS,
+    env,
+    env_name,
+    find_manifest,
+    has_manifest,
+)
 from lib.manifest_defaults import (
     default_field,
     legacy_root_discovery_enabled,
@@ -37,8 +45,8 @@ def find_project_root(start: Path | None = None) -> Path:
     start = (start or Path.cwd()).resolve()
     if has_manifest(start):
         return start
-    if os.environ.get("GEOSTAT_PROJECT_ROOT"):
-        env_root = Path(os.environ["GEOSTAT_PROJECT_ROOT"]).resolve()
+    if env("PROJECT_ROOT"):
+        env_root = Path(env("PROJECT_ROOT")).resolve()
         if has_manifest(env_root):
             return env_root
     for p in [start, *start.parents]:
@@ -47,11 +55,11 @@ def find_project_root(start: Path | None = None) -> Path:
     if legacy_root_discovery_enabled():
         for p in [start, *start.parents]:
             if (p / "ops" / "config").is_dir() or (p / "secrets").is_dir():
-                if (p / "kits" / "geostat-kit").is_dir() or (p / "packages" / "geostat-kit").is_dir():
+                if any((p / d).is_dir() for d in (*VENDOR_DIRS, *LEGACY_VENDOR_DIRS)):
                     return p
     raise FileNotFoundError(
         f"project root not found ({MANIFEST_FILENAME} required; "
-        "set GEOSTAT_LEGACY_ROOT_DISCOVERY=1 for pre-v2 trees)"
+        f"set {env_name('LEGACY_ROOT_DISCOVERY')}=1 for pre-v2 trees)"
     )
 
 

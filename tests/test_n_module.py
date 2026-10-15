@@ -16,7 +16,7 @@ from lib.project_context import ProjectContext
 def _manifest_three_modules() -> dict:
     return {
         "version": 2,
-        "package": "kits/geostat-kit",
+        "package": "kits/stack-kit",
         "secrets": "ops/config",
         "cli": {
             "aliases": {"w": "web", "a": "api"},
@@ -76,7 +76,7 @@ def test_default_stack_deploy_api_before_ui() -> None:
 
 
 def test_project_context_role_api(tmp_path) -> None:
-    mf = tmp_path / "geostat.ops.json"
+    mf = tmp_path / "stack-kit.json"
     data = _manifest_three_modules()
     mf.write_text(json.dumps(data), encoding="utf-8")
     ctx = ProjectContext(root=tmp_path, manifest=data)

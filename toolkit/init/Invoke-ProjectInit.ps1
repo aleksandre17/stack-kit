@@ -1,4 +1,4 @@
-# geostat init — full project bootstrap (scaffold + seed secrets + compose-gen + checklist)
+# stack-kit init — full project bootstrap (scaffold + seed secrets + compose-gen + checklist)
 param(
     [string]$ProjectRoot = "",
     [string]$PackageRoot = "",
@@ -22,13 +22,13 @@ function Find-ProjectRoot {
     $dir = (Resolve-Path $Start -ErrorAction SilentlyContinue).Path
     if (-not $dir) { $dir = (Get-Location).Path }
     while ($dir) {
-        if (Test-Path (Join-Path $dir "geostat.ops.json")) { return $dir }
+        if (Test-Path (Join-Path $dir "stack-kit.json")) { return $dir }
         $parent = Split-Path $dir -Parent
         if (-not $parent -or $parent -eq $dir) { break }
         $dir = $parent
     }
     $viaPkg = Split-Path (Split-Path $PackageRoot -Parent) -Parent
-    if (Test-Path (Join-Path $viaPkg "geostat.ops.json")) { return $viaPkg }
+    if (Test-Path (Join-Path $viaPkg "stack-kit.json")) { return $viaPkg }
     return (Get-Location).Path
 }
 
@@ -85,7 +85,7 @@ function Merge-GitIgnore {
     if ($added -gt 0) {
         if ($buf.Count -gt 0 -and $buf[-1] -ne "") { [void]$buf.Add("") }
         if (-not (Test-Path $target)) {
-            [void]$buf.Insert(0, "# geostat-kit init")
+            [void]$buf.Insert(0, "# stack-kit init")
             [void]$buf.Insert(1, "")
         }
         Set-Content -Path $target -Value $buf -Encoding UTF8
@@ -151,7 +151,7 @@ function Get-PythonCmd {
 
 function Show-Checklist {
     param([string]$Root)
-    $env:GEOSTAT_PROJECT_ROOT = $Root
+    $env:STACK_KIT_PROJECT_ROOT = $Root
     . (Join-Path $PackageRoot "lib\project.ps1")
     . (Join-Path $PackageRoot "lib\modules.ps1")
 
@@ -199,15 +199,15 @@ function Show-Checklist {
 
     Write-Host ""
     Write-Host "  Commands:" -ForegroundColor Cyan
-    Write-Host "    .\tools\geostat.ps1 compose-gen    # after catalog edits"
-    Write-Host "    .\tools\geostat.ps1 stack up -d --build"
-    Write-Host "    .\tools\geostat.ps1 mod <moduleId> check   # or cli aliases (fe, be, ui, api)"
-    Write-Host "  Docs: kits\geostat-kit\docs\ADOPTION-LINE.md"
+    Write-Host "    .\tools\stack-kit.ps1 compose-gen    # after catalog edits"
+    Write-Host "    .\tools\stack-kit.ps1 stack up -d --build"
+    Write-Host "    .\tools\stack-kit.ps1 mod <moduleId> check   # or cli aliases (fe, be, ui, api)"
+    Write-Host "  Docs: kits\stack-kit\docs\ADOPTION-LINE.md"
     Write-Host ""
 }
 
 Write-Host ""
-Write-Host "  geostat init → $ProjectRoot" -ForegroundColor White
+Write-Host "  stack-kit init → $ProjectRoot" -ForegroundColor White
 Write-Host "  package: $PackageRoot" -ForegroundColor DarkGray
 
 # ── 1. Scaffold tree ─────────────────────────────────────────────
@@ -263,14 +263,14 @@ if (-not $SkipGitIgnore) {
 }
 
 # ── 5. compose-gen ───────────────────────────────────────────────
-$env:GEOSTAT_PROJECT_ROOT = $ProjectRoot
-$env:GEOSTAT_KIT_ROOT = $PackageRoot
+$env:STACK_KIT_PROJECT_ROOT = $ProjectRoot
+$env:STACK_KIT_KIT_ROOT = $PackageRoot
 
 if (-not $SkipComposeGen) {
     Write-Step "Generate docker-compose files (compose-gen)"
     $py = Get-PythonCmd
     if (-not $py) {
-        Write-Host "  [warn] Python not found — run later: geostat compose-gen" -ForegroundColor Yellow
+        Write-Host "  [warn] Python not found — run later: stack-kit compose-gen" -ForegroundColor Yellow
     } else {
         $buildPy = Join-Path $PackageRoot "compose\build.py"
         & @py $buildPy
@@ -289,14 +289,14 @@ if ($py) {
     $vscodePy = Join-Path $PackageRoot "lib\vscode_gen.py"
     $env:PYTHONPATH = $PackageRoot
     & @py $vscodePy
-    if ($LASTEXITCODE -eq 0) { Write-Host "  [OK]   .vscode (missing files only; use geostat vscode-gen --force)" -ForegroundColor Green }
+    if ($LASTEXITCODE -eq 0) { Write-Host "  [OK]   .vscode (missing files only; use stack-kit vscode-gen --force)" -ForegroundColor Green }
 } else {
-    Write-Host "  [warn] Python not found — run: geostat vscode-gen" -ForegroundColor Yellow
+    Write-Host "  [warn] Python not found — run: stack-kit vscode-gen" -ForegroundColor Yellow
 }
 
 # ── 7. nginx-gen (optional) ──────────────────────────────────────
 if (-not $SkipNginxGen) {
-    $mf = Join-Path $ProjectRoot "geostat.ops.json"
+    $mf = Join-Path $ProjectRoot "stack-kit.json"
     if (Test-Path $mf) {
         $manifest = Get-Content $mf -Raw | ConvertFrom-Json
         $tpl = $manifest.adapters.nginx.template

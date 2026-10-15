@@ -1,5 +1,5 @@
-# geostat-kit — Postgres, Redis, Qdrant (local / remote / tunnel)
-# Usage: geostat infra [prereqs|local|remote|tunnel] [up|down|sync|status|purge] [-Prod] [-Confirm]
+# stack-kit — Postgres, Redis, Qdrant (local / remote / tunnel)
+# Usage: stack-kit infra [prereqs|local|remote|tunnel] [up|down|sync|status|purge] [-Prod] [-Confirm]
 
 param(
     [Parameter(Position = 0)]
@@ -11,8 +11,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PackageRoot = if ($env:GEOSTAT_KIT_ROOT) {
-    $env:GEOSTAT_KIT_ROOT
+$PackageRoot = if ($env:STACK_KIT_KIT_ROOT) {
+    $env:STACK_KIT_KIT_ROOT
 } else {
     (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
@@ -24,10 +24,10 @@ if (Test-Path $SshLib) { . $SshLib }
 
 $Root = Get-ProjectRootFromManifest
 if (-not $Root) {
-    Write-Host "[infra] geostat.ops.json not found" -ForegroundColor Red
+    Write-Host "[infra] stack-kit.json not found" -ForegroundColor Red
     exit 1
 }
-$env:GEOSTAT_PROJECT_ROOT = $Root
+$env:STACK_KIT_PROJECT_ROOT = $Root
 
 $InfraComposeDir = Get-InfraComposeDirFromManifest
 $SecretsInfra = Join-Path (Get-SecretsRoot) "infra"
@@ -121,7 +121,7 @@ function Upload-InfraToRemote {
         Write-InfraLog "ssh not found" "ERROR"
         exit 1
     }
-    $mkdirRc = Invoke-GeostatRemoteBash "mkdir -p '$remoteCompose'"
+    $mkdirRc = Invoke-StackKitRemoteBash "mkdir -p '$remoteCompose'"
     if ($mkdirRc -ne 0) {
         Write-InfraLog "mkdir on server failed (exit $mkdirRc)" "ERROR"
         exit 1
@@ -145,17 +145,17 @@ function Upload-InfraToRemote {
             if ($remoteDir -match '/') {
                 $parent = $remoteDir.Substring(0, $remoteDir.LastIndexOf('/'))
                 if ($parent) {
-                    $null = Invoke-GeostatRemoteBash "mkdir -p '$parent'"
+                    $null = Invoke-StackKitRemoteBash "mkdir -p '$parent'"
                 }
             }
-            $scpRc = Invoke-GeostatScp $local $remoteFile
+            $scpRc = Invoke-StackKitScp $local $remoteFile
             if ($scpRc -ne 0) { exit $scpRc }
         }
     }
 
     $envFile = Assert-InfraEnvFile
     $remoteEnv = "$remoteBase/.env.runtime"
-    $scpRc = Invoke-GeostatScp $envFile $remoteEnv
+    $scpRc = Invoke-StackKitScp $envFile $remoteEnv
     if ($scpRc -ne 0) { exit $scpRc }
     Write-InfraLog "Synced compose + .env.runtime"
 }
@@ -185,7 +185,7 @@ function Invoke-InfraRemoteCompose {
         'if docker compose version >/dev/null 2>&1; then docker compose {1} --env-file "{2}" {3}; ' +
         'else docker-compose {1} --env-file "{2}" {3}; fi'
     ) -f $remoteCompose, $composeFiles, $envRemote, $ComposeAction
-    $sshRc = Invoke-GeostatRemoteBash $remoteScript
+    $sshRc = Invoke-StackKitRemoteBash $remoteScript
     if ($sshRc -ne 0) { exit $sshRc }
 }
 
@@ -217,7 +217,7 @@ function Start-InfraTunnel {
         Write-InfraLog $_.Exception.Message "ERROR"
         exit 1
     }
-    $sshExtra = @(Get-GeostatSshExtraArgs)
+    $sshExtra = @(Get-StackKitSshExtraArgs)
     $portList = ($forwards | ForEach-Object { $_.Local }) -join ','
     $svcList = ($forwards | ForEach-Object { "$($_.Service)($($_.Env))" }) -join ', '
     Write-InfraLog "SSH tunnel (Ctrl+C) services: $svcList"
@@ -237,7 +237,7 @@ function Start-InfraTunnel {
 function Show-InfraHelp {
     Write-Host @"
 
-  geostat infra - Postgres, Redis, Qdrant (geostat-kit)
+  stack-kit infra - Postgres, Redis, Qdrant (stack-kit)
 
     prereqs              SSH: docker network + checks
     local up|down|status Docker on this machine
@@ -248,7 +248,7 @@ function Show-InfraHelp {
 
     -Prod                .env.prod + docker-compose.prod.yml overlay
 
-  Compose dir: stack.infraComposeDir in geostat.ops.json
+  Compose dir: stack.infraComposeDir in stack-kit.json
   Remote path: {DEPLOY_SERVER_BASE}/{DEPLOY_PROJECT}/infra/{INFRA_SLUG}
 
 "@
@@ -267,7 +267,7 @@ switch ($Mode.ToLowerInvariant()) {
             "up" { Invoke-InfraLocalCompose "up -d" }
             "down" { Invoke-InfraLocalCompose "down" }
             "status" { Invoke-InfraLocalCompose "ps" }
-            default { Write-InfraLog "Usage: geostat infra local up|down|status" "ERROR"; exit 1 }
+            default { Write-InfraLog "Usage: stack-kit infra local up|down|status" "ERROR"; exit 1 }
         }
     }
     "remote" {
@@ -280,7 +280,7 @@ switch ($Mode.ToLowerInvariant()) {
             "down" { Invoke-InfraRemoteCompose "down" }
             "status" { Invoke-InfraRemoteCompose "ps" }
             "purge" { Invoke-InfraRemotePurge }
-            default { Write-InfraLog "Usage: geostat infra remote up|down|sync|status|purge -Confirm" "ERROR"; exit 1 }
+            default { Write-InfraLog "Usage: stack-kit infra remote up|down|sync|status|purge -Confirm" "ERROR"; exit 1 }
         }
     }
     "tunnel" { Start-InfraTunnel }

@@ -23,8 +23,8 @@ for ($i = 0; $i -lt $Rest.Count; $i++) {
 }
 . (Join-Path $PSScriptRoot "..\_init.ps1")
 
-$moduleId = $env:GEOSTAT_MODULE_ID
-$projectRoot = $env:GEOSTAT_PROJECT_ROOT
+$moduleId = $env:STACK_KIT_MODULE_ID
+$projectRoot = $env:STACK_KIT_PROJECT_ROOT
 
 switch ($Action) {
     "artifact" { }

@@ -11,34 +11,22 @@ from pathlib import Path
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
-HEADER = "# GENERATED — do not edit. Run: geostat compose-gen\n\n"
+HEADER = "# GENERATED — do not edit. Run: stack-kit compose-gen\n\n"
 
 def find_project_root() -> Path:
-    from lib.manifest_defaults import legacy_root_discovery_enabled
+    # One discovery, owned by the project context -- never a second copy here.
+    from lib.project_context import find_project_root as discover
 
-    if os.environ.get("GEOSTAT_PROJECT_ROOT"):
-        return Path(os.environ["GEOSTAT_PROJECT_ROOT"]).resolve()
-    start = Path.cwd().resolve()
-    for p in [start, *start.parents]:
-        if (p / "geostat.ops.json").is_file():
-            return p
-    if legacy_root_discovery_enabled():
-        for p in [start, *start.parents]:
-            if ((p / "ops" / "config").is_dir() or (p / "secrets").is_dir()) and (
-                (p / "kits" / "geostat-kit").is_dir() or (p / "packages" / "geostat-kit").is_dir()
-            ):
-                return p
-    raise SystemExit(
-        "ERROR: project root not found (geostat.ops.json required; "
-        "GEOSTAT_LEGACY_ROOT_DISCOVERY=1 for pre-v2 trees)"
-    )
+    try:
+        return discover()
+    except FileNotFoundError as e:
+        raise SystemExit(f"ERROR: {e}") from None
 
 
 def load_manifest(root: Path) -> dict:
-    mf = root / "geostat.ops.json"
-    if mf.is_file():
-        return json.loads(mf.read_text(encoding="utf-8"))
-    return {}
+    from lib.project_context import load_manifest as load
+
+    return load(root)
 
 
 def catalog_path(root: Path, manifest: dict) -> Path:
@@ -144,7 +132,9 @@ def build_target(
 
 def main() -> int:
     root = find_project_root()
-    os.environ.setdefault("GEOSTAT_PROJECT_ROOT", str(root))
+    from lib.identity import env_name
+
+    os.environ.setdefault(env_name("PROJECT_ROOT"), str(root))
     fmt_global = global_fmt(root)
     manifest = load_manifest(root)
     templates, targets, catalog_features = load_catalog(root)

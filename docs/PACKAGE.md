@@ -1,15 +1,15 @@
 ﻿# Package vs project — responsibility matrix
 
-| Artifact | Package (`kits/geostat-kit`) | Project (repo root) |
+| Artifact | Package (`kits/stack-kit`) | Project (repo root) |
 |----------|------------------------------|---------------------|
-| `geostat.ops.json` | schema | **instance** |
+| `stack-kit.json` | schema | **instance** |
 | `ops/config/deploy.env` | example in scaffold | **real values (gitignored)** |
 | `ops/compose/catalog.json` | minimal scaffold | **full stack definition** |
 | `docker-compose*.yml` | engine | **generated** under `apps/*`, `ops/compose/stack/` |
 | `ops.modules` | sync script | **generated** at `apps/backend/ops.modules` |
 | `nginx.conf.template` | — | **adapter** under `apps/frontend/` + `ops/config` |
 | Java domain code | — | **`apps/backend/` only** |
-| Deploy/manage scripts | `toolkit/`, `drivers/` | CLI via `tools/geostat.ps1` |
+| Deploy/manage scripts | `toolkit/`, `drivers/` | CLI via `tools/stack-kit.ps1` |
 | CI integration | `ci/wait-health.sh`, … | **`ops/ci/integration-stack.sh`** |
 
 ## Rule

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render nginx.conf from geostat.ops.json adapters.nginx + ops/config (manifest-driven)."""
+"""Render nginx.conf from stack-kit.json adapters.nginx + ops/config (manifest-driven)."""
 from __future__ import annotations
 
 import sys
@@ -39,7 +39,9 @@ def main() -> int:
     try:
         ctx = ProjectContext.discover()
     except FileNotFoundError:
-        print("ERROR: project root not found (geostat.ops.json)", file=sys.stderr)
+        from lib.identity import MANIFEST_FILENAME
+
+        print(f"ERROR: project root not found ({MANIFEST_FILENAME})", file=sys.stderr)
         return 1
 
     root = ctx.root
@@ -74,7 +76,7 @@ def main() -> int:
     env_example_rel = _nginx_field("envExample")
     env_file_rel = _nginx_field("env")
     if not template_rel:
-        print("ERROR: adapters.nginx.template or ui module required in geostat.ops.json", file=sys.stderr)
+        print("ERROR: adapters.nginx.template or ui module required in stack-kit.json", file=sys.stderr)
         return 1
 
     template = root / template_rel

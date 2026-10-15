@@ -1,4 +1,4 @@
-# geostat-kit package tests
+# stack-kit package tests
 
 Runs **without SSH, rsync, or Docker**. Validates contracts before you adopt the package.
 
@@ -8,13 +8,13 @@ From repo root:
 
 ```bash
 pip install pytest
-python3 -m pytest kits/geostat-kit/tests -v
+python3 -m pytest kits/stack-kit/tests -v
 ```
 
 Or:
 
 ```bash
-bash kits/geostat-kit/tests/run-kit-tests.sh
+bash kits/stack-kit/tests/run-kit-tests.sh
 ```
 
 ## What is covered
@@ -42,8 +42,8 @@ The suite runs against a **synthetic, self-contained reference consumer** under
 `tests/fixtures/golden-consumer/` — not the live project manifest. This keeps the
 kit's tests validating the kit's *machinery* independent of any consumer's module
 set. `conftest.py` self-provisions the two gitignored/volatile bits at session
-start (the `kits/geostat-kit` junction and `ops/config/deploy.env`), so a fresh
-checkout runs green with no setup. Point `GEOSTAT_PROJECT_ROOT` at a real repo
+start (the `kits/stack-kit` junction and `ops/config/deploy.env`), so a fresh
+checkout runs green with no setup. Point `STACK_KIT_PROJECT_ROOT` at a real repo
 only to smoke-test an adoption.
 
 ## Last results

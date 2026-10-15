@@ -32,9 +32,9 @@ Unified verbs where possible:
 ```
 
 ```bash
-./tools/geostat.sh be manage api status --prod
-./tools/geostat.sh be manage api logs errors --prod
-./tools/geostat.sh be manage api logs app ERROR --prod
+./tools/stack-kit.sh be manage api status --prod
+./tools/stack-kit.sh be manage api logs errors --prod
+./tools/stack-kit.sh be manage api logs app ERROR --prod
 ```
 
 ```powershell

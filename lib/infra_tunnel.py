@@ -1,4 +1,4 @@
-"""SSH tunnel forwards for geostat infra — manifest services + catalog port env keys."""
+"""SSH tunnel forwards for stack-kit infra — manifest services + catalog port env keys."""
 from __future__ import annotations
 
 import json

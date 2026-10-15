@@ -1,6 +1,6 @@
 ﻿# java-boot driver
 
-Gradle / Spring Boot multi-module deploy and remote dev for `geostat.ops.json` modules with `"type": "java-boot"`.
+Gradle / Spring Boot multi-module deploy and remote dev for `stack-kit.json` modules with `"type": "java-boot"`.
 
 ## Commands
 
@@ -15,7 +15,7 @@ Gradle / Spring Boot multi-module deploy and remote dev for `geostat.ops.json` m
 | `be check` | Pre-flight before deploy |
 | `be modules` | List `ops.modules` registry |
 
-Scripts: `sh/*.sh` (run via Git Bash on Windows: `tools/geostat.ps1`).
+Scripts: `sh/*.sh` (run via Git Bash on Windows: `tools/stack-kit.ps1`).
 
 ## Layout — `structured` vs `flat`
 
@@ -61,10 +61,10 @@ Docs:
 | `toolkit/deploy/dev-remote.sh` | `be dev` rsync + workspace compose |
 | `toolkit/deploy/*.sh` | Full deploy pipeline (gradle → upload → compose) |
 
-Tests: `kits/geostat-kit/tests/test_backend_*.py`
+Tests: `kits/stack-kit/tests/test_backend_*.py`
 
-Smoke (local): `bash kits/geostat-kit/scripts/backend-ops-smoke.sh`
+Smoke (local): `bash kits/stack-kit/scripts/backend-ops-smoke.sh`
 
-Layout report: `geostat layout --backend -Markdown -OutFile docs/BACKEND-LAYOUT-SIMULATION-FULL.md`
+Layout report: `stack-kit layout --backend -Markdown -OutFile docs/BACKEND-LAYOUT-SIMULATION-FULL.md`
 
-Migrate flat → runtime on server: `bash kits/geostat-kit/toolkit/deploy/migrate-backend-layout.sh --dry-run`
+Migrate flat → runtime on server: `bash kits/stack-kit/toolkit/deploy/migrate-backend-layout.sh --dry-run`

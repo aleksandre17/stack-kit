@@ -4,17 +4,17 @@
 : "${OPS_SCRIPT_DIR:?OPS_SCRIPT_DIR not set}"
 : "${OPS_SECRETS_MODULE:?OPS_SECRETS_MODULE not set}"
 
-SECRETS_DIR="$(geostat_secrets_module_dir "$OPS_SECRETS_MODULE")"
+SECRETS_DIR="$(stack_kit_secrets_module_dir "$OPS_SECRETS_MODULE")"
 OPS_LOG_DIR="${OPS_SCRIPT_DIR}/logs"
 mkdir -p "$OPS_LOG_DIR"
 
-SERVER="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_SERVER "$(geostat_deploy_env_value DEPLOY_SERVER "")")"
-PROJECT="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_PROJECT "")"
+SERVER="$(stack_kit_env_value "$OPS_SECRETS_MODULE" DEPLOY_SERVER "$(stack_kit_deploy_env_value DEPLOY_SERVER "")")"
+PROJECT="$(stack_kit_env_value "$OPS_SECRETS_MODULE" DEPLOY_PROJECT "")"
 [[ -n "$PROJECT" ]] || PROJECT="${OPS_PROJECT_NAME:-}"
-[[ -n "$PROJECT" ]] || PROJECT="$(geostat_project_slug)"
-SERVER_BASE="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_SERVER_BASE "$(geostat_server_base)")"
-OPS_BUILD_TMP_PREFIX="$(geostat_deploy_env_value OPS_BUILD_TMP_PREFIX "ops-build")"
-DOCKER_NETWORK="$(geostat_docker_network)"
+[[ -n "$PROJECT" ]] || PROJECT="$(stack_kit_project_slug)"
+SERVER_BASE="$(stack_kit_env_value "$OPS_SECRETS_MODULE" DEPLOY_SERVER_BASE "$(stack_kit_server_base)")"
+OPS_BUILD_TMP_PREFIX="$(stack_kit_deploy_env_value OPS_BUILD_TMP_PREFIX "ops-build")"
+DOCKER_NETWORK="$(stack_kit_docker_network)"
 
 # Optional module overrides (ops.config.sh)
 : "${VERSIONS_KEEP:=5}"
@@ -23,4 +23,4 @@ DOCKER_NETWORK="$(geostat_docker_network)"
 
 # shellcheck source=../../lib/ssh.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/lib/ssh.sh"
-geostat_ssh_maybe_alias
+stack_kit_ssh_maybe_alias

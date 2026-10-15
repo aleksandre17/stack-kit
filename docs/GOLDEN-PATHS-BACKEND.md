@@ -43,7 +43,7 @@ app.jar
 docker-compose.{dev|prod}.yml
 logs/
 versions/           # prod
-.geostat-deploy.json
+.stack-kit-deploy.json
 ```
 
 Driver: [drivers/java-boot/README.md](../drivers/java-boot/README.md), [REMOTE-DEV-JAR-FLOW.md](./REMOTE-DEV-JAR-FLOW.md).
@@ -81,4 +81,4 @@ Driver: [drivers/java-boot/README.md](../drivers/java-boot/README.md), [REMOTE-D
 3. `be deploy <svc>` → ახალი ფაილები `runtime/`-ში
 4. ძველი `{DEPLOY_PATH}/{container}/` წაშლა (optional)
 
-სიმულაცია: `geostat layout --backend` → [BACKEND-LAYOUT-SIMULATION-FULL.md](../../../docs/BACKEND-LAYOUT-SIMULATION-FULL.md)
+სიმულაცია: `stack-kit layout --backend` → [BACKEND-LAYOUT-SIMULATION-FULL.md](../../../docs/BACKEND-LAYOUT-SIMULATION-FULL.md)

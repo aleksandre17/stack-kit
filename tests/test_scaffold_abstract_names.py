@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 
 BANNED = (
-    "geostat-chat",
-    "geostat_chat",
-    "geostat-chat-bot",
+    "stack-kit-chat",
+    "stack_kit_chat",
+    "stack-kit-chat-bot",
     "GEMINI_API",
-    "GEOSTAT_SEARCH",
+    "STACK_KIT_SEARCH",
     "ELEVENLABS",
 )
 
@@ -37,4 +37,4 @@ def test_catalog_uses_placeholder_service_keys() -> None:
     blob = json.dumps(cat["templates"])
     assert "{api_service}" in blob
     assert "{app_service}" in blob
-    assert "geostat-chat" not in blob.lower()
+    assert "stack-kit-chat" not in blob.lower()

@@ -3,10 +3,10 @@
 #  Pre-flight Checks — validates all prerequisites before deploy
 #
 #  Usage:
-#    geostat be check                        check all services
-#    geostat be check api                    check api only
-#    geostat be check api frontend           check api on frontend target
-#    geostat be check --no-build             skip build-related checks
+#    stack-kit be check                        check all services
+#    stack-kit be check api                    check api only
+#    stack-kit be check api frontend           check api on frontend target
+#    stack-kit be check --no-build             skip build-related checks
 #
 #  Exit codes:
 #    0 — all checks passed (warnings allowed)
@@ -33,14 +33,14 @@ done
 
 COMPOSE_FILE="docker-compose.prod.yml"
 ENV_FILE=".env.prod"
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
 module_load_registry
 
 module_port_env_key() {
     local key
-    key="$(PYTHONPATH="${GEOSTAT_KIT_ROOT}" geostat_python "$GEOSTAT_KIT_ROOT/lib/config_gen.py" --port-env "$GEOSTAT_MODULE_ID" 2>/dev/null || true)"
+    key="$(PYTHONPATH="${STACK_KIT_KIT_ROOT}" stack_kit_python "$STACK_KIT_KIT_ROOT/lib/config_gen.py" --port-env "$STACK_KIT_MODULE_ID" 2>/dev/null || true)"
     [[ -n "$key" ]] || key="API_PORT"
     echo "$key"
 }
@@ -164,16 +164,14 @@ if [ -f "$SECRETS_DIR/.env.prod" ]; then
     # Required port — manifest-driven (API_PORT, RETRIEVAL_PORT, INGESTION_PORT, …)
     check_var "$MODULE_PORT_ENV" "required"
 
-    # Shared optional
-    check_var "GEMINI_API_KEY" "optional"
-
-    # chat-api only optional integrations
-    if [ "$GEOSTAT_MODULE_ID" = "chat-api" ]; then
-        check_var "ELEVENLABS_API_KEY"    "optional"
-        check_var "GCP_PROJECT_ID"        "optional"
-        check_var "GEOSTAT_SEARCH_API_KEY" "optional"
-        check_var "GEOSTAT_SEARCH_CX_ID"  "optional"
-    fi
+    # A module's own integrations are the project's to name: modules.<id>.check.requiredEnv and
+    # modules.<id>.check.optionalEnv in the manifest. The kit names none of them (ADR-001).
+    while read -r var; do
+        [[ -n "$var" ]] && check_var "$var" "required"
+    done < <(stack_kit_read_manifest_list "modules.${STACK_KIT_MODULE_ID}.check.requiredEnv")
+    while read -r var; do
+        [[ -n "$var" ]] && check_var "$var" "optional"
+    done < <(stack_kit_read_manifest_list "modules.${STACK_KIT_MODULE_ID}.check.optionalEnv")
 fi
 
 # ════════════════════════════════════════════════

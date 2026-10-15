@@ -1,6 +1,6 @@
 # node-api driver
 
-Node HTTP services (Fastify / Express / Nest) for `geostat.ops.json` modules with
+Node HTTP services (Fastify / Express / Nest) for `stack-kit.json` modules with
 `"type": "node-api"`. Same deploy **lifecycle** as `java-boot` (build artifact → docker
 image → `up -d` → health-gate → rollback on failure), but the build is **pnpm**
 (workspace) and the run is `node dist/index.js` inside a multi-stage image — not gradle/JAR.
@@ -20,7 +20,7 @@ health-checked process/container, so its ops surface mirrors java-boot, not node
 | `<alias> check` | Pre-flight (package.json, pnpm, Dockerfile, `.env.prod` secrets) |
 | `<alias> modules` | List compose services for this module |
 
-Scripts: `sh/*.sh` (Git Bash on Windows, via the consumer's `geostat` entry script);
+Scripts: `sh/*.sh` (Git Bash on Windows, via the consumer's `stack-kit` entry script);
 `ps1/run.ps1` for local run.
 
 ## Build ordering
@@ -85,7 +85,7 @@ secretsModule.
 `drivers/registry.json` declares what this driver serves; no generator names it:
 
 - `roles: ["api"]` — the role inferred when a module omits one.
-- `tasks.devWatch: ["dev", "watch"]` — the argv used by `geostat dev up --mode remote`
+- `tasks.devWatch: ["dev", "watch"]` — the argv used by `stack-kit dev up --mode remote`
   and by the VS Code watch task `vscode-gen` emits.
 - `vscode.launch: "node-terminal"` — the launch shape `vscode-gen` emits.
 

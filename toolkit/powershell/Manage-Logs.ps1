@@ -73,7 +73,7 @@ function Invoke-ManageLogs {
 
     switch ($LogSource) {
         "docker" {
-            & ssh @(Get-GeostatSshExtraArgs) $SERVER "docker logs -f --tail=100 $ContainerName"
+            & ssh @(Get-StackKitSshExtraArgs) $SERVER "docker logs -f --tail=100 $ContainerName"
         }
         "files" {
             $remoteScript = @"
@@ -95,7 +95,7 @@ elif [ -f '$DeployPath/$file' ]; then tail -f '$DeployPath/$file' $grepSuffix
 else echo '[remote] Log file not found: $file (tried logs/ and deploy root)'; exit 1
 fi
 "@
-            & ssh @(Get-GeostatSshExtraArgs) $SERVER $remoteScript
+            & ssh @(Get-StackKitSshExtraArgs) $SERVER $remoteScript
         }
     }
 }

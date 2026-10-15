@@ -1,4 +1,4 @@
-Host geostat-deploy
+Host stack-kit-deploy
     HostName YOUR_SERVER_IP
     User YOUR_USER
     Port 22

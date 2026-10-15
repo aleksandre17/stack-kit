@@ -3,9 +3,9 @@
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
 export PYTHONPATH="${PKG}${PYTHONPATH:+:$PYTHONPATH}"
-export GEOSTAT_KIT_ROOT="$PKG"
-if [[ -z "${GEOSTAT_PROJECT_ROOT:-}" ]]; then
-  export GEOSTAT_PROJECT_ROOT="$(cd "$PKG/../.." && pwd)"
+export STACK_KIT_KIT_ROOT="$PKG"
+if [[ -z "${STACK_KIT_PROJECT_ROOT:-}" ]]; then
+  export STACK_KIT_PROJECT_ROOT="$(cd "$PKG/../.." && pwd)"
 fi
 
 PYBIN=""
@@ -28,7 +28,7 @@ from lib.project_context import ProjectContext
 ctx = ProjectContext.discover()
 api_id = module_by_role(ctx.manifest, "api", 0)
 if not api_id:
-    raise SystemExit("FAIL: no modules.*.role=api in geostat.ops.json")
+    raise SystemExit("FAIL: no modules.*.role=api in stack-kit.json")
 deploy = ctx.secrets_module_dir(api_id) / ".env.deploy"
 if not deploy.is_file():
     raise SystemExit(f"FAIL: missing {deploy}")

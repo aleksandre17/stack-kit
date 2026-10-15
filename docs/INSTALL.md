@@ -1,4 +1,4 @@
-# Install geostat-kit (for other projects)
+# Install stack-kit (for other projects)
 
 Use this after you **cloned or submodule-added** this package. Your app code stays in **your** repo; only ops live here.
 
@@ -8,19 +8,19 @@ Use this after you **cloned or submodule-added** this package. Your app code sta
 
 ```bash
 cd your-project
-git submodule add https://github.com/YOUR_USER/geostat-kit.git kits/geostat-kit
-cd kits/geostat-kit
+git submodule add https://github.com/YOUR_USER/stack-kit.git kits/stack-kit
+cd kits/stack-kit
 git checkout v1.0.0
 cd ../..
-git add kits/geostat-kit .gitmodules
-git commit -m "chore: add geostat-kit v1.0.0"
+git add kits/stack-kit .gitmodules
+git commit -m "chore: add stack-kit v1.0.0"
 ```
 
 ### B. Copy
 
 ```bash
-git clone https://github.com/YOUR_USER/geostat-kit.git /tmp/geostat-kit
-cp -r /tmp/geostat-kit your-project/kits/geostat-kit
+git clone https://github.com/YOUR_USER/stack-kit.git /tmp/stack-kit
+cp -r /tmp/stack-kit your-project/kits/stack-kit
 ```
 
 Pin version: use tag `v1.0.0` or commit SHA.
@@ -29,30 +29,30 @@ Pin version: use tag `v1.0.0` or commit SHA.
 
 ```text
 your-project/
-├── geostat.ops.json      ← you own this
+├── stack-kit.json      ← you own this
 ├── apps/                 ← your frontend, backend, …
 ├── ops/config/           ← secrets (gitignored)
 ├── ops/compose/
-├── tools/geostat.ps1     ← thin shim (below)
-└── kits/geostat-kit/     ← this package (do not edit for app logic)
+├── tools/stack-kit.ps1     ← thin shim (below)
+└── kits/stack-kit/     ← this package (do not edit for app logic)
 ```
 
-## 3. CLI shim (`tools/geostat.ps1`)
+## 3. CLI shim (`tools/stack-kit.ps1`)
 
 Create in **your project root**:
 
 ```powershell
-# tools/geostat.ps1
-$Kit = Join-Path $PSScriptRoot "..\kits\geostat-kit"
-& (Join-Path $Kit "cli\geostat.ps1") @args
+# tools/stack-kit.ps1
+$Kit = Join-Path $PSScriptRoot "..\kits\stack-kit"
+& (Join-Path $Kit "cli\stack-kit.ps1") @args
 ```
 
-Linux / macOS can call `kits/geostat-kit/cli/geostat.sh` from project root with `GEOSTAT_PROJECT_ROOT` set.
+Linux / macOS can call `kits/stack-kit/cli/stack-kit.sh` from project root with `STACK_KIT_PROJECT_ROOT` set.
 
 ## 4. Manifest
 
 ```bash
-cp kits/geostat-kit/scaffold/geostat.ops.json ./geostat.ops.json
+cp kits/stack-kit/scaffold/stack-kit.json ./stack-kit.json
 ```
 
 Edit:
@@ -60,24 +60,24 @@ Edit:
 - `modules.<id>.path` — e.g. `apps/frontend`, `apps/backend`
 - `modules.<id>.role` — `ui`, `api`, `worker`
 - `modules.<id>.secretsModule` — folder under `ops/config/`
-- `package` — must be `"kits/geostat-kit"`
+- `package` — must be `"kits/stack-kit"`
 
 ## 5. Bootstrap
 
 ```powershell
-.\tools\geostat.ps1 init
-.\tools\geostat.ps1 validate
-.\tools\geostat.ps1 compose-gen
-.\tools\geostat.ps1 vscode-gen
+.\tools\stack-kit.ps1 init
+.\tools\stack-kit.ps1 validate
+.\tools\stack-kit.ps1 compose-gen
+.\tools\stack-kit.ps1 vscode-gen
 ```
 
 ## 6. Daily commands
 
 ```powershell
-.\tools\geostat.ps1 help
-.\tools\geostat.ps1 mod backend check
-.\tools\geostat.ps1 mod frontend compose up -d
-.\tools\geostat.ps1 stack up -d --build
+.\tools\stack-kit.ps1 help
+.\tools\stack-kit.ps1 mod backend check
+.\tools\stack-kit.ps1 mod frontend compose up -d
+.\tools\stack-kit.ps1 stack up -d --build
 ```
 
 Aliases (`fe`, `be`) come from `cli.aliases` in your manifest.

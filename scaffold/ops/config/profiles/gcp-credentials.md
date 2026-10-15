@@ -17,6 +17,6 @@ If your **java-boot** API needs GCP:
 
 3. Set vars in `ops/config/backend/.env.*` (e.g. `GCP_PROJECT_ID`).
 
-4. `.\tools\geostat.ps1 compose-gen`
+4. `.\tools\stack-kit.ps1 compose-gen`
 
 Do not put project brand names in the kit scaffold — only your `deploy.env` `COMPOSE_*` values.

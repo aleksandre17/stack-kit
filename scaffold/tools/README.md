@@ -1,11 +1,11 @@
-﻿# geostat CLI (project entry)
+﻿# stack-kit CLI (project entry)
 
-Delegates to `kits/geostat-kit/cli/`.
+Delegates to `kits/stack-kit/cli/`.
 
 ```powershell
-.\tools\geostat.ps1 help
-.\tools\geostat.ps1 compose-gen
-.\tools\geostat.ps1 stack up -d --build
+.\tools\stack-kit.ps1 help
+.\tools\stack-kit.ps1 compose-gen
+.\tools\stack-kit.ps1 stack up -d --build
 ```
 
-See [kits/geostat-kit/docs/ADOPTION-LINE.md](../kits/geostat-kit/docs/ADOPTION-LINE.md).
+See [kits/stack-kit/docs/ADOPTION-LINE.md](../kits/stack-kit/docs/ADOPTION-LINE.md).

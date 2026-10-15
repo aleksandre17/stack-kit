@@ -17,14 +17,14 @@ Stack-agnostic **single-page app** module driver: **Vite (React)**, **Angular CL
 ## Remote dev
 
 ```powershell
-geostat fe dev bootstrap -Environment dev
-geostat fe dev watch
+stack-kit fe dev bootstrap -Environment dev
+stack-kit fe dev watch
 ```
 
 See project `docs/DEV-REMOTE.md`.
 
 ## Angular / Nx
 
-1. Set `modules.<id>.type` to `node-vite` in `geostat.ops.json`.
+1. Set `modules.<id>.type` to `node-vite` in `stack-kit.json`.
 2. Provide `docker-compose.override.yml` with dev target + `.:/app` (or `develop.watch`).
 3. Optional `ops.config.ps1`: `$OpsDevWatchPaths = @("src", "angular.json", "projects")`.

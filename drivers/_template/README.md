@@ -7,7 +7,7 @@ Copy this folder to `drivers/<your-type>/` (e.g. `node-api`, `go-fiber`).
 ```
 <your-type>/
   README.md
-  _init.sh | _init.ps1     # GEOSTAT_MODULE_ID, ops.config, toolkit _common
+  _init.sh | _init.ps1     # STACK_KIT_MODULE_ID, ops.config, toolkit _common
   sh/  or  ps1/            # deploy, manage, compose, check, …
 ```
 
@@ -49,6 +49,6 @@ Optional CLI shortcut:
 
 ## Reuse toolkit
 
-Deploy/manage logic should call `kits/geostat-kit/toolkit/` (SSH, env, compose-cli) — do not fork copy into the driver unless stack-specific (Gradle vs npm).
+Deploy/manage logic should call `kits/stack-kit/toolkit/` (SSH, env, compose-cli) — do not fork copy into the driver unless stack-specific (Gradle vs npm).
 
 Reference implementations: `java-boot/`, `node-vite/`.

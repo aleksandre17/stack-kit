@@ -1,6 +1,6 @@
 """
 Deploy path resolution — single source for tests and tooling.
-Mirrors kits/geostat-kit/toolkit/powershell/Deploy-Path.ps1
+Mirrors kits/stack-kit/toolkit/powershell/Deploy-Path.ps1
 """
 from __future__ import annotations
 
@@ -136,7 +136,7 @@ def deploy_path_summary(
 ) -> str:
     if not base:
         sb = normalize_base(server_base) if server_base else "/home/administrator"
-        proj = project or "geostat"
+        proj = project or "app"
         return f"{sb}/{proj}/backend/runtime/<container>/ (set DEPLOY_PATH in ops/config)"
     base = normalize_base(base)
     if layout == "structured":
@@ -188,7 +188,7 @@ def resolve_infra_deploy_path(
     if server_base and global_project:
         gp = normalize_infra_slug(global_project)
         return f"{normalize_base(server_base)}/{gp}/infra/{slug}"
-    return f"/home/administrator/geostat/infra/{slug}"
+    return f"/home/administrator/stack-kit/infra/{slug}"
 
 
 def infra_deploy_path_candidates(

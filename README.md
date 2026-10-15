@@ -1,4 +1,4 @@
-﻿# geostat-kit
+﻿# stack-kit
 
 **v1.0.0** — Manifest-driven **operations package** for SaaS monorepos.
 
@@ -14,49 +14,49 @@ Compose generation, SSH deploy, env contract, multi-module CLI — **no** applic
 
 ```bash
 # Recommended: git submodule
-git submodule add https://github.com/YOUR_USER/geostat-kit.git kits/geostat-kit
-cd kits/geostat-kit && git checkout v1.0.0
+git submodule add https://github.com/YOUR_USER/stack-kit.git kits/stack-kit
+cd kits/stack-kit && git checkout v1.0.0
 ```
 
-Or clone / copy this repo into your project as `kits/geostat-kit/`.
+Or clone / copy this repo into your project as `kits/stack-kit/`.
 
 In your **project root** (not inside the kit):
 
 ```json
-// geostat.ops.json
+// stack-kit.json
 {
   "version": 2,
-  "package": "kits/geostat-kit",
+  "package": "kits/stack-kit",
   "secrets": "ops/config",
   ...
 }
 ```
 
 ```powershell
-# From your project root — add tools/geostat.ps1 shim (see docs/INSTALL.md)
-.\tools\geostat.ps1 init
-.\tools\geostat.ps1 validate
+# From your project root — add tools/stack-kit.ps1 shim (see docs/INSTALL.md)
+.\tools\stack-kit.ps1 init
+.\tools\stack-kit.ps1 validate
 ```
 
 Details: **[docs/INSTALL.md](docs/INSTALL.md)**
 
 ## Features (1.0.0)
 
-- `geostat.ops.json` — modules, roles (`ui`, `api`, `worker`), paths, CI, adapters
+- `stack-kit.json` — modules, roles (`ui`, `api`, `worker`), paths, CI, adapters
 - Drivers: `java-boot` (Spring/Gradle), `node-vite` (Vite)
-- `geostat validate` · `migrate` · `vscode-gen` · `stack` · remote deploy / `dev watch`
-- N-module CLI: `geostat mod <moduleId> …`
+- `stack-kit validate` · `migrate` · `vscode-gen` · `stack` · remote deploy / `dev watch`
+- N-module CLI: `stack-kit mod <moduleId> …`
 - See [CHANGELOG.md](CHANGELOG.md)
 
 ## Layout
 
 ```text
-geostat-kit/          ← this repository (standalone package)
+stack-kit/          ← this repository (standalone package)
 ├── lib/              # manifest resolution API
 ├── drivers/          # stack-type plugins
 ├── toolkit/          # deploy, stack, init
 ├── compose/          # catalog → docker-compose generator
-├── cli/              # geostat entry
+├── cli/              # stack-kit entry
 ├── scaffold/         # templates for new projects
 ├── ci/               # generic CI helpers
 ├── scripts/          # verify / smoke
@@ -67,7 +67,7 @@ geostat-kit/          ← this repository (standalone package)
 ## Tests (package maintainers)
 
 ```powershell
-cd geostat-kit
+cd stack-kit
 $env:PYTHONPATH = (Get-Location).Path
 python -m pytest tests -q
 ```

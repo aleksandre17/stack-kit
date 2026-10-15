@@ -91,3 +91,41 @@ owns: identity-and-shape
   they should be one (construction over convention); the shells keep their place as shims.
 - **Rewrite the kit in one language including the scripts.** The shell and PowerShell entry points are what
   operators type on two platforms; they stay, holding no rule.
+
+## Amendment 1 — K1 as built (2026-10-15, owner-delegated)
+
+**Landed.** Every name is declared once in `lib/identity.json` (current and `legacy*`, with
+`legacyRemovedIn: 2.0.0`); Python (`lib/identity.py`), bash (`lib/project.sh`) and PowerShell
+(`lib/project.ps1`) project it. The tree was renamed mechanically (197 files, 11 paths); the
+former command paths remain as shims that read the declaration. `stack-kit migrate` carries a host
+across. Proof: `tests/test_identity.py` — the boundary (no tracked file names the former kit outside
+the declaration, this record and the changelog; mutation-checked), a host DERIVED from the reference
+consumer by turning every declared rename back resolves to the same root under Python, bash and
+PowerShell and is told each replacement once, the former command runs, the migration moves what the
+kit owns and prints what the host wrote, and two manifest homes are refused.
+
+**Decided while building, with what was rejected:**
+
+1. **One prefix rule for every variable** (`GEOSTAT_X` → `STACK_KIT_X`), so `STACK_KIT_KIT_ROOT` is
+   awkward and stays. *Rejected:* a per-variable rename table — a second rule each runtime would have to
+   carry, for one prettier name.
+2. **Former variables are adopted inward, never mirrored outward.** At load, each runtime copies a former
+   variable to its current name (the current one wins), tells it once, and unsets the former so a child
+   is not told again. *Rejected:* exporting both names to every child — it doubles every export for the
+   whole 1.x line, and no host reads a kit-set variable (the two known hosts were searched; their
+   launchers SET the former names, which inward adoption serves).
+3. **"Once" is per process tree, carried in `STACK_KIT_NOTICED`.** *Rejected:* a per-process memo — a
+   bash `$(…)` subshell cannot export to its parent, so every resolution re-told the same name.
+4. **The migration is part of `migrate`, not a new verb**, and it never rewrites the host's own files:
+   it prints each line with its replacement. *Rejected:* rewriting host launchers and docs in place — a
+   host's words are its owner's decision (the agent kit's relocation rule, ADR-021).
+5. **The reference consumer is on the current names**; the legacy host is derived from it in each run.
+   *Rejected:* a second, tracked legacy fixture — two specimens drift, and the derived one follows the
+   declaration under test.
+6. **Consumer-shaped defaults went with the name**: the java-boot check's integration keys became
+   `modules.<id>.check.{requiredEnv,optionalEnv}`; `primary_api_module_id` lost its privileged ids for
+   `stack.primaryApiModule` or role `api`; generated Spring defaults use `app`.
+
+**Owed, named:** `config/config-catalog.json` `envProfileSecretsBlock` still renders one consumer's AI
+integration keys into every env-profiles module (K5, with the catalogue's sensitivity columns); several
+unit tests still use `chat-api` as sample module-id data (K3, with the test split).

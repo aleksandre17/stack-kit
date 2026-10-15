@@ -26,9 +26,9 @@ def test_manifest_schema_validates_consumer() -> None:
 
     from conftest import run_kit_cli
 
-    # Validate against the kit-owned synthetic fixture, not whatever geostat.ops.json
+    # Validate against the kit-owned synthetic fixture, not whatever stack-kit.json
     # sits at the real repo root. The harness pins cwd + env (PYTHONPATH so the child
-    # can import `lib`, GEOSTAT_PROJECT_ROOT -> fixture) so this is cwd-independent.
+    # can import `lib`, STACK_KIT_PROJECT_ROOT -> fixture) so this is cwd-independent.
     r = run_kit_cli(script="validate_manifest.py", check=False)
     assert r.returncode == 0, r.stderr or r.stdout
     assert "OK" in r.stdout

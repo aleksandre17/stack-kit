@@ -4,9 +4,9 @@
 #  node-stack specifics (package.json / pnpm / Dockerfile / DATABASE_URL).
 #
 #  Usage:
-#    geostat <api> check                 check all services
-#    geostat <api> check <svc>           check one service
-#    geostat <api> check --no-build      skip build-related checks
+#    stack-kit <api> check                 check all services
+#    stack-kit <api> check <svc>           check one service
+#    stack-kit <api> check --no-build      skip build-related checks
 #  Exit: 0 = passed (warnings allowed), 1 = errors found
 # ============================================================
 
@@ -28,7 +28,7 @@ done
 
 COMPOSE_FILE="docker-compose.prod.yml"
 ENV_FILE=".env.prod"
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
 deploy_path_load_config

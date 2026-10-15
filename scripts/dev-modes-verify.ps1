@@ -1,5 +1,5 @@
 # Dev modes verification — package + consumer (no long-running servers)
-# Usage: .\kits\geostat-kit\scripts\dev-modes-verify.ps1 [-SkipDocker] [-SkipGradle] [-SkipNpm]
+# Usage: .\kits\stack-kit\scripts\dev-modes-verify.ps1 [-SkipDocker] [-SkipGradle] [-SkipNpm]
 param(
     [switch]$SkipDocker,
     [switch]$SkipGradle,
@@ -8,11 +8,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Kit = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$Root = if ($env:GEOSTAT_PROJECT_ROOT) { $env:GEOSTAT_PROJECT_ROOT } else {
+$Root = if ($env:STACK_KIT_PROJECT_ROOT) { $env:STACK_KIT_PROJECT_ROOT } else {
     (Resolve-Path (Join-Path $Kit "..\..")).Path
 }
-$env:GEOSTAT_KIT_ROOT = $Kit
-$env:GEOSTAT_PROJECT_ROOT = $Root
+$env:STACK_KIT_KIT_ROOT = $Kit
+$env:STACK_KIT_PROJECT_ROOT = $Root
 $env:PYTHONPATH = $Kit
 function Get-PythonCmd {
     foreach ($c in @("python", "py", "python3")) {
@@ -37,7 +37,7 @@ function Add-Result($Name, $Ok, $Detail) {
 }
 
 Write-Host ""
-Write-Host "=== geostat dev-modes verify ===" -ForegroundColor Cyan
+Write-Host "=== stack-kit dev-modes verify ===" -ForegroundColor Cyan
 Write-Host "  root: $Root"
 Write-Host "  kit:  $Kit"
 Write-Host ""
@@ -54,7 +54,7 @@ try {
 # 2 Manifest validate
 Write-Host "--- 2. Manifest validate ---" -ForegroundColor Cyan
 $valOut = & @pyCmd (Join-Path $Kit "lib\validate_manifest.py") 2>&1 | Out-String
-Add-Result "geostat validate" ($LASTEXITCODE -eq 0) $valOut.Trim()
+Add-Result "stack-kit validate" ($LASTEXITCODE -eq 0) $valOut.Trim()
 
 # 3 DEV-MODES doc + vscode files
 Write-Host "--- 3. Docs + .vscode ---" -ForegroundColor Cyan
@@ -66,7 +66,7 @@ Add-Result ".vscode/tasks.json" (Test-Path $tasks) $tasks
 
 # 4 Mode 1 prerequisites (host)
 Write-Host "--- 4. Mode 1 local host (prereqs) ---" -ForegroundColor Cyan
-$mf = Get-Content (Join-Path $Root "geostat.ops.json") -Raw | ConvertFrom-Json
+$mf = Get-Content (Join-Path $Root "stack-kit.json") -Raw | ConvertFrom-Json
 $fePath = Join-Path $Root ($mf.modules.frontend.path -replace '/', '\')
 $beModId = [string]$mf.cli.aliases.be
 $bePath = Join-Path $Root ($mf.modules.$beModId.path -replace '/', '\')
@@ -83,8 +83,8 @@ if (-not $SkipGradle) {
 
 # 5 Mode 2 compose (docker)
 Write-Host "--- 5. Mode 2 local Docker ---" -ForegroundColor Cyan
-$geostat = Join-Path $Root "tools\geostat.ps1"
-Add-Result "tools/geostat.ps1" (Test-Path $geostat) ""
+$stackKit = Join-Path $Root "tools\stack-kit.ps1"
+Add-Result "tools/stack-kit.ps1" (Test-Path $stackKit) ""
 if (-not $SkipDocker) {
     $dockerOk = $false
     $dockerDetail = "docker not in PATH"
@@ -94,11 +94,11 @@ if (-not $SkipDocker) {
         $dockerDetail = if ($dockerOk) { "server $dv" } else { $dv }
     }
     Add-Result "docker daemon" $dockerOk $dockerDetail
-    if ($dockerOk -and (Test-Path $geostat)) {
-        & $geostat fe check 2>&1 | Out-Null
-        Add-Result "geostat fe check" ($LASTEXITCODE -eq 0) ""
-        & $geostat be check 2>&1 | Out-Null
-        Add-Result "geostat be check" ($LASTEXITCODE -eq 0) ""
+    if ($dockerOk -and (Test-Path $stackKit)) {
+        & $stackKit fe check 2>&1 | Out-Null
+        Add-Result "stack-kit fe check" ($LASTEXITCODE -eq 0) ""
+        & $stackKit be check 2>&1 | Out-Null
+        Add-Result "stack-kit be check" ($LASTEXITCODE -eq 0) ""
     }
 } else {
     Add-Result "docker checks" $true "skipped (-SkipDocker)"

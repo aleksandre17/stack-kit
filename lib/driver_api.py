@@ -11,20 +11,20 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from lib.identity import MANIFEST_FILENAME, find_manifest
+from lib.identity import MANIFEST_FILENAME, env, find_manifest
 
 
 def _root() -> Path:
-    r = os.environ.get("GEOSTAT_PROJECT_ROOT", "").strip()
+    r = env("PROJECT_ROOT").strip()
     if not r:
-        raise SystemExit("GEOSTAT_PROJECT_ROOT not set")
+        raise SystemExit("STACK_KIT_PROJECT_ROOT not set")
     return Path(r)
 
 
 def _pkg() -> Path:
-    p = os.environ.get("GEOSTAT_KIT_ROOT", "").strip()
+    p = env("KIT_ROOT").strip()
     if not p:
-        raise SystemExit("GEOSTAT_KIT_ROOT not set")
+        raise SystemExit("STACK_KIT_KIT_ROOT not set")
     return Path(p)
 
 
@@ -69,7 +69,7 @@ def registry_entry(registry: dict[str, Any], typ: str) -> dict[str, Any]:
     if typ not in registry:
         known = ", ".join(sorted(registry.keys()))
         raise SystemExit(
-            f"Unknown driver type '{typ}' — implement kits/geostat-kit/drivers/{typ}/ and register it. Known: {known}"
+            f"Unknown driver type '{typ}' — implement kits/stack-kit/drivers/{typ}/ and register it. Known: {known}"
         )
     return registry[typ]
 

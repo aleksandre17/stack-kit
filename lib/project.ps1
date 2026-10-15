@@ -3,17 +3,45 @@
 # The manifest's NAME is not spelled here. It is declared once in lib/identity.json
 # and projected into every runtime, so a rename is one edit and never an archaeology.
 
-$script:GeostatIdentity = $null
+$script:StackKitIdentity = $null
 
 function Get-KitIdentity {
-    if ($null -ne $script:GeostatIdentity) { return $script:GeostatIdentity }
+    if ($null -ne $script:StackKitIdentity) { return $script:StackKitIdentity }
     $decl = Join-Path $PSScriptRoot 'identity.json'
     # No guessed default: a missing declaration is a broken kit, and a fallback
     # spelling here would be exactly the second home this file exists to remove.
     if (-not (Test-Path $decl)) { throw "kit identity declaration missing: $decl" }
-    $script:GeostatIdentity = Get-Content -Raw -Encoding UTF8 $decl | ConvertFrom-Json
-    return $script:GeostatIdentity
+    $script:StackKitIdentity = Get-Content -Raw -Encoding UTF8 $decl | ConvertFrom-Json
+    return $script:StackKitIdentity
 }
+
+function Write-KitDeprecation {
+    # One line, once per legacy name: what is deprecated, what replaces it, when it stops (ADR-001).
+    param([string]$Old, [string]$New)
+    $id = Get-KitIdentity
+    if ((Test-Path "env:$($id.envPrefix)_NO_DEPRECATION_NOTICE") -or
+        ($id.legacyEnvPrefix -and (Test-Path "env:$($id.legacyEnvPrefix)_NO_DEPRECATION_NOTICE"))) { return }
+    # The names already told travel in <prefix>_NOTICED, shared with bash and python.
+    $told = "$($id.envPrefix)_NOTICED"
+    $seen = @(((Get-Item "env:$told" -ErrorAction SilentlyContinue).Value -split '\|') | Where-Object { $_ })
+    if ($seen -contains $Old) { return }
+    Set-Item -Path "env:$told" -Value (@($seen + $Old) -join '|')
+    [Console]::Error.WriteLine("[$($id.kitName)] deprecated: $Old -> $New; read until $($id.legacyRemovedIn)")
+}
+
+function Invoke-KitLegacyEnvAdoption {
+    # Carry every legacy-prefixed variable to its canonical name for this process tree. The
+    # canonical name wins when both are set; the legacy one is removed so a child is not told twice.
+    $id = Get-KitIdentity
+    if (-not $id.legacyEnvPrefix) { return }
+    foreach ($item in @(Get-ChildItem env: | Where-Object { $_.Name -like "$($id.legacyEnvPrefix)_*" })) {
+        $new = "$($id.envPrefix)_" + $item.Name.Substring($id.legacyEnvPrefix.Length + 1)
+        if (-not (Test-Path "env:$new")) { Set-Item -Path "env:$new" -Value $item.Value }
+        Write-KitDeprecation $item.Name $new
+        Remove-Item -Path "env:$($item.Name)"
+    }
+}
+Invoke-KitLegacyEnvAdoption
 
 function Get-ManifestFileNames {
     # Accepted manifest filenames, canonical first.
@@ -25,14 +53,18 @@ function Get-ManifestInDirectory {
     param([string]$Directory)
     foreach ($name in Get-ManifestFileNames) {
         $candidate = Join-Path $Directory $name
-        if (Test-Path $candidate) { return $candidate }
+        if (Test-Path $candidate) {
+            $canonical = (Get-KitIdentity).manifestFilename
+            if ($name -ne $canonical) { Write-KitDeprecation $name $canonical }
+            return $candidate
+        }
     }
     return $null
 }
 
 function Get-ProjectManifestPath {
-    if ($env:GEOSTAT_PROJECT_ROOT) {
-        $mf = Get-ManifestInDirectory $env:GEOSTAT_PROJECT_ROOT
+    if ($env:STACK_KIT_PROJECT_ROOT) {
+        $mf = Get-ManifestInDirectory $env:STACK_KIT_PROJECT_ROOT
         if ($mf) { return $mf }
     }
     $dir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
@@ -47,10 +79,10 @@ function Get-ProjectManifestPath {
 }
 
 function Get-ProjectRootFromManifest {
-    if ($env:GEOSTAT_PROJECT_ROOT) { return $env:GEOSTAT_PROJECT_ROOT }
+    if ($env:STACK_KIT_PROJECT_ROOT) { return $env:STACK_KIT_PROJECT_ROOT }
     $mf = Get-ProjectManifestPath
     if ($mf) { return Split-Path $mf -Parent }
-    if ($env:GEOSTAT_LEGACY_ROOT_DISCOVERY -match '^(1|true|yes|on)$') {
+    if ($env:STACK_KIT_LEGACY_ROOT_DISCOVERY -match '^(1|true|yes|on)$') {
         $dir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
         while ($dir) {
             if ((Test-Path (Join-Path $dir "ops\config")) -or (Test-Path (Join-Path $dir "secrets"))) { return $dir }
@@ -64,8 +96,8 @@ function Get-ProjectRootFromManifest {
 
 function Get-ScaffoldManifestPath {
     $name = (Get-KitIdentity).manifestFilename
-    if ($env:GEOSTAT_KIT_ROOT) {
-        return Join-Path $env:GEOSTAT_KIT_ROOT (Join-Path 'scaffold' $name)
+    if ($env:STACK_KIT_KIT_ROOT) {
+        return Join-Path $env:STACK_KIT_KIT_ROOT (Join-Path 'scaffold' $name)
     }
     Join-Path (Get-OpsPackageRoot) (Join-Path 'scaffold' $name)
 }
@@ -92,15 +124,29 @@ function Get-ManifestField {
     $mf = Get-ProjectManifestPath
     if (-not $mf -or -not (Test-Path $mf)) { return $Default }
     $m = Get-Content $mf -Raw | ConvertFrom-Json
-    $v = $m
-    foreach ($p in ($Field -split '\.')) {
-        if ($null -eq $v) { return $Default }
-        $prop = $v.PSObject.Properties[$p]
-        if (-not $prop) { return $Default }
-        $v = $prop.Value
+    $v = Get-JsonDotted $m $Field
+    if ($null -eq $v) {
+        # A field the kit renamed is still read under its old name, with a notice (ADR-001).
+        $id = Get-KitIdentity
+        foreach ($rename in @($id.legacyManifestFields.PSObject.Properties | Where-Object { $_.Value -eq $Field })) {
+            $v = Get-JsonDotted $m $rename.Name
+            if ($null -ne $v) { Write-KitDeprecation "$($id.manifestFilename): $($rename.Name)" $Field; break }
+        }
     }
     if ($null -eq $v) { return $Default }
     return [string]$v
+}
+
+function Get-JsonDotted {
+    param($Object, [string]$Dotted)
+    $v = $Object
+    foreach ($p in ($Dotted -split '\.')) {
+        if ($null -eq $v) { return $null }
+        $prop = $v.PSObject.Properties[$p]
+        if (-not $prop) { return $null }
+        $v = $prop.Value
+    }
+    return $v
 }
 
 function Get-OpsPackageRoot {
@@ -279,7 +325,7 @@ function Add-InfraComposeFileArgs {
 
 function Get-InfraCatalogFilePaths {
     $paths = [System.Collections.ArrayList]@()
-    $kitRoot = if ($env:GEOSTAT_KIT_ROOT) { $env:GEOSTAT_KIT_ROOT } else { Get-OpsPackageRoot }
+    $kitRoot = if ($env:STACK_KIT_KIT_ROOT) { $env:STACK_KIT_KIT_ROOT } else { Get-OpsPackageRoot }
     $kitCat = Join-Path $kitRoot "compose\infra-catalog.json"
     if (Test-Path $kitCat) { [void]$paths.Add($kitCat) }
     $consumerCat = Join-Path (Get-InfraComposeDirFromManifest) "infra-catalog.json"

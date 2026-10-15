@@ -1,11 +1,11 @@
 # stack-kit — smart dev startup orchestrator.
 #
-# Usage: geostat dev up [alias|moduleId|all] [--mode hybrid|local|docker|remote] [--no-infra] [--no-tunnel]
+# Usage: stack-kit dev up [alias|moduleId|all] [--mode hybrid|local|docker|remote] [--no-infra] [--no-tunnel]
 #
 # Modes (auto-detected when not set):
 #   hybrid   Apps on host (Windows), infra remote Docker + SSH tunnel.  Default when DEPLOY_SERVER set.
 #   local    Apps on host only — no infra management.                   Default when DEPLOY_SERVER not set.
-#   docker   Full stack via geostat stack up -d --build.                Ignores per-module target.
+#   docker   Full stack via stack-kit stack up -d --build.                Ignores per-module target.
 #   remote   Source on Windows, rsync → Linux server, Docker reloads.
 #
 # Nothing here knows a driver name or a consumer's module vocabulary: roles, boot order
@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PackageRoot = if ($env:GEOSTAT_KIT_ROOT) { $env:GEOSTAT_KIT_ROOT } else {
+$PackageRoot = if ($env:STACK_KIT_KIT_ROOT) { $env:STACK_KIT_KIT_ROOT } else {
     Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 }
 . (Join-Path $PackageRoot "lib\project.ps1")
@@ -30,7 +30,7 @@ $PackageRoot = if ($env:GEOSTAT_KIT_ROOT) { $env:GEOSTAT_KIT_ROOT } else {
 
 $Root = Get-ProjectRootFromManifest
 if (-not $Root) {
-    Write-Host "[dev] geostat.ops.json not found (run: geostat init)" -ForegroundColor Red
+    Write-Host "[dev] stack-kit.json not found (run: stack-kit init)" -ForegroundColor Red
     exit 1
 }
 
@@ -78,14 +78,14 @@ function Show-DevHelp {
 
     Write-Host @"
 
-  geostat dev — smart development startup (stack-kit)
+  stack-kit dev — smart development startup (stack-kit)
 
-    geostat dev up <alias|moduleId|all> [flags]
+    stack-kit dev up <alias|moduleId|all> [flags]
 
   Modes (auto-detected from ops/config/deploy.env DEPLOY_SERVER):
     hybrid    Apps on host + infra remote Docker + SSH tunnel  [default when DEPLOY_SERVER set]
     local     Apps on host only; no infra management           [default otherwise]
-    docker    Full stack via compose (geostat stack up)
+    docker    Full stack via compose (stack-kit stack up)
     remote    rsync source → Linux server, Docker reloads
 
   Flags:
@@ -100,12 +100,12 @@ function Show-DevHelp {
                 (remote mode: each module gets its own watch window)
 
   Examples:
-    geostat dev up $a1                  # $m1, hybrid mode (auto)
-    geostat dev up $a2 --no-tunnel      # $m2, skip tunnel
-    geostat dev up all                  # all modules in new windows
-    geostat dev up $a1 --mode local     # $m1, local only
-    geostat dev up $a1 --mode remote    # rsync source → server, docker reloads
-    geostat dev up all --mode remote    # all modules as remote watch
+    stack-kit dev up $a1                  # $m1, hybrid mode (auto)
+    stack-kit dev up $a2 --no-tunnel      # $m2, skip tunnel
+    stack-kit dev up all                  # all modules in new windows
+    stack-kit dev up $a1 --mode local     # $m1, local only
+    stack-kit dev up $a1 --mode remote    # rsync source → server, docker reloads
+    stack-kit dev up all --mode remote    # all modules as remote watch
 
   CLI aliases: $aliasLine
 
@@ -133,15 +133,15 @@ function Get-DevMode {
     return "local"
 }
 
-function Get-GeostatScript {
-    $rel = Get-ManifestField "vscode.geostatScript"
-    if (-not $rel) { $rel = "tools/geostat.ps1" }
+function Get-StackKitScript {
+    $rel = Get-ManifestField "vscode.cliScript"
+    if (-not $rel) { $rel = "tools/stack-kit.ps1" }
     Join-Path $Root ($rel -replace '/', '\')
 }
 
 function Start-ModuleInNewWindow {
     param([string]$ModuleId)
-    $gs = Get-GeostatScript
+    $gs = Get-StackKitScript
     Write-DevLog "Opening window: $ModuleId"
     Start-Process powershell -ArgumentList @(
         '-NoExit',
@@ -152,7 +152,7 @@ function Start-ModuleInNewWindow {
 }
 
 function Start-TunnelInNewWindow {
-    $gs = Get-GeostatScript
+    $gs = Get-StackKitScript
     Write-DevLog "Opening SSH tunnel window (Ctrl+C in that window to close tunnel)"
     Start-Process powershell -ArgumentList @(
         '-NoExit',
@@ -191,7 +191,7 @@ function Get-ModulesInRoleOrder {
 if ($SubCommand -in @("help", "", $null)) { Show-DevHelp; exit 0 }
 
 if ($SubCommand -ne "up") {
-    Write-DevLog "Unknown subcommand: '$SubCommand'. Run: geostat dev help" "ERROR"
+    Write-DevLog "Unknown subcommand: '$SubCommand'. Run: stack-kit dev help" "ERROR"
     exit 1
 }
 
@@ -221,7 +221,7 @@ while ($i -lt $DevArgs.Count) {
 }
 
 if (-not $target) {
-    Write-DevLog "Usage: geostat dev up <alias|moduleId|all> [--mode hybrid|local|docker|remote] [--no-infra] [--no-tunnel]" "ERROR"
+    Write-DevLog "Usage: stack-kit dev up <alias|moduleId|all> [--mode hybrid|local|docker|remote] [--no-infra] [--no-tunnel]" "ERROR"
     exit 1
 }
 
@@ -230,8 +230,8 @@ Write-DevLog "mode=$mode  target=$target  skip-infra=$skipInfra  skip-tunnel=$sk
 
 # ── Docker mode ───────────────────────────────────────────────────────────────
 if ($mode -eq "docker") {
-    Write-DevLog "Starting full stack via Docker Compose (geostat stack up -d --build)"
-    $gs = Get-GeostatScript
+    Write-DevLog "Starting full stack via Docker Compose (stack-kit stack up -d --build)"
+    $gs = Get-StackKitScript
     & $gs stack up -d --build
     exit $LASTEXITCODE
 }
@@ -240,7 +240,7 @@ if ($mode -eq "docker") {
 # Source stays on Windows; the driver's declared devWatch argv rsyncs to the Linux
 # server and reloads the container. Requires DEPLOY_SERVER + DEPLOY_LAYOUT=structured.
 if ($mode -eq "remote") {
-    $gs = Get-GeostatScript
+    $gs = Get-StackKitScript
     $server = Get-DeployEnvValue "DEPLOY_SERVER"
     if (-not $server) {
         Write-DevLog "DEPLOY_SERVER not set in ops/config/deploy.env — remote watch requires a server." "ERROR"
@@ -290,8 +290,8 @@ if ($mode -eq "remote") {
 # ── Infra + tunnel (hybrid only) ──────────────────────────────────────────────
 if ($mode -eq "hybrid") {
     if (-not $skipInfra) {
-        Write-DevLog "Starting remote infra (geostat infra remote up)..."
-        $gs = Get-GeostatScript
+        Write-DevLog "Starting remote infra (stack-kit infra remote up)..."
+        $gs = Get-StackKitScript
         & $gs infra remote up
         if ($LASTEXITCODE -ne 0) {
             Write-DevLog "infra remote up failed (exit $LASTEXITCODE). Pass --no-infra to skip." "ERROR"
@@ -327,13 +327,13 @@ if ($target -eq "all") {
 
 $resolved = Resolve-DevTarget $target
 if (-not $resolved) {
-    Write-DevLog "Unknown target: '$target'. Check cli.aliases in geostat.ops.json or use a module id." "ERROR"
+    Write-DevLog "Unknown target: '$target'. Check cli.aliases in stack-kit.json or use a module id." "ERROR"
     Write-DevLog "Known aliases: $((Get-CliAliasesFromManifest).GetEnumerator() | ForEach-Object { "$($_.Key)->$($_.Value)" } | Out-String)"
     exit 1
 }
 
 Write-DevLog "Booting $resolved..."
-$env:GEOSTAT_MODULE_ID = $resolved
+$env:STACK_KIT_MODULE_ID = $resolved
 $runScript = Get-DriverCommandPath -ModuleId $resolved -Command "run"
 & $runScript
 exit $LASTEXITCODE

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run geostat-kit package tests (no SSH/Docker required)
+# Run stack-kit package tests (no SSH/Docker required)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PKG="$(cd "$(dirname "$0")/.." && pwd)"

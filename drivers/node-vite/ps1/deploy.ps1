@@ -2,7 +2,7 @@
 #  deploy.ps1  -  Multi-package deployment
 #
 #  Modes:  local | dist | remote | sync | watch
-#  watch = static dist loop (npm build + nginx). For source rsync use: geostat fe dev watch
+#  watch = static dist loop (npm build + nginx). For source rsync use: stack-kit fe dev watch
 #  Env:    -Environment dev | prod  (all modes respect profile)
 # ==================================================================
 param(
@@ -15,7 +15,7 @@ param(
 )
 
 . "$PSScriptRoot\_common.ps1"
-$GetComposeServices = Join-Path $env:GEOSTAT_KIT_ROOT "toolkit\powershell\Get-ComposeServices.ps1"
+$GetComposeServices = Join-Path $env:STACK_KIT_KIT_ROOT "toolkit\powershell\Get-ComposeServices.ps1"
 . $GetComposeServices
 
 # Resolve the pnpm workspace root for the remote build context — mirror of node-api's
@@ -23,7 +23,7 @@ $GetComposeServices = Join-Path $env:GEOSTAT_KIT_ROOT "toolkit\powershell\Get-Co
 # holding pnpm-workspace.yaml, bounded by the project root; fall back to the module dir.
 function Get-NodeWorkspaceDir {
     param([Parameter(Mandatory = $true)][string]$StartDir)
-    $projRoot = $env:GEOSTAT_PROJECT_ROOT
+    $projRoot = $env:STACK_KIT_PROJECT_ROOT
     $ws = (Resolve-Path $StartDir).Path
     while ($true) {
         if (Test-Path (Join-Path $ws "pnpm-workspace.yaml")) { return $ws }
@@ -36,7 +36,7 @@ function Get-NodeWorkspaceDir {
 }
 
 # Module path relative to the workspace root, with forward slashes for the server
-# (e.g. workspace platform/, module platform/apps/geostat -> "apps/geostat").
+# (e.g. workspace platform/, module platform/apps/stack-kit -> "apps/stack-kit").
 function Get-RelativeModulePath {
     param(
         [Parameter(Mandatory = $true)][string]$WorkspaceRoot,
@@ -49,7 +49,7 @@ function Get-RelativeModulePath {
     return ($rel -replace '\\', '/')
 }
 
-# geostat mod fe deploy dist -Environment prod → ("dist","-Environment","prod") via @rest
+# stack-kit mod fe deploy dist -Environment prod → ("dist","-Environment","prod") via @rest
 if ($Arg2 -eq "-Environment" -and $args.Count -ge 1 -and $args[0] -in @("dev", "prod")) {
     $Environment = [string]$args[0]
     $Arg2 = ""

@@ -1,11 +1,11 @@
 #!/bin/bash
 # List node-api compose services for this module.
-# Usage: geostat <api> modules
+# Usage: stack-kit <api> modules
 
 # shellcheck source=../_init.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_init.sh"
 
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
 
@@ -26,6 +26,6 @@ done
 
 echo ""
 echo "  Deploy examples:"
-for s in "${SERVICES[@]}"; do echo "    geostat mod $GEOSTAT_MODULE_ID deploy $s --prod"; done
-echo "    geostat mod $GEOSTAT_MODULE_ID deploy all --prod"
+for s in "${SERVICES[@]}"; do echo "    stack-kit mod $STACK_KIT_MODULE_ID deploy $s --prod"; done
+echo "    stack-kit mod $STACK_KIT_MODULE_ID deploy all --prod"
 echo ""

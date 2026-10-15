@@ -6,18 +6,18 @@
 #  All operations execute on the remote server via SSH.
 #
 #  Usage:
-#    geostat be manage                          interactive menu
-#    geostat be manage api stop                 stop api (backend)
-#    geostat be manage api stop frontend        stop api (frontend)
-#    geostat be manage all nuke -y              nuke all (no confirm)
-#    geostat be manage api logs errors          show error.log
-#    geostat be manage all logs files           list all log files
+#    stack-kit be manage                          interactive menu
+#    stack-kit be manage api stop                 stop api (backend)
+#    stack-kit be manage api stop frontend        stop api (frontend)
+#    stack-kit be manage all nuke -y              nuke all (no confirm)
+#    stack-kit be manage api logs errors          show error.log
+#    stack-kit be manage all logs files           list all log files
 # ============================================================
 
 # shellcheck source=../_init.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_init.sh"
 # shellcheck source=../../toolkit/bash/compose-cli.sh
-source "$GEOSTAT_KIT_ROOT/toolkit/bash/compose-cli.sh"
+source "$STACK_KIT_KIT_ROOT/toolkit/bash/compose-cli.sh"
 
 # ── Parse TARGET / ENV from args ──
 MANAGE_ENV="prod"
@@ -30,10 +30,10 @@ done
 
 COMPOSE_FILE="docker-compose.${MANAGE_ENV}.yml"
 ENV_FILE=".env.${MANAGE_ENV}"
-geostat_compose_init
-COMPOSE="${GEOSTAT_COMPOSE[*]} -f $COMPOSE_FILE --env-file ./$ENV_FILE"
+stack_kit_compose_init
+COMPOSE="${STACK_KIT_COMPOSE[*]} -f $COMPOSE_FILE --env-file ./$ENV_FILE"
 
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
 deploy_path_load_config
@@ -46,9 +46,9 @@ _manage_remote_dir() {
 }
 
 # shellcheck source=../../toolkit/bash/manage-remote.sh
-source "$GEOSTAT_KIT_ROOT/toolkit/bash/manage-remote.sh"
+source "$STACK_KIT_KIT_ROOT/toolkit/bash/manage-remote.sh"
 # shellcheck source=../../toolkit/bash/manage-logs.sh
-source "$GEOSTAT_KIT_ROOT/toolkit/bash/manage-logs.sh"
+source "$STACK_KIT_KIT_ROOT/toolkit/bash/manage-logs.sh"
 
 # ── Discover services: local compose keys with deploy compose on server ──
 mapfile -t _MANAGE_COMPOSE_SVCS < <(
@@ -64,7 +64,7 @@ done
 if [ ${#SERVICES[@]} -eq 0 ]; then
     deploy_path_load_config
     echo "  ERROR: No deployed services found (checked under ${DEPLOY_PATH_BASE:-$DEPLOY_SUMMARY})."
-    echo "  Run: geostat be deploy <service> --$MANAGE_ENV"
+    echo "  Run: stack-kit be deploy <service> --$MANAGE_ENV"
     exit 1
 fi
 

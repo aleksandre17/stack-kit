@@ -28,6 +28,6 @@ fi
 ENV_ARGS=()
 while IFS= read -r f; do
   [[ -n "$f" ]] && ENV_ARGS+=(--env-file "$f")
-done < <(geostat_env_files "$OPS_SECRETS_MODULE" "$PROFILE")
+done < <(stack_kit_env_files "$OPS_SECRETS_MODULE" "$PROFILE")
 
 exec docker compose "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" "${REMAIN[@]}"

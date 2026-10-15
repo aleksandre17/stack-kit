@@ -48,7 +48,7 @@ def test_list_secrets_module_folders(repo_root: Path, manifest: dict) -> None:
 
 
 def test_default_remote_deploy_base_uses_secrets_folder(tmp_path: Path) -> None:
-    mf = tmp_path / "geostat.ops.json"
+    mf = tmp_path / "stack-kit.json"
     mf.write_text(
         '{"secrets":"ops/config","modules":{"web":{"secretsModule":"web"}}}',
         encoding="utf-8",

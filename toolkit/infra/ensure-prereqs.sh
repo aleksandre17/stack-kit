@@ -1,24 +1,24 @@
 ﻿#!/bin/bash
 # One-time server prerequisites — SSH from local machine
-# Usage: geostat infra  |  bash kits/geostat-kit/toolkit/infra/ensure-prereqs.sh
+# Usage: stack-kit infra  |  bash kits/stack-kit/toolkit/infra/ensure-prereqs.sh
 
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/../.." && pwd)"
 ROOT="$(cd "$PKG/../.." && pwd)"
-export GEOSTAT_PROJECT_ROOT="$ROOT"
+export STACK_KIT_PROJECT_ROOT="$ROOT"
 # shellcheck source=../../lib/env.sh
 source "$PKG/lib/env.sh"
 
 SERVER="${DEPLOY_SERVER:-${1:-}}"
 if [ -z "$SERVER" ]; then
-  SERVER="$(geostat_deploy_env_value DEPLOY_SERVER "")"
+  SERVER="$(stack_kit_deploy_env_value DEPLOY_SERVER "")"
 fi
 if [ -z "$SERVER" ]; then
   echo "Set DEPLOY_SERVER in ops/config/deploy.env or pass user@host"
   exit 1
 fi
 
-NETWORK="$(geostat_docker_network)"
+NETWORK="$(stack_kit_docker_network)"
 
 run_remote() {
   ssh "$SERVER" "DOCKER_NETWORK='$NETWORK' bash -s" <<'REMOTE'

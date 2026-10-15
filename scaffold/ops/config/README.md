@@ -1,4 +1,4 @@
-﻿# ops/config/ — project configuration (consumer repo, not in geostat-kit package)
+﻿# ops/config/ — project configuration (consumer repo, not in stack-kit package)
 
 All runtime values live here. Application folders (`frontend/`, `backend/`) hold code only.
 
@@ -16,8 +16,8 @@ copy backend\.env.deploy.example backend\.env.deploy
 # GCP (if needed): backend/google-credentials.json
 ```
 
-Then: `.\tools\geostat.ps1 compose-gen`
+Then: `.\tools\stack-kit.ps1 compose-gen`
 
 ## Layout
 
-See [kits/geostat-kit/scaffold/README.md](../scaffold/README.md) and [kits/geostat-kit/docs/ADOPTION-LINE.md](../docs/ADOPTION-LINE.md).
+See [kits/stack-kit/scaffold/README.md](../scaffold/README.md) and [kits/stack-kit/docs/ADOPTION-LINE.md](../docs/ADOPTION-LINE.md).

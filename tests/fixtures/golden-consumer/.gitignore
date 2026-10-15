@@ -1,5 +1,5 @@
 # Volatile bits materialised by tests/conftest.py at session start — never commit.
-# The kit self-reference (package == "kits/geostat-kit") is created as a
+# The kit self-reference (package == "kits/stack-kit") is created as a
 # junction/symlink pointing back at the real kit; committing it would recurse.
 /kits/
 

@@ -1,15 +1,15 @@
 #!/bin/bash
-# node-api SSH deploy — orchestrator (kits/geostat-kit/toolkit/deploy/)
+# node-api SSH deploy — orchestrator (kits/stack-kit/toolkit/deploy/)
 # Same lifecycle as java-boot/sh/deploy.sh; the build is pnpm (workspace) and the artifact
 # is a server-built docker image (multi-stage Dockerfile), not a gradle JAR.
 #
 # Usage:
-#   geostat <api-alias> deploy [service] [--dev|--prod] [--no-build] [--skip-checks]
+#   stack-kit <api-alias> deploy [service] [--dev|--prod] [--no-build] [--skip-checks]
 
 # shellcheck source=../_init.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_init.sh"
 
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # Generic helpers reused as-is from the toolkit (path resolution, compose-gen):
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
@@ -94,5 +94,5 @@ for s in "${SERVICES[@]}"; do
   [ "$SERVICE" != "all" ] && [ "$SERVICE" != "$s" ] && continue
   echo "  DONE $s — logs: $(remote_path_for_service "$s")/logs/"
 done
-echo "  Manage:  geostat mod $GEOSTAT_MODULE_ID manage $SERVICE status --$ENVIRONMENT"
+echo "  Manage:  stack-kit mod $STACK_KIT_MODULE_ID manage $SERVICE status --$ENVIRONMENT"
 echo ""

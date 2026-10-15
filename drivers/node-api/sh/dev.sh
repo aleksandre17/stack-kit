@@ -3,11 +3,11 @@
 # Mirror of java-boot/sh/dev.sh; the run command is pnpm (not gradle bootRun).
 #
 # Usage:
-#   geostat <api> dev bootstrap [service] [--no-build]
-#   geostat <api> dev sync [service]
-#   geostat <api> dev watch [service] [--debounce-ms 1500] [--restart]
-#   geostat <api> dev restart [service]
-#   geostat <api> dev help
+#   stack-kit <api> dev bootstrap [service] [--no-build]
+#   stack-kit <api> dev sync [service]
+#   stack-kit <api> dev watch [service] [--debounce-ms 1500] [--restart]
+#   stack-kit <api> dev restart [service]
+#   stack-kit <api> dev help
 
 # shellcheck source=../_init.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_init.sh"
@@ -35,7 +35,7 @@ for arg in "$@"; do
   esac
 done
 
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
 # Generic dev helpers (rsync, paths, compose up/restart) …
@@ -101,7 +101,7 @@ case "$SUB" in
     dev_compose_up "$SERVICE" "$build_flag" || exit 1
     echo "  [4/4] manifest"
     dev_write_workspace_manifest "$SERVICE"
-    echo "  [OK] pnpm dev on server — logs: geostat mod $GEOSTAT_MODULE_ID manage $SERVICE logs --dev"
+    echo "  [OK] pnpm dev on server — logs: stack-kit mod $STACK_KIT_MODULE_ID manage $SERVICE logs --dev"
     ;;
   sync)
     dev_rsync_to_workspace "$SERVICE" || exit 1

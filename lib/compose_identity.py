@@ -14,7 +14,7 @@ DEPLOY_IDENTITY_KEYS = (
     "COMPOSE_APP_SERVICE",
     "COMPOSE_WORKER_SERVICE",
     "DOCKER_NETWORK",
-    "GEOSTAT_DOCKER_NETWORK",
+    "STACK_KIT_DOCKER_NETWORK",
 )
 
 
@@ -62,12 +62,13 @@ def stack_compose_module_ids(manifest: dict[str, Any]) -> list[str]:
 
 
 def primary_api_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
+    """The module the stack's API is: `stack.primaryApiModule` when declared, else the first module
+    whose role is `api`. No module id is spelled here -- an id is the project's word (ADR-001)."""
     ids = module_ids if module_ids is not None else stack_compose_module_ids(manifest)
     mods = manifest.get("modules") or {}
-    if "backend" in ids and isinstance(mods.get("backend"), dict):
-        return "backend"
-    if "chat-api" in ids and isinstance(mods.get("chat-api"), dict):
-        return "chat-api"
+    declared = (manifest.get("stack") or {}).get("primaryApiModule")
+    if declared in ids and isinstance(mods.get(declared), dict):
+        return declared
     for mid in ids:
         cfg = mods.get(mid)
         if isinstance(cfg, dict) and cfg.get("role") == "api":
@@ -227,7 +228,7 @@ def build_global_fmt(
     api_svc = names["api"]
     network = (
         deploy.get("DOCKER_NETWORK")
-        or deploy.get("GEOSTAT_DOCKER_NETWORK")
+        or deploy.get("STACK_KIT_DOCKER_NETWORK")
         or f"{slug}-net"
     )
     compose_name = deploy.get("COMPOSE_PROJECT_NAME") or repo_name

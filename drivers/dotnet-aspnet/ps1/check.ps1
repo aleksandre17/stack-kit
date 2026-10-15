@@ -26,7 +26,7 @@ function Test-Warn {
 }
 
 Write-Host ""
-Write-Host "  Pre-flight ($env:GEOSTAT_MODULE_ID, dotnet-aspnet)" -ForegroundColor Cyan
+Write-Host "  Pre-flight ($env:STACK_KIT_MODULE_ID, dotnet-aspnet)" -ForegroundColor Cyan
 Write-Host ""
 
 Test-Check "dotnet SDK" { (Get-Command dotnet -ErrorAction SilentlyContinue) -ne $null }
@@ -34,7 +34,7 @@ Test-Check "module path" { Test-Path $OpsModuleRoot -PathType Container }
 
 $project = $null
 try {
-    $project = Resolve-DotnetProjectFile -ModuleId $env:GEOSTAT_MODULE_ID -ModPath $OpsModuleRoot
+    $project = Resolve-DotnetProjectFile -ModuleId $env:STACK_KIT_MODULE_ID -ModPath $OpsModuleRoot
     if (-not $Quiet) { Write-Host "  [OK]   project file ($project)" -ForegroundColor Green }
 } catch {
     Write-Host "  [FAIL] project file - $($_.Exception.Message)" -ForegroundColor Red
@@ -50,7 +50,7 @@ if (-not (Test-Path (Join-Path $SECRETS_DIR ".env.dev"))) {
     Test-Warn ".env.dev" "local run uses appsettings only (ASP.NET reads KEY__SUB=value env vars)"
 }
 
-$expect = @(Get-DotnetOption -ModuleId $env:GEOSTAT_MODULE_ID -Name "publishExpect" -Default @())
+$expect = @(Get-DotnetOption -ModuleId $env:STACK_KIT_MODULE_ID -Name "publishExpect" -Default @())
 if ($expect.Count -eq 0) {
     Test-Warn "dotnet.publishExpect" "not declared - deploy artifact checks only that publish succeeded"
 }

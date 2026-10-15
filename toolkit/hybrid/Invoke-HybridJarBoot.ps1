@@ -1,10 +1,10 @@
 # Resolves boot JAR path and runs java -jar (Windows-safe: avoids Gradle includeBuild file-lock).
-$PackageRoot = if ($env:GEOSTAT_KIT_ROOT) { $env:GEOSTAT_KIT_ROOT } else {
+$PackageRoot = if ($env:STACK_KIT_KIT_ROOT) { $env:STACK_KIT_KIT_ROOT } else {
     Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 }
 . (Join-Path $PackageRoot "lib\module-manifest.ps1")
 
-function Get-GeostatHybridBootJar {
+function Get-StackKitHybridBootJar {
     param([string]$Root, [string]$ModuleId, [string]$ModPath)
     $explicit = Get-ModuleBootJar $ModuleId
     if ($explicit) {
@@ -19,19 +19,19 @@ function Get-GeostatHybridBootJar {
     return $null
 }
 
-function Test-GeostatPreferHybridJar {
+function Test-StackKitPreferHybridJar {
     param([string]$ModuleId)
-    if ($env:GEOSTAT_HYBRID_GRADLE -eq '1') { return $false }
-    if ($env:GEOSTAT_HYBRID_JAR -eq '1') { return $true }
+    if ($env:STACK_KIT_HYBRID_GRADLE -eq '1') { return $false }
+    if ($env:STACK_KIT_HYBRID_JAR -eq '1') { return $true }
     $pref = Get-ModulePreferHybridJar $ModuleId
     if ($pref -eq 'true') { return $true }
     if ($pref -eq 'false') { return $false }
     return $IsWindows
 }
 
-function Invoke-GeostatHybridJarBoot {
+function Invoke-StackKitHybridJarBoot {
     param([string]$Root, [string]$ModuleId, [string]$ModPath)
-    $jar = Get-GeostatHybridBootJar -Root $Root -ModuleId $ModuleId -ModPath $ModPath
+    $jar = Get-StackKitHybridBootJar -Root $Root -ModuleId $ModuleId -ModPath $ModPath
     if (-not $jar -or -not (Test-Path $jar)) { return }
 
     $profiles = Get-ModuleHybridProfiles $ModuleId

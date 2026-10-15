@@ -25,7 +25,7 @@ def test_tasks_include_validate(repo_root: Path, manifest: dict) -> None:
     ctx = ProjectContext(root=repo_root, manifest=manifest)
     tasks = build_tasks_json(ctx)
     labels = [t["label"] for t in tasks["tasks"]]
-    assert "geostat: validate" in labels
+    assert "stack-kit: validate" in labels
     # Per-module check tasks are labelled by the manifest cli alias, not by any
     # consumer vocabulary: the fixture declares w -> web, a -> api.
     assert any("w check" in lb or "a check" in lb for lb in labels)
@@ -48,13 +48,13 @@ def test_write_vscode_tmp(tmp_path: Path) -> None:
                 "secretsModule": "web",
             }
         },
-        "vscode": {"folder": ".vscode", "geostatScript": "tools/geostat.ps1"},
+        "vscode": {"folder": ".vscode", "cliScript": "tools/stack-kit.ps1"},
     }
-    (tmp_path / "geostat.ops.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (tmp_path / "stack-kit.json").write_text(json.dumps(manifest), encoding="utf-8")
     (tmp_path / "apps" / "web").mkdir(parents=True)
     pkg = Path(__file__).resolve().parents[1]
     manifest["package"] = os.path.relpath(pkg, tmp_path).replace("\\", "/")
-    (tmp_path / "geostat.ops.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (tmp_path / "stack-kit.json").write_text(json.dumps(manifest), encoding="utf-8")
     ctx = ProjectContext(root=tmp_path, manifest=manifest)
     paths = write_vscode(ctx, force=True)
     assert any(p.endswith("launch.json") for p in paths)

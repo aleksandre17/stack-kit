@@ -1,7 +1,7 @@
 ﻿# Module drivers
 
 **Driver type** = stack toolchain (`java-boot`, `node-vite`, `node-api`, …).  
-**Module id** = project key in `geostat.ops.json` (`backend`, `frontend`, `bff`, …).  
+**Module id** = project key in `stack-kit.json` (`backend`, `frontend`, `bff`, …).  
 **Role** (`api`, `ui`, `worker`) is documented in the registry only — the manifest always sets `type` explicitly.
 
 ```
@@ -15,9 +15,9 @@ drivers/
 
 ## Rules (architecture does not break when you add stacks)
 
-1. **Never** infer driver type from folder name `backend` / `frontend`. Only `modules.<id>.type` in `geostat.ops.json`.
+1. **Never** infer driver type from folder name `backend` / `frontend`. Only `modules.<id>.type` in `stack-kit.json`.
 2. **Multiple APIs** are fine: e.g. `backend` → `java-boot`, `gateway` → `node-api` — different module ids, different types.
-3. **CLI**: `geostat mod <moduleId> <command> …` always works; `fe` / `be` are optional aliases via `cli.aliases`.
+3. **CLI**: `stack-kit mod <moduleId> <command> …` always works; `fe` / `be` are optional aliases via `cli.aliases`.
 4. **Commands** allowed per module = keys in `registry.json` → `commands` for that type (no hardcoded `modules` only on backend).
 5. **Full-stack remote deploy** = `stackDeploy.steps` in manifest (not hardcoded be/fe in scripts).
 
@@ -50,11 +50,11 @@ drivers/
 ```
 
 5. Adjust `stackDeploy.steps` if this module replaces Java in remote deploy.
-6. `.\tools\geostat.ps1 help` — lists types and per-module capabilities.
+6. `.\tools\stack-kit.ps1 help` — lists types and per-module capabilities.
 
 ## Switch backend Java → Node (example)
 
-Only manifest + driver folder change; `geostat be` still targets `modules.backend` via `cli.aliases.be`.
+Only manifest + driver folder change; `stack-kit be` still targets `modules.backend` via `cli.aliases.be`.
 
 | Before | After |
 |--------|--------|
@@ -67,6 +67,6 @@ Frontend stays `node-vite`; catalog / compose may need catalog entries for the n
 
 - PowerShell: `lib/drivers.ps1`
 - Bash: `lib/drivers.sh` → `lib/driver_api.py`
-- List types: `python3 kits/geostat-kit/lib/driver_api.py list-types`
+- List types: `python3 kits/stack-kit/lib/driver_api.py list-types`
 
 See [docs/adr/007-module-drivers.md](../../../docs/adr/007-module-drivers.md).

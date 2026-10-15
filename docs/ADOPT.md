@@ -1,4 +1,4 @@
-﻿# Adopting geostat-kit
+﻿# Adopting stack-kit
 
 სრული ნაბიჯ-ნაბიჯ გზამკვლევი (ფაილები, secrets, frontend/backend, CI, ახალი driver):
 
@@ -7,7 +7,7 @@
  შემოწმება:
 
 ```powershell
-copy kits\geostat-kit\scaffold\geostat.ops.json geostat.ops.json
-.\tools\geostat.ps1 compose-gen
-.\tools\geostat.ps1 help
+copy kits\stack-kit\scaffold\stack-kit.json stack-kit.json
+.\tools\stack-kit.ps1 compose-gen
+.\tools\stack-kit.ps1 help
 ```

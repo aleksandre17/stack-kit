@@ -9,7 +9,7 @@ $ROOT = $OpsModuleRoot
 . (Join-Path $PSScriptRoot "..\..\lib\project.ps1")
 $LibEnv = Join-Path (Get-OpsPackageRoot) "lib\env.ps1"
 if (-not (Test-Path $LibEnv)) {
-    throw "geostat-kit package lib/env.ps1 not found. Check geostat.ops.json package path."
+    throw "stack-kit package lib/env.ps1 not found. Check stack-kit.json package path."
 }
 . $LibEnv
 $SshLib = Join-Path (Get-OpsPackageRoot) "lib\ssh.ps1"
@@ -213,7 +213,7 @@ function LogDone {
 
 function Invoke-SSH {
     param([string]$Script)
-    $sshExtra = @(Get-GeostatSshExtraArgs)
+    $sshExtra = @(Get-StackKitSshExtraArgs)
     ($Script -replace "`r", "") | & ssh @sshExtra $SERVER bash 2>&1 | ForEach-Object {
         if ($LOG_FILE) { Add-Content -Path $LOG_FILE -Value "[ssh] $_" -Encoding UTF8 }
         Write-Host "[ssh] $_" -ForegroundColor DarkGray
@@ -223,13 +223,13 @@ function Invoke-SSH {
 
 function Invoke-SSHCapture {
     param([string]$Script)
-    $sshExtra = @(Get-GeostatSshExtraArgs)
+    $sshExtra = @(Get-StackKitSshExtraArgs)
     ($Script -replace "`r", "") | & ssh @sshExtra $SERVER bash 2>&1
 }
 
 function Invoke-SCP {
     param([string]$Source, [string]$Dest, [switch]$Recurse)
-    $sshExtra = @(Get-GeostatSshExtraArgs)
+    $sshExtra = @(Get-StackKitSshExtraArgs)
     $scpArgs = @($sshExtra)
     if ($Recurse) { $scpArgs += "-r" }
     $scpArgs += $Source, "${SERVER}:${Dest}"

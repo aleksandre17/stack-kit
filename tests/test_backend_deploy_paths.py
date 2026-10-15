@@ -69,7 +69,7 @@ def test_multi_module_paths(container: str):
 
 
 class TestDeployPathBaseInherit:
-    BACKEND_BASE = "/home/administrator/geostat/backend"
+    BACKEND_BASE = "/home/administrator/stack-kit/backend"
 
     def test_worker_inherits_backend_base(self):
         assert (
@@ -114,6 +114,6 @@ class TestDeployPathSummary:
         s = deploy_path_summary(
             base=None,
             server_base="/home/administrator",
-            project="geostat",
+            project="app",
         )
         assert "backend/runtime/<container>/" in s

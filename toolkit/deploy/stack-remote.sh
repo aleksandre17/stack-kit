@@ -1,17 +1,17 @@
 #!/bin/bash
-# Full-stack remote deploy — steps from geostat.ops.json stackDeploy (or defaults)
-# Usage: geostat stack-deploy [--dev|--prod] [--no-build] [--skip-checks]
+# Full-stack remote deploy — steps from stack-kit.json stackDeploy (or defaults)
+# Usage: stack-kit stack-deploy [--dev|--prod] [--no-build] [--skip-checks]
 
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/../.." && pwd)"
 ROOT="$(cd "$PKG/../.." && pwd)"
-export GEOSTAT_KIT_ROOT="$PKG"
+export STACK_KIT_KIT_ROOT="$PKG"
 
 # shellcheck source=../../lib/project.sh
 source "$PKG/lib/project.sh"
 
-GEOSTAT_PROJECT_ROOT="$(geostat_find_project_root "$ROOT" 2>/dev/null || echo "$ROOT")"
-export GEOSTAT_PROJECT_ROOT
+STACK_KIT_PROJECT_ROOT="$(stack_kit_find_project_root "$ROOT" 2>/dev/null || echo "$ROOT")"
+export STACK_KIT_PROJECT_ROOT
 
 ENV_FLAG="--prod"
 EXTRA=()
@@ -32,7 +32,7 @@ echo ""
 
 step=0
 
-mapfile -t LINES < <(geostat_python "$PKG/lib/driver_api.py" stack-steps $([[ "$ENV_FLAG" == "--dev" ]] && echo --dev))
+mapfile -t LINES < <(stack_kit_python "$PKG/lib/driver_api.py" stack-steps $([[ "$ENV_FLAG" == "--dev" ]] && echo --dev))
 total="${#LINES[@]}"
 
 for line in "${LINES[@]}"; do
@@ -45,7 +45,7 @@ for line in "${LINES[@]}"; do
     # shellcheck disable=SC2206
     args=($args_rest)
   fi
-  mod_type="$(PYTHONPATH="${PKG}" geostat_python "$PKG/lib/driver_api.py" type "$module_id" 2>/dev/null || true)"
+  mod_type="$(PYTHONPATH="${PKG}" stack_kit_python "$PKG/lib/driver_api.py" type "$module_id" 2>/dev/null || true)"
   if [[ "$subcmd" == "deploy" ]]; then
     if [[ "$mod_type" == "java-boot" ]]; then
       args+=("$ENV_FLAG")
@@ -56,7 +56,7 @@ for line in "${LINES[@]}"; do
   echo ""
   # shellcheck disable=SC2086
   powershell.exe -ExecutionPolicy Bypass -NoProfile -File \
-    "$ROOT/tools/geostat.ps1" mod "$module_id" "$subcmd" "${args[@]}"
+    "$ROOT/tools/stack-kit.ps1" mod "$module_id" "$subcmd" "${args[@]}"
   echo ""
 done
 

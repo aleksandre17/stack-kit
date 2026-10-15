@@ -1,4 +1,4 @@
-# geostat-kit package — env & naming (no application logic)
+# stack-kit package — env & naming (no application logic)
 
 . (Join-Path $PSScriptRoot "project.ps1")
 
@@ -10,15 +10,15 @@ function Get-Slugify {
 
 function Get-MonorepoRoot {
     if ($env:OPS_MONOREPO_ROOT) { return $env:OPS_MONOREPO_ROOT }
-    if ($env:GEOSTAT_MONOREPO_ROOT) { return $env:GEOSTAT_MONOREPO_ROOT }
-    if ($env:GEOSTAT_PROJECT_ROOT) { return $env:GEOSTAT_PROJECT_ROOT }
+    if ($env:STACK_KIT_MONOREPO_ROOT) { return $env:STACK_KIT_MONOREPO_ROOT }
+    if ($env:STACK_KIT_PROJECT_ROOT) { return $env:STACK_KIT_PROJECT_ROOT }
     $root = Get-ProjectRootFromManifest
     if ($root) { return $root }
     $dir = $PSScriptRoot
     if (-not $dir) { $dir = Split-Path -Parent $MyInvocation.MyCommand.Path }
     while ($dir) {
         if (Get-ManifestInDirectory $dir) { return $dir }
-        if ($env:GEOSTAT_LEGACY_ROOT_DISCOVERY -match '^(1|true|yes|on)$') {
+        if ($env:STACK_KIT_LEGACY_ROOT_DISCOVERY -match '^(1|true|yes|on)$') {
             if (Test-Path (Join-Path $dir "secrets")) { return $dir }
             if (Test-Path (Join-Path $dir "ops/config")) { return $dir }
         }
@@ -26,7 +26,7 @@ function Get-MonorepoRoot {
         if ($parent -eq $dir) { break }
         $dir = $parent
     }
-    throw "Project root not found ($((Get-KitIdentity).manifestFilename) required; GEOSTAT_LEGACY_ROOT_DISCOVERY=1 for old trees)"
+    throw "Project root not found ($((Get-KitIdentity).manifestFilename) required; STACK_KIT_LEGACY_ROOT_DISCOVERY=1 for old trees)"
 }
 
 function Get-SecretsRoot {
@@ -126,7 +126,7 @@ function Get-ComposeSlug {
 
 function Get-DockerNetworkName {
     $net = Get-DeployEnvValue "DOCKER_NETWORK"
-    if (-not $net) { $net = Get-DeployEnvValue "GEOSTAT_DOCKER_NETWORK" }
+    if (-not $net) { $net = Get-DeployEnvValue "STACK_KIT_DOCKER_NETWORK" }
     if (-not $net) { $net = "$(Get-ComposeSlug)-net" }
     $net
 }
@@ -171,7 +171,7 @@ function Resolve-InfraDeployPath {
     if ($serverBase -and $globalRoot) {
         return "$serverBase/$(Get-Slugify $globalRoot)/infra/$slug"
     }
-    return "/home/administrator/geostat/infra/$slug"
+    return "/home/administrator/stack-kit/infra/$slug"
 }
 
 function Get-StackComposeEnvFileArgs {

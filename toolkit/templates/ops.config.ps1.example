@@ -2,7 +2,7 @@
 $OpsSecretsModule = "frontend"
 $OpsComposeFile     = "docker-compose.yml"
 
-# --- Remote dev (geostat <module> dev bootstrap|sync|watch) ---
+# --- Remote dev (stack-kit <module> dev bootstrap|sync|watch) ---
 # Stack-agnostic: Vite, Angular CLI, Nx — requires compose dev + volume in override.
 # $OpsDevSyncExcludes     = @(".nx", "storybook-static")
 # $OpsDevWatchPaths       = @("src", "angular.json", "projects")

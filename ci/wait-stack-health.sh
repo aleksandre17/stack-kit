@@ -2,10 +2,10 @@
 # Wait for all stack health targets (manifest stack.composeModules + stack-catalog)
 set -euo pipefail
 
-ROOT="${GEOSTAT_PROJECT_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
-PKG="${GEOSTAT_KIT_ROOT:-$ROOT/kits/geostat-kit}"
-export GEOSTAT_PROJECT_ROOT="$ROOT"
-export GEOSTAT_KIT_ROOT="$PKG"
+ROOT="${STACK_KIT_PROJECT_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
+PKG="${STACK_KIT_KIT_ROOT:-$ROOT/kits/stack-kit}"
+export STACK_KIT_PROJECT_ROOT="$ROOT"
+export STACK_KIT_KIT_ROOT="$PKG"
 
 MAX="${CI_HEALTH_TIMEOUT:-180}"
 WAIT="${1:-$PKG/ci/wait-health.sh}"

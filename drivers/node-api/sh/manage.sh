@@ -7,16 +7,16 @@
 #  as java-boot/sh/manage.sh (no JVM/JAR specifics; the image is built server-side).
 #
 #  Usage:
-#    geostat <api> manage                      interactive menu
-#    geostat <api> manage <svc> status --prod
-#    geostat <api> manage <svc> logs --dev
-#    geostat <api> manage all restart --prod
+#    stack-kit <api> manage                      interactive menu
+#    stack-kit <api> manage <svc> status --prod
+#    stack-kit <api> manage <svc> logs --dev
+#    stack-kit <api> manage all restart --prod
 # ============================================================
 
 # shellcheck source=../_init.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_init.sh"
 # shellcheck source=../../toolkit/bash/compose-cli.sh
-source "$GEOSTAT_KIT_ROOT/toolkit/bash/compose-cli.sh"
+source "$STACK_KIT_KIT_ROOT/toolkit/bash/compose-cli.sh"
 
 MANAGE_ENV="prod"
 for arg in "$@"; do
@@ -28,17 +28,17 @@ done
 
 COMPOSE_FILE="docker-compose.${MANAGE_ENV}.yml"
 ENV_FILE=".env.${MANAGE_ENV}"
-geostat_compose_init
-COMPOSE="${GEOSTAT_COMPOSE[*]} -f $COMPOSE_FILE --env-file ./$ENV_FILE"
+stack_kit_compose_init
+COMPOSE="${STACK_KIT_COMPOSE[*]} -f $COMPOSE_FILE --env-file ./$ENV_FILE"
 
-DEPLOY_LIB="$(geostat_kit_deploy_lib)"
+DEPLOY_LIB="$(stack_kit_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
 deploy_path_load_config
 DEPLOY_SUMMARY="$(deploy_path_summary)"
 
 # shellcheck source=../../toolkit/bash/manage-remote.sh
-source "$GEOSTAT_KIT_ROOT/toolkit/bash/manage-remote.sh"
+source "$STACK_KIT_KIT_ROOT/toolkit/bash/manage-remote.sh"
 
 # ── Discover deployed services (compose keys that have a deploy compose on server) ──
 mapfile -t _SVCS < <(
@@ -53,7 +53,7 @@ for _ms in "${_SVCS[@]}"; do
 done
 if [ ${#SERVICES[@]} -eq 0 ]; then
   echo "  ERROR: No deployed services found (checked under ${DEPLOY_PATH_BASE:-$DEPLOY_SUMMARY})."
-  echo "  Run: geostat mod $GEOSTAT_MODULE_ID deploy <service> --$MANAGE_ENV"
+  echo "  Run: stack-kit mod $STACK_KIT_MODULE_ID deploy <service> --$MANAGE_ENV"
   exit 1
 fi
 

@@ -44,7 +44,7 @@ upload_service() {
       scp "$f" "$SERVER:$rp/$(basename "$cred_file")" 2>/dev/null
       echo "  [cred] $(basename "$cred_file") (manifest)"
     fi
-  done < <(geostat_module_credentials_lines "$s")
+  done < <(stack_kit_module_credentials_lines "$s")
 
   for pattern in $CRED_PATTERNS; do
     for f in "$cred_base/"$pattern; do

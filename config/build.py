@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI entry for geostat config-gen."""
+"""CLI entry for stack-kit config-gen."""
 from __future__ import annotations
 
 import sys

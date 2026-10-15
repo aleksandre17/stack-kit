@@ -1,13 +1,13 @@
-﻿# geostat-kit architecture
+﻿# stack-kit architecture
 
 ## Boundaries
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│  kits/geostat-kit  (this package — copy/submodule)      │
+│  kits/stack-kit  (this package — copy/submodule)      │
 │  lib · compose · toolkit · adapters · contracts · ci    │
 └───────────────────────────┬─────────────────────────────┘
-                            │ geostat.ops.json
+                            │ stack-kit.json
 ┌───────────────────────────▼─────────────────────────────┐
 │  Consumer project (your-app, …)                         │
 │  ops/config/ · ops/compose/catalog.json · apps/*        │
@@ -30,16 +30,16 @@
 
 | Consumer calls | Package path |
 |----------------|--------------|
-| `geostat compose-gen` | `compose/build.py` |
-| `geostat nginx-gen` | `adapters/render_nginx.py` |
-| `geostat stack` | `toolkit/stack/compose.ps1` |
-| `geostat infra` | `toolkit/infra/Invoke-Infra.ps1` (+ `ensure-prereqs.sh` when no subcommand) |
-| `geostat init` | `toolkit/init/` → `lib/ci_prepare.py` |
+| `stack-kit compose-gen` | `compose/build.py` |
+| `stack-kit nginx-gen` | `adapters/render_nginx.py` |
+| `stack-kit stack` | `toolkit/stack/compose.ps1` |
+| `stack-kit infra` | `toolkit/infra/Invoke-Infra.ps1` (+ `ensure-prereqs.sh` when no subcommand) |
+| `stack-kit init` | `toolkit/init/` → `lib/ci_prepare.py` |
 | `be deploy` / `fe deploy` | `toolkit/deploy/` via drivers |
 
 ## Manifest
 
-`geostat.ops.json` at project root — see [manifest.schema.json](manifest.schema.json) and [docs/PACKAGE-ARCHITECTURE.md](docs/PACKAGE-ARCHITECTURE.md).
+`stack-kit.json` at project root — see [manifest.schema.json](manifest.schema.json) and [docs/PACKAGE-ARCHITECTURE.md](docs/PACKAGE-ARCHITECTURE.md).
 
 Resolution API: `lib/project_context.py` (Python), `lib/project.sh` + `lib/env.sh` (Bash), `lib/project.ps1` + `lib/env.ps1` (PowerShell).
 

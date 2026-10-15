@@ -1,7 +1,7 @@
 {
-  "$schema": "./kits/geostat-kit/manifest.schema.json",
+  "$schema": "./kits/stack-kit/manifest.schema.json",
   "version": 2,
-  "package": "kits/geostat-kit",
+  "package": "kits/stack-kit",
   "secrets": "ops/config",
   "features": {
     "gcpCredentials": false
@@ -57,12 +57,12 @@
   },
   "ci": {
     "integration": "ops/ci/integration-stack.sh",
-    "prepareEnv": "kits/geostat-kit/ci/prepare-integration-env.sh",
-    "waitHealth": "kits/geostat-kit/ci/wait-health.sh",
-    "waitStackHealth": "kits/geostat-kit/ci/wait-stack-health.sh"
+    "prepareEnv": "kits/stack-kit/ci/prepare-integration-env.sh",
+    "waitHealth": "kits/stack-kit/ci/wait-health.sh",
+    "waitStackHealth": "kits/stack-kit/ci/wait-stack-health.sh"
   },
   "vscode": {
     "folder": ".vscode",
-    "geostatScript": "tools/geostat.ps1"
+    "cliScript": "tools/stack-kit.ps1"
   }
 }

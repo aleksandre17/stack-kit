@@ -32,7 +32,7 @@ if ($driverArgs -contains "help" -or $driverArgs -contains "-h" -or $driverArgs 
 }
 
 . "$PSScriptRoot\_common.ps1"
-$GetComposeServices = Join-Path $env:GEOSTAT_KIT_ROOT "toolkit\powershell\Get-ComposeServices.ps1"
+$GetComposeServices = Join-Path $env:STACK_KIT_KIT_ROOT "toolkit\powershell\Get-ComposeServices.ps1"
 . $GetComposeServices
 
 $validSubs = @("bootstrap", "sync", "watch", "restart")
@@ -49,8 +49,8 @@ if ($SubCommand -eq "help") {
     Write-Host "    <alias> deploy watch  ->  npm build + dist/ + nginx (static prod-like)" -ForegroundColor Gray
     Write-Host "    <alias> dev watch     ->  rsync src only + Vite in container" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  Example: geostat <alias> dev bootstrap -Environment dev" -ForegroundColor Gray
-    Write-Host "           geostat <alias> dev watch" -ForegroundColor Gray
+    Write-Host "  Example: stack-kit <alias> dev bootstrap -Environment dev" -ForegroundColor Gray
+    Write-Host "           stack-kit <alias> dev watch" -ForegroundColor Gray
     Write-Host ""
     exit 0
 }
@@ -168,7 +168,7 @@ switch ($SubCommand) {
             $w.NotifyFilter = [IO.NotifyFilters]'FileName, LastWrite, DirectoryName'
             $w.EnableRaisingEvents = $true
             foreach ($evt in @("Changed", "Created", "Deleted", "Renamed")) {
-                Register-ObjectEvent -InputObject $w -EventName $evt -SourceIdentifier "geostat-dev-$($Collect.Count)-$evt" -Action {
+                Register-ObjectEvent -InputObject $w -EventName $evt -SourceIdentifier "stack-kit-dev-$($Collect.Count)-$evt" -Action {
                     $p = $Event.SourceEventArgs.FullPath
                     if ($p -match '[\\/](node_modules|dist|build|\.git|\.angular|coverage)([\\/]|$)') { return }
                     $global:devWatchLastChange = Get-Date
@@ -186,7 +186,7 @@ switch ($SubCommand) {
 
         Write-Host ""
         Write-Host "  dev watch [source rsync]: debounce ${DebounceMs}ms. Ctrl+C to stop." -ForegroundColor Cyan
-        Write-Host "  (For static dist loop use: geostat <alias> deploy watch)" -ForegroundColor DarkGray
+        Write-Host "  (For static dist loop use: stack-kit <alias> deploy watch)" -ForegroundColor DarkGray
         Write-Host "  Run dev bootstrap once if container is not up." -ForegroundColor Gray
         Write-Host ""
 
@@ -200,7 +200,7 @@ switch ($SubCommand) {
                 Invoke-DevWatchSync
             }
         } finally {
-            Get-EventSubscriber | Where-Object { $_.SourceIdentifier -like 'geostat-dev-*' } |
+            Get-EventSubscriber | Where-Object { $_.SourceIdentifier -like 'stack-kit-dev-*' } |
                 ForEach-Object { Unregister-Event -SubscriptionId $_.SubscriptionId -ErrorAction SilentlyContinue }
             foreach ($w in $watchers) {
                 $w.EnableRaisingEvents = $false
