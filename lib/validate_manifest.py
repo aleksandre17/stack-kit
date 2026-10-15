@@ -190,6 +190,12 @@ def validate_manifest(
     from lib.migrations_gate import check as migrations_carry_data
 
     errs.extend(f"migrations: {f}" for f in migrations_carry_data(ctx.root, ctx.manifest))
+    # Configuration carries its sensitivity; a committed secret is refused (ADR-001 decision 5).
+    from lib.config_keys import check as config_keys
+
+    keys = config_keys(ctx.root, ctx.manifest)
+    errs.extend(f"config: {f}" for f in keys.failures)
+    warnings.extend(f"config: {k}" for k in keys.known)
     # A declared pipeline must be a proof before it is ever run (ADR-001 decision 4).
     stages = (ctx.manifest.get("validate") or {}).get("stages")
     if stages is not None:

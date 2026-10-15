@@ -107,6 +107,8 @@ class ModuleConfigSpec:
     rabbitmq: bool = False
     events_enabled_env: str = ""
     env_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: YAML the MODULE declares for every env profile (its own integrations, loggers); the kit adds none.
+    profile_yml: str = ""
 
 
 def _resolve_port(ctx: ProjectContext, module_id: str, cfg: dict[str, Any]) -> tuple[str, str]:
@@ -208,7 +210,14 @@ def _env_profiles_module_spec(ctx: ProjectContext, module_id: str, cfg: dict[str
         default_profile=default_profile,
         management_endpoints=_management_endpoints(spring_cfg),
         env_profiles=enriched,
+        profile_yml=_profile_yml(cfg),
     )
+
+
+def _profile_yml(cfg: dict[str, Any]) -> str:
+    gen = cfg.get("configGen") if isinstance(cfg.get("configGen"), dict) else {}
+    text = str(gen.get("profileYml") or "")
+    return text if not text or text.endswith("\n") else text + "\n"
 
 
 def _module_spec(ctx: ProjectContext, module_id: str) -> ModuleConfigSpec | None:
@@ -254,10 +263,11 @@ def _render_env_profile_file(
     profile_name: str,
     profile_cfg: dict[str, Any],
     tpl: dict[str, Any],
+    profile_yml: str = "",
 ) -> str:
     fmt = {
         "env_import": profile_cfg["envImport"],
-        "secrets_block": tpl["envProfileSecretsBlock"].format(),
+        "profile_block": profile_yml,
     }
     if profile_cfg.get("devtools"):
         return tpl["envProfileDevYml"].format(**fmt)
@@ -300,7 +310,7 @@ def render_module_files(
             if not profile_cfg:
                 continue
             file_name = f"application-{profile_name}.yml"
-            out[file_name] = header + _render_env_profile_file(profile_name, profile_cfg, tpl)
+            out[file_name] = header + _render_env_profile_file(profile_name, profile_cfg, tpl, spec.profile_yml)
         return out
 
     out["application.yml"] = header + tpl["applicationYml"].format(**fmt)

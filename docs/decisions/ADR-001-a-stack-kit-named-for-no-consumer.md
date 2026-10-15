@@ -207,3 +207,27 @@ the agent kit's row shape over disjoint places; `tests/acceptance/test_layout_fl
 `stack.deployBaseSecretsModule` to a literal module id; `manifest.schema.json` still carries
 consumer-shaped fields (`ci.rag*`, `modules.*.catalog`, `modules.*.derivation`), each to be
 generalized or removed with a deprecation read.
+
+## Amendment 4 — K5 as built (2026-10-15, owner-delegated)
+
+**Landed.** The key catalogue's shape is the kit's (`config/config-keys.schema.json`) and the host's
+catalogue is named by the manifest (`config.keys`); `lib/config_keys.py` holds it in `validate`.
+Proof: `tests/unit/test_config_keys.py`, where a SECRET committed in JSON, YAML or an env line is
+refused and no verdict carries the value. On the second host, before any change there, the gate
+named exactly the exposures that host had already registered by hand (its AIR-001), and nothing else.
+
+**Decided while building, with what was rejected:**
+
+1. **The catalogue is the host's file, its shape the kit's.** The second host had already invented
+   one (key, sensitivity, owner, allowed source); the kit adopted that shape and added `rotation`.
+   *Rejected:* growing `config/config-catalog.json`, which holds Spring templates, not keys.
+2. **A known exposure is printed, not failed.** *Rejected:* failing until removal. Rotation is an
+   operator's act outside the repository, so the gate would stay red on work no commit can do, and
+   a gate that is always red is a gate nobody reads. Silence was rejected too: an exposure is named
+   on every run until the work it cites removes it.
+3. **References are not values.** `${NAME}` and `${NAME:default}` point at the environment.
+   *Rejected:* flagging a reference's default, which is a development fallback the generators write
+   on purpose. A secret's default is refused where it is declared, in the catalogue.
+4. **The generated profiles carry no integration.** The block one consumer needed moved to that
+   module's declaration (`configGen.profileYml`); the reference consumer declares it, and its golden
+   output changed only by the consumer's AI and package loggers leaving the kit's template.

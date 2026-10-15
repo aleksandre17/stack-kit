@@ -13,8 +13,3 @@ spring:
       project-id: ${GCP_PROJECT_ID:}
       credentials:
         location: ${GCP_CREDENTIALS:classpath:service-account-key.json}
-
-logging:
-  level:
-    org.springframework.ai: DEBUG
-    org.springframework.ai.chat.client: DEBUG

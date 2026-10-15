@@ -54,7 +54,8 @@
       "secretsModule": "api",
       "target": "api",
       "configGen": {
-        "mode": "env-profiles"
+        "mode": "env-profiles",
+        "profileYml": "  ai:\n    google:\n      genai:\n        api-key: ${GEMINI_API_KEY}\n    elevenlabs:\n      api-key: ${ELEVENLABS_API_KEY:}\n  cloud:\n    gcp:\n      project-id: ${GCP_PROJECT_ID:}\n      credentials:\n        location: ${GCP_CREDENTIALS:classpath:service-account-key.json}\n"
       },
       "spring": {
         "portEnv": "API_PORT",

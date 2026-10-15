@@ -13,14 +13,10 @@ spring:
       project-id: ${GCP_PROJECT_ID:}
       credentials:
         location: ${GCP_CREDENTIALS:classpath:service-account-key.json}
-
 logging:
   file:
     path: /app/logs
   level:
-    org.springframework.ai: WARN
-    org.springframework.ai.chat.client: WARN
     root: WARN
-    com.stack-kit.chat: INFO
     org.springframework: WARN
     org.hibernate: WARN

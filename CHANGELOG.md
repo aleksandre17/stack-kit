@@ -2,6 +2,23 @@
 
 ## 1.2.0-dev — unreleased
 
+### Configuration carries its sensitivity (ADR-001 K5)
+
+- A host names its key catalogue in the manifest (`config.keys`). The kit owns its shape
+  (`config/config-keys.schema.json`): per key `sensitivity` (SECRET, INTERNAL, PUBLIC), `owner`,
+  `allowedSource`, `rotation` (required for SECRET), an optional non-secret `default`, extra
+  `env` spellings; `knownExposures`; `orphans`.
+- `validate` refuses a SECRET given a real value in any tracked env file, JSON or YAML: the key's
+  path, or its environment spellings (`A:B` → `A__B`, `a.b` → `A_B`). A placeholder
+  (`__NAME__`), an empty value or a `${...}` reference is not a value. A SECRET with a `default`
+  or without a `rotation` is refused. A finding names file, place and key, never the value.
+- An exposure already known is listed under `knownExposures` with the work that removes it. It
+  is then printed on every validate instead of failing. Rotate first: the value is already in
+  history.
+- java-boot env-profile generation adds no integration of its own. The model, speech and cloud
+  keys and the AI and `com.<consumer>.chat` loggers it rendered into every env-profiles module
+  were one consumer's. A module declares its own block in `modules.<id>.configGen.profileYml`.
+
 ### Validation is a proof (ADR-001 K4)
 
 - **The manifest schema is enforced on every machine.** `validate` used to hand

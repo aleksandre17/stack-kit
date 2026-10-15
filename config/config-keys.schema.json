@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "stack-kit configuration key catalogue",
+  "description": "Every configuration key a host's code reads, with what it is worth to an attacker and where its value may come from (ADR-001 decision 5). The host owns the file (manifest `config.keys`); the kit owns this shape and the gate that holds it (lib/config_keys.py).",
+  "type": "object",
+  "required": ["version", "keys"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "sensitivity", "owner", "allowedSource"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1, "description": "The key as the code reads it (`Section:Name`, `spring.a.b`, or an environment variable)" },
+          "env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "The environment variable names that set it, when they are not the key's own spellings (`A:B` -> `A__B`, `a.b` -> `A_B`)" },
+          "type": { "type": "string" },
+          "sensitivity": { "type": "string", "enum": ["SECRET", "INTERNAL", "PUBLIC"], "description": "SECRET: a credential; never committed with a real value. INTERNAL: not a credential, not for the public. PUBLIC: may be shown to anyone." },
+          "owner": { "type": "string", "minLength": 1 },
+          "allowedSource": { "type": "string", "minLength": 1, "description": "Where the value may come from at runtime" },
+          "rotation": { "type": "string", "minLength": 1, "description": "When and how the value is replaced; required for SECRET" },
+          "default": { "description": "The value used when no source sets it -- for a non-secret key only; a SECRET with a default is a committed secret" },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "knownExposures": {
+      "type": "array",
+      "description": "A SECRET already committed and tracked to its removal: printed on every validate, not failed, until the work it names removes it. Rotation comes before removal: the value is already in history.",
+      "items": {
+        "type": "object",
+        "required": ["key", "file", "tracking"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "file": { "type": "string", "minLength": 1 },
+          "tracking": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "orphans": {
+      "type": "array",
+      "description": "Keys found in configuration that no code reads, each with the file it is in",
+      "items": { "type": "object" }
+    }
+  },
+  "additionalProperties": true
+}

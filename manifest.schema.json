@@ -340,6 +340,10 @@
               "mode": {
                 "type": "string",
                 "enum": ["simple", "postgres-profiles", "env-profiles"]
+              },
+              "profileYml": {
+                "type": "string",
+                "description": "env-profiles only: YAML this module adds to every generated profile (its own integrations and loggers); the kit adds none"
               }
             },
             "additionalProperties": false
@@ -507,6 +511,14 @@
         }
       },
       "additionalProperties": true
+    },
+    "config": {
+      "type": "object",
+      "description": "Configuration carries its sensitivity (ADR-001 decision 5)",
+      "properties": {
+        "keys": { "type": "string", "minLength": 1, "description": "Project-relative path of the key catalogue (shape: config/config-keys.schema.json); validate refuses a SECRET with a committed value" }
+      },
+      "additionalProperties": false
     },
     "validate": {
       "type": "object",
