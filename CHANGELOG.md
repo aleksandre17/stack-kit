@@ -2,6 +2,15 @@
 
 ## 1.2.0-dev — unreleased
 
+### A project may declare its own drivers (ADR-001 K7b)
+
+- `drivers.registry` in the manifest names a project registry in the kit's shape. Its drivers
+  live beside it (`<registry dir>/<id>/`) and are composed with the kit's by `lib/modules.py`,
+  the one home of the composition. The resolver, driver dispatch, validate and every runtime
+  see them.
+- An id the kit already has is refused (`drivers: ... are the kit's`), never shadowed. The
+  declared registry file is a layout-floor row.
+
 ### Configuration carries its sensitivity (ADR-001 K5)
 
 - A host names its key catalogue in the manifest (`config.keys`). The kit owns its shape

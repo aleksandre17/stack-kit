@@ -9,15 +9,76 @@ from typing import Any
 MODULE_ROLES = frozenset({"ui", "api", "worker", "gateway", "data", "other"})
 
 
-@lru_cache(maxsize=1)
-def driver_registry() -> dict[str, Any]:
-    """The declared driver registry — the ONE home of what a driver is and can do."""
-    path = Path(__file__).resolve().parent.parent / "drivers" / "registry.json"
+KIT_DRIVERS = Path(__file__).resolve().parent.parent / "drivers"
+
+
+class DriverCollision(ValueError):
+    """A project registry declares a driver id the kit already has: two homes for one name."""
+
+
+def _read_registry(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    return data if isinstance(data, dict) else {}
+    return {k: v for k, v in data.items() if isinstance(v, dict)} if isinstance(data, dict) else {}
+
+
+def project_registry_path(root: Path, manifest: dict[str, Any]) -> Path | None:
+    """The project's own driver registry, when its manifest declares one (`drivers.registry`)."""
+    rel = (manifest.get("drivers") or {}).get("registry") if isinstance(manifest.get("drivers"), dict) else None
+    return root / str(rel) if rel else None
+
+
+def compose_registry(root: Path | None, manifest: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Path]]:
+    """(registry, home of each driver): the kit's drivers, then the project's (ADR-001 decision 7).
+
+    A project driver lives beside its registry, `<registry dir>/<id>/`, exactly as a kit driver
+    lives under the kit's `drivers/<id>/`. An id the kit already has is refused, never shadowed:
+    a host that wants its own flavour of a kit driver gives it its own name.
+    """
+    registry = _read_registry(KIT_DRIVERS / "registry.json")
+    homes = {typ: KIT_DRIVERS / typ for typ in registry}
+    path = project_registry_path(root, manifest or {}) if root is not None else None
+    if path is not None:
+        own = _read_registry(path)
+        clash = sorted(set(own) & set(registry))
+        if clash:
+            raise DriverCollision(f"{path}: driver id(s) {', '.join(clash)} are the kit's -- name the project's "
+                                  "driver differently")
+        registry.update(own)
+        homes.update({typ: path.parent / typ for typ in own})
+    return registry, homes
+
+
+@lru_cache(maxsize=8)
+def _composed_for(root_key: str) -> tuple[dict[str, Any], dict[str, Path]]:
+    if not root_key:
+        return compose_registry(None, None)
+    from lib.project_context import load_manifest
+
+    root = Path(root_key)
+    return compose_registry(root, load_manifest(root))
+
+
+def _current_root() -> str:
+    try:
+        from lib.project_context import find_project_root
+
+        return str(find_project_root())
+    except FileNotFoundError:
+        return ""
+
+
+def driver_registry() -> dict[str, Any]:
+    """The declared driver registry — the ONE home of what a driver is and can do: the kit's,
+    composed with the current project's own (`drivers.registry`)."""
+    return _composed_for(_current_root())[0]
+
+
+def driver_home(driver_id: str) -> Path:
+    """The directory a driver's command scripts are resolved under."""
+    return _composed_for(_current_root())[1].get(str(driver_id), KIT_DRIVERS / str(driver_id))
 
 
 def driver_capability(driver_id: str, key: str, default: Any = None) -> Any:

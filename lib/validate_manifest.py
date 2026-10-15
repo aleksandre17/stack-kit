@@ -174,7 +174,12 @@ def validate_manifest(
     ctx = ProjectContext.discover(root)
     pkg = pkg_root or ctx.package_root
     schema = _load_schema(pkg)
-    registry = json.loads((pkg / "drivers" / "registry.json").read_text(encoding="utf-8"))
+    from lib.modules import DriverCollision, compose_registry
+
+    try:
+        registry, _ = compose_registry(ctx.root, ctx.manifest)
+    except DriverCollision as e:
+        return [f"drivers: {e}"], []
 
     errs = _validate_required(ctx.manifest)
     errs.extend(_validate_jsonschema(with_current_fields(ctx.manifest), schema))

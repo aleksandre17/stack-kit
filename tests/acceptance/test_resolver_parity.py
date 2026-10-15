@@ -199,7 +199,8 @@ def _spelled_fields(text: str) -> list[str]:
     code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
     found = []
     for top in TOP_LEVEL_FIELDS:
-        for m in re.finditer(rf"(?<![\w.:$-]){re.escape(top)}\.[A-Za-z]", code):
+        # `drivers.ps1` is a file, not the `drivers.` field: a script extension is never a field name.
+        for m in re.finditer(rf"(?<![\w.:$/\\-]){re.escape(top)}\.(?!(?:ps1|sh|py|json|md)\b)[A-Za-z]", code):
             found.append(code[m.start():m.start() + 40].split()[0])
     for m in re.finditer(rf"{READERS}\s+[\"']?[A-Za-z]", code):
         found.append(code[m.start():m.end() + 30].split("\n")[0])
@@ -218,4 +219,6 @@ def test_the_sensor_sees_a_spelled_field():
     assert not _spelled_fields("# a comment about stack.composeDir\n")
     assert not _spelled_fields('_stack_kit_ctx path:stackComposeDir\n')
     assert not _spelled_fields('[ValidateSet("dev", "prod")][string]$Environment\n')
+    assert not _spelled_fields('. (Join-Path $PSScriptRoot "drivers.ps1")\n')
+    assert _spelled_fields('$r = Get-KitContextValue "x"; $p = "drivers.registry"\n')
     assert not _spelled_fields('_stack_kit_ctx "field:$1" && return 0\n')

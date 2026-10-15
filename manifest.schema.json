@@ -512,6 +512,14 @@
       },
       "additionalProperties": true
     },
+    "drivers": {
+      "type": "object",
+      "description": "The project's own drivers (ADR-001 decision 7), composed with the kit's; an id the kit already has is refused",
+      "properties": {
+        "registry": { "type": "string", "minLength": 1, "description": "Project-relative path of a registry in the kit's shape; each driver lives in <registry dir>/<id>/" }
+      },
+      "additionalProperties": false
+    },
     "config": {
       "type": "object",
       "description": "Configuration carries its sensitivity (ADR-001 decision 5)",

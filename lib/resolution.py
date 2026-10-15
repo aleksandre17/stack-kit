@@ -35,6 +35,7 @@ from lib.credentials import module_credentials
 from lib.manifest_defaults import flatten_defaults
 from lib.modules import (
     driver_default_role,
+    driver_home,
     driver_registry,
     infer_cli_aliases,
     layout_simulator_for_type,
@@ -140,7 +141,7 @@ def context(start: Path | None = None) -> dict[str, str]:
         out[f"module:{mid}:secretsDir"] = str(secrets_root / folder)
         out[f"module:{mid}:credentials"] = _lines(
             "\t".join((c["file"], c["mount"], c.get("envVar", ""))) for c in module_credentials(manifest, mid))
-        out[f"module:{mid}:driverRoot"] = str(KIT_ROOT / "drivers" / typ) if typ else ""
+        out[f"module:{mid}:driverRoot"] = str(driver_home(typ)) if typ else ""
         out[f"module:{mid}:json"] = json.dumps(cfg, sort_keys=True)
         if role:
             roles.setdefault(role, []).append(mid)
@@ -163,7 +164,7 @@ def _drivers() -> dict[str, str]:
     registry = {k: v for k, v in driver_registry().items() if isinstance(v, dict)}
     out["drivers"] = _lines(sorted(registry))
     for typ, entry in registry.items():
-        home = KIT_ROOT / "drivers" / typ
+        home = driver_home(typ)
         commands = entry.get("commands") or {}
         out[f"driver:{typ}:commands"] = _lines(sorted(commands))
         for name, rel in commands.items():

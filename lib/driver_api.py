@@ -38,10 +38,10 @@ def load_manifest(root: Path | None = None) -> dict[str, Any]:
 
 
 def load_registry(pkg: Path | None = None) -> dict[str, Any]:
-    pkg = pkg or _pkg()
-    path = pkg / "drivers" / "registry.json"
-    with path.open(encoding="utf-8") as f:
-        return json.load(f)
+    """The composed registry: the kit's drivers and the project's own (lib.modules owns the rule)."""
+    from lib.modules import driver_registry
+
+    return driver_registry()
 
 
 def module_ids(manifest: dict[str, Any]) -> list[str]:
@@ -86,7 +86,9 @@ def command_path(root: Path, pkg: Path, manifest: dict[str, Any], registry: dict
     if not rel:
         caps = ", ".join(driver_capabilities(registry, typ))
         raise SystemExit(f"Driver '{typ}' has no command '{command}' (available: {caps})")
-    path = pkg / "drivers" / typ / rel
+    from lib.modules import driver_home
+
+    path = driver_home(typ) / rel
     if not path.is_file():
         raise SystemExit(f"Driver script missing: {path}")
     return path

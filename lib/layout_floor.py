@@ -64,6 +64,8 @@ def derived_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     if isinstance(infra, dict) and infra.get("services"):
         rel = declared("stack.infraComposeDir") or "ops/compose/infra"
         rows.append(_row(rel, "dir", "infra", "stack.infra.services"))
+    if declared("drivers.registry"):
+        rows.append(_row(declared("drivers.registry"), "file", "drivers", "drivers.registry"))
     if declared("adapters.nginx.template"):
         rows.append(_row(declared("adapters.nginx.template"), "file", "module-source",
                          "adapters.nginx.template"))
