@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "geostat.ops project manifest",
   "type": "object",
-  "required": ["version", "package", "secrets", "compose", "modules"],
+  "required": ["version", "package", "secrets", "modules"],
   "properties": {
     "version": { "type": "integer", "minimum": 2 },
     "package": {
@@ -186,6 +186,22 @@
               }
             },
             "additionalProperties": true
+          },
+          "dotnet": {
+            "type": "object",
+            "description": "dotnet-aspnet driver options (all optional)",
+            "properties": {
+              "project": { "type": "string", "description": "Project file relative to the module path; default: the single *.csproj there" },
+              "launchProfile": { "type": "string", "description": "Properties/launchSettings.json profile for dotnet run" },
+              "configuration": { "type": "string", "default": "Release", "description": "dotnet publish configuration for deploy artifact" },
+              "publishExpect": {
+                "type": "array",
+                "items": { "type": "string" },
+                "default": [],
+                "description": "Paths that must exist in the publish output (e.g. Api.dll, web.config, wwwroot/index.html)"
+              }
+            },
+            "additionalProperties": false
           },
           "hybrid": {
             "type": "object",

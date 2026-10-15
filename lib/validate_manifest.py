@@ -35,7 +35,8 @@ def _validate_required(instance: dict[str, Any]) -> list[str]:
     errs: list[str] = []
     if instance.get("version", 0) < 2:
         errs.append("version: must be >= 2 (run: geostat migrate)")
-    for key in ("package", "secrets", "compose", "modules"):
+    # compose is optional: a project whose drivers deploy no containers declares none.
+    for key in ("package", "secrets", "modules"):
         if key not in instance:
             errs.append(f"(root): missing required field '{key}'")
     compose = instance.get("compose")

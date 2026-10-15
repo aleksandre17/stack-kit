@@ -92,5 +92,28 @@
     "vscode": {
       "launch": "node-terminal"
     }
+  },
+  "dotnet-aspnet": {
+    "label": "ASP.NET Core - dotnet run / dotnet publish artifact (Windows or cross-platform host)",
+    "roles": [
+      "api"
+    ],
+    "deployKind": "artifact",
+    "deployArgs": [
+      "artifact"
+    ],
+    "runtime": "powershell",
+    "commands": {
+      "deploy": "ps1/deploy.ps1",
+      "run": "ps1/run.ps1",
+      "check": "ps1/check.ps1"
+    },
+    "hybrid": {
+      "script": "ps1/hybrid.ps1"
+    },
+    "tasks": {},
+    "vscode": {
+      "launch": "dotnet"
+    }
   }
 }

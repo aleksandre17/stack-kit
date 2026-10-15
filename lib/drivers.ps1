@@ -105,6 +105,20 @@ function Get-DriverTaskArgs {
     return @($tasks.$TaskName)
 }
 
+# The launch script a driver DECLARES for a host-process run (registry "hybrid.script"),
+# resolved under drivers/<type>/, or $null when the driver declares none.
+function Get-DriverHybridScript {
+    param([string]$Type)
+    if (-not $Type) { return $null }
+    $reg = Get-Content (Get-DriverRegistryPath) -Raw | ConvertFrom-Json
+    if (-not $reg.PSObject.Properties[$Type]) { return $null }
+    $hybrid = $reg.$Type.hybrid
+    if (-not $hybrid -or -not $hybrid.script) { return $null }
+    $path = Join-Path (Join-Path (Get-OpsPackageRoot) "drivers\$Type") $hybrid.script
+    if (-not (Test-Path $path)) { throw "drivers/registry.json: $Type.hybrid.script points to a missing file: $path" }
+    return $path
+}
+
 function Get-CliAliasesFromManifest {
     $mf = Get-ProjectManifestPath
     if (-not $mf) { return @{} }

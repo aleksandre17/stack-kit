@@ -32,6 +32,20 @@
 
 ### Capability
 
+- `dotnet-aspnet` driver (registry entry, `_init.ps1`, `ps1/{run,hybrid,check,deploy}.ps1`):
+  `run` through the shared hybrid runner, `check` pre-flight, `deploy artifact` =
+  `dotnet publish` + declared `modules.<id>.dotnet.publishExpect` + `release.json`;
+  `deploy remote` is an explicit refusal (delivery is not declared yet).
+- **Hybrid run is declarative for new drivers.** `toolkit/hybrid/Invoke-HybridRun.ps1`'s
+  `default` branch dot-sources the launch script a driver declares as
+  `"hybrid": {"script": ...}` (`Get-DriverHybridScript` in `lib/drivers.ps1`) instead of
+  refusing; the three existing rungs are unchanged.
+- `lib/vscode_gen.py`: launch kind `dotnet` (C# Dev Kit `"type": "dotnet"`, project from
+  `modules.<id>.dotnet.project` or the module's single `*.csproj`; ambiguity renders nothing).
+- Manifest: `compose` is **optional** (schema `required` and `_validate_required`); a present
+  `compose` without `catalog` is still refused. New module block `dotnet` (`project`,
+  `launchProfile`, `configuration`, `publishExpect`).
+
 - `node-api` driver (registry entry, `sh/`, `ps1/`, `_init.sh`).
 - `geostat dev up` (`toolkit/dev/`), `resource_limits` / `extraServices`
   compose seams, `manifest.migration.legacyDirs`.

@@ -105,6 +105,14 @@ switch ($driverType) {
         exit $LASTEXITCODE
     }
     default {
-        throw ('Hybrid run not supported for driver type ''{0}'' (module {1})' -f $driverType, $ModuleId)
+        # A driver that is not one of the rungs above DECLARES its launch step
+        # (drivers/registry.json "hybrid": {"script": ...}); this file learns no new name.
+        $hybridScript = Get-DriverHybridScript $driverType
+        if ($hybridScript) {
+            Set-Location $modPath
+            . $hybridScript
+            exit $LASTEXITCODE
+        }
+        throw ('Hybrid run not supported for driver type ''{0}'' (module {1}) - declare "hybrid": {{"script": ...}} in drivers/registry.json' -f $driverType, $ModuleId)
     }
 }

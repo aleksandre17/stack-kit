@@ -192,12 +192,45 @@ def _infra_tunnel_task(ctx: ProjectContext) -> dict[str, Any]:
     }
 
 
+def _dotnet_project_file(module_dir: Path, declared: str | None) -> Path | None:
+    """The project file a module DECLARES (dotnet.project), else its single *.csproj."""
+    if declared:
+        candidate = module_dir / declared
+        return candidate if candidate.is_file() else None
+    found = sorted(module_dir.glob("*.csproj"))
+    return found[0] if len(found) == 1 else None
+
+
+def _launch_dotnet(
+    ctx: ProjectContext, module_id: str, aliases: dict[str, str]
+) -> dict[str, Any] | None:
+    """C# Dev Kit launch ("type": "dotnet") for an SDK-style project."""
+    mod_dir = ctx.module_path(module_id)
+    declared = read_nested(ctx.manifest, f"modules.{module_id}.dotnet.project", "")
+    project = _dotnet_project_file(mod_dir, str(declared) if declared else None)
+    if project is None:
+        return None
+    dbg = _module_debug_cfg(ctx.manifest, module_id)
+    label = str(dbg.get("label") or f"{module_id}: dotnet run")
+    cfg: dict[str, Any] = {
+        "name": label,
+        "type": "dotnet",
+        "request": "launch",
+        "projectPath": "${workspaceFolder}/" + _posix_rel(ctx.root, project),
+    }
+    profile = read_nested(ctx.manifest, f"modules.{module_id}.dotnet.launchProfile", "")
+    if profile:
+        cfg["launchConfigurationId"] = f"TargetFramework=;{profile}"
+    return cfg
+
+
 # Launch builders are keyed by the launch KIND a driver DECLARES in
 # drivers/registry.json ("vscode": {"launch": ...}). A new driver becomes debuggable by
 # declaring a kind it already supports; the generator holds no driver name of its own.
 LAUNCH_BUILDERS = {
     "node-terminal": _launch_node_terminal,
     "java": _launch_java,
+    "dotnet": _launch_dotnet,
 }
 
 
