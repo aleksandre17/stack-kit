@@ -27,9 +27,12 @@ you want to smoke-test an adoption (documented in tests/README.md).
 """
 from __future__ import annotations
 
+import atexit
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -57,11 +60,26 @@ collect_ignore = ["fixtures"]
 def pytest_ignore_collect(collection_path, config):  # noqa: ARG001
     return "fixtures" in Path(str(collection_path)).parts
 
-# Allow an explicit override (manual adoption smoke-test); otherwise the
-# self-contained synthetic consumer fixture is the project root for the suite.
+def _disposable_copy(source: Path) -> Path:
+    """A copy of the reference consumer the suite may write into (ADR-001 decision 7).
+
+    The tracked fixture is the specimen, never the workbench: generators the suite exercises write
+    their outputs into the project they are pointed at, and pointing them at the tracked tree left
+    `git status` dirty after every run -- a test that rewrites what it reads stops being a test of
+    the kit and starts being a test of its own previous run. The kit link is recreated in the copy.
+    """
+    root = Path(tempfile.mkdtemp(prefix="stack-kit-fixture-")) / source.name
+    shutil.copytree(source, root, ignore=shutil.ignore_patterns("kits", "__pycache__", ".pytest_cache"))
+    atexit.register(shutil.rmtree, root.parent, True)
+    return root
+
+
+# Allow an explicit override (manual adoption smoke-test); otherwise a disposable copy of the
+# self-contained synthetic consumer is the project root for the suite.
+WORKING_ROOT = _disposable_copy(FIXTURE_ROOT)
 REPO = Path(os.environ["GEOSTAT_PROJECT_ROOT"]).resolve() if os.environ.get(
     "GEOSTAT_PROJECT_ROOT"
-) else FIXTURE_ROOT
+) else WORKING_ROOT
 
 
 def _link_kit_into_fixture(fixture_root: Path, kit_root: Path) -> None:
@@ -114,9 +132,9 @@ def _write_volatile_secrets(fixture_root: Path) -> None:
 @pytest.fixture(scope="session", autouse=True)
 def _fixture_project(request: pytest.FixtureRequest) -> None:
     """Prepare the synthetic consumer + wire driver_api env for the session."""
-    if REPO == FIXTURE_ROOT:
-        _link_kit_into_fixture(FIXTURE_ROOT, PKG)
-        _write_volatile_secrets(FIXTURE_ROOT)
+    if REPO == WORKING_ROOT:
+        _link_kit_into_fixture(WORKING_ROOT, PKG)
+        _write_volatile_secrets(WORKING_ROOT)
     os.environ.setdefault("GEOSTAT_PROJECT_ROOT", str(REPO))
     os.environ["GEOSTAT_KIT_ROOT"] = str(PKG)
 
