@@ -8,9 +8,6 @@
     "configGen": true,
     "acceptsGlobalCredentials": true,
     "deployKind": "runtime",
-    "deployArgs": [
-      "all"
-    ],
     "layoutSimulator": "simulate-backend-layout.ps1",
     "runtime": "bash",
     "commands": {
@@ -41,6 +38,32 @@
         "(?i)\\bupdate\\s+\\S+\\s+set\\b",
         "(?i)\\bdelete\\s+from\\b"
       ]
+    },
+    "delivery": {
+      "local": {
+        "command": "run"
+      },
+      "hybrid": {
+        "via": "hybrid"
+      },
+      "remote-dev": {
+        "command": "dev"
+      },
+      "release": {
+        "command": "deploy",
+        "args": [
+          "all"
+        ]
+      }
+    },
+    "operands": {
+      "watch": {
+        "to": [
+          "dev",
+          "watch"
+        ],
+        "hint": "<alias> watch is <alias> dev watch (rsync + bootRun in workspace/); <alias> deploy watch is the bootJar publish loop"
+      }
     }
   },
   "node-vite": {
@@ -49,11 +72,6 @@
       "ui"
     ],
     "deployKind": "static",
-    "deployArgs": [
-      "dist",
-      "-Environment",
-      "{environment}"
-    ],
     "layoutSimulator": "simulate-frontend-layout.ps1",
     "runtime": "powershell",
     "commands": {
@@ -76,6 +94,34 @@
     },
     "vscode": {
       "launch": "node-terminal"
+    },
+    "delivery": {
+      "local": {
+        "command": "run"
+      },
+      "hybrid": {
+        "via": "hybrid"
+      },
+      "remote-dev": {
+        "command": "dev"
+      },
+      "release": {
+        "command": "deploy",
+        "args": [
+          "dist",
+          "-Environment",
+          "{environment}"
+        ]
+      }
+    },
+    "operands": {
+      "watch": {
+        "to": [
+          "deploy",
+          "watch"
+        ],
+        "hint": "<alias> watch is <alias> deploy watch (static dist on the server); <alias> dev watch syncs source to the remote dev container"
+      }
     }
   },
   "node-api": {
@@ -102,6 +148,18 @@
     },
     "vscode": {
       "launch": "node-terminal"
+    },
+    "delivery": {
+      "local": {
+        "command": "run"
+      },
+      "remote-dev": {
+        "command": "dev"
+      },
+      "release": {
+        "command": "deploy",
+        "args": []
+      }
     }
   },
   "dotnet-aspnet": {
@@ -110,9 +168,6 @@
       "api"
     ],
     "deployKind": "artifact",
-    "deployArgs": [
-      "artifact"
-    ],
     "runtime": "powershell",
     "commands": {
       "deploy": "ps1/deploy.ps1",
@@ -138,6 +193,23 @@
         "\\.(InsertData|UpdateData|DeleteData)\\s*\\(",
         "(?i)\\.Sql\\s*\\(\\s*@?\\$?\\\"\\s*(insert\\s+into|update\\s+\\S+\\s+set|delete\\s+from)"
       ]
+    },
+    "delivery": {
+      "local": {
+        "command": "run"
+      },
+      "hybrid": {
+        "via": "hybrid"
+      },
+      "release": {
+        "command": "deploy",
+        "args": [
+          "artifact"
+        ]
+      },
+      "container": {
+        "pending": "an image built by `dotnet publish` in a multi-stage Dockerfile and run by the stack compose; declared, not built -- it has to be proven against a docker host first"
+      }
     }
   }
 }

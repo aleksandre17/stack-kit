@@ -2,6 +2,31 @@
 
 ## 1.2.0-dev — unreleased
 
+### Delivery ladders by declaration (ADR-001 K6)
+
+- Each driver declares its delivery ladder in `drivers/registry.json` `delivery`: rung →
+  `{command, args}` (a driver command; `{environment}` substituted), `{via}` (a kit verb, e.g.
+  `hybrid`) or `{pending}` (named, not built, with its reason). Declared today:
+
+  | Driver | local | hybrid | remote-dev | release | container |
+  |---|---|---|---|---|---|
+  | java-boot | run | via hybrid | dev | deploy all | — |
+  | node-vite | run | via hybrid | dev | deploy dist -Environment {environment} | — |
+  | node-api | run | — | dev | deploy | — |
+  | dotnet-aspnet | run | via hybrid | — | deploy artifact | pending: needs a docker host to prove it |
+
+  The `release` rung is the one home of what `deployArgs` held (`stack-deploy` reads it; a project
+  registry still saying `deployArgs` is read).
+- `stack-kit mod <id> deliver <rung> [--env dev|prod] [--plan]` runs a rung, or prints its plan.
+  An undeclared rung is refused, naming the declared ones; a pending rung is refused with its reason.
+- `cli/stack-kit.ps1` names no driver. Its branches for two drivers' `watch`, `run` and
+  `deploy` became declarations (`operands`: a word the driver rewrites, with its hint) and one
+  generic dispatch. A `.sh` script runs under bash, a `.ps1` in the session, whatever the driver's
+  `runtime` says. A PowerShell script's `-Name value` operands bind to the parameters it declares.
+  A project driver (K7b) used to be dispatched by the kit registry's `runtime`; it is now
+  dispatched by its own scripts.
+- Off Windows, the CLI finds bash on PATH.
+
 ### A project may declare its own drivers (ADR-001 K7b)
 
 - `drivers.registry` in the manifest names a project registry in the kit's shape. Its drivers

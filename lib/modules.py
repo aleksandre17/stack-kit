@@ -199,9 +199,18 @@ def driver_deploy_kind(driver_type: str) -> str:
     return str(value).strip().lower()
 
 
+def driver_delivery(driver_type: str) -> dict[str, dict[str, Any]]:
+    """The delivery ladder a driver DECLARES: rung name -> `{command, args}`, `{via}` (a kit verb)
+    or `{pending}` (named, not built). A rung the driver does not declare does not exist for it."""
+    value = driver_capability(driver_type, "delivery", {})
+    return {str(k): v for k, v in value.items() if isinstance(v, dict)} if isinstance(value, dict) else {}
+
+
 def driver_deploy_args(driver_type: str) -> list[str]:
-    """Extra argv a driver DECLARES for its stack deploy step (default: none)."""
-    value = driver_capability(driver_type, "deployArgs", [])
+    """The argv of a driver's `release` rung -- what its stack deploy step runs (default: none).
+    A project registry written before the ladder may still say `deployArgs`; it is read."""
+    release = driver_delivery(driver_type).get("release") or {}
+    value = release.get("args") if "args" in release else driver_capability(driver_type, "deployArgs", [])
     return [str(a) for a in value] if isinstance(value, list) else []
 
 

@@ -231,3 +231,36 @@ named exactly the exposures that host had already registered by hand (its AIR-00
 4. **The generated profiles carry no integration.** The block one consumer needed moved to that
    module's declaration (`configGen.profileYml`); the reference consumer declares it, and its golden
    output changed only by the consumer's AI and package loggers leaving the kit's template.
+
+## Amendment 5 — K6 and K7b as built (2026-10-15, owner-delegated)
+
+**K7b landed.** `drivers.registry` names a project registry, composed with the kit's in
+`lib/modules.py` (each driver at `<registry dir>/<id>/`); an id the kit already has is refused
+(`tests/acceptance/test_project_drivers.py`).
+
+**K6 landed.** Every driver declares its delivery ladder and the CLI names none
+(`tests/acceptance/test_delivery.py`: every built kit rung is planned through the real CLI to a
+script its driver declares; rungs run through a project driver, binding operands by name and order,
+under bash or PowerShell by script; undeclared and pending rungs refused; mutation-checked).
+
+**Decided while building, with what was rejected:**
+
+1. **The dotnet container rung is declared pending, not built.** This workstation has no docker,
+   and a Dockerfile and compose wiring nobody has run is a claim, not delivery. *Rejected:* shipping
+   it untested. The pending rung is refused with its reason until a docker host proves it.
+2. **A rung is a driver command with arguments, or a kit verb.** *Rejected:* a rung kind per
+   technology, which would move the driver-name ladder from the CLI into the rung grammar.
+3. **The script decides how it is run, not the driver.** `java-boot` declares `runtime: bash` and
+   ships a PowerShell `run`; the CLI had special-cased `run` for exactly that. Dispatch by script
+   type removes the case. *Rejected:* a per-command runtime field, a second home for what the file
+   name already says.
+4. **Operands bind to the parameters a script declares.** This replaces one driver's hand-written
+   `-Environment` parser in the CLI. *Rejected:* keeping per-driver argument shapes in the CLI.
+5. **`release` absorbs `deployArgs`.** *Rejected:* keeping both, which would be two homes for one
+   argv; a project registry on the old field is still read.
+
+**ADR-001 slices: K1–K7 landed.** Still owed (named in the amendments above): the container rung;
+`--mode remote` in the CLI help; a literal default module id in `toolkit/deploy/deploy-path.sh`;
+consumer-shaped schema fields (`ci.rag*`, `modules.*.catalog`, `modules.*.derivation`); folding
+`driver_api.py` and `modules_cli.py` into `resolve_cli.py`; `lib/module-manifest.ps1`'s typed
+accessors.

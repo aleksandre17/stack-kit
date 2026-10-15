@@ -56,10 +56,13 @@ class TestDeployScriptModes:
         assert "Invoke-DevRsyncToRemote" in text
 
     def test_cli_redirects_fe_watch_to_deploy(self, pkg_root: Path):
-        text = _read(pkg_root / "cli" / "stack-kit.ps1")
-        assert 'sub -eq "watch"' in text
-        assert "node-vite" in text
-        assert "deploy" in text
+        # Declared by the static-delivery driver, not branched on in the CLI (ADR-001 K6).
+        import json
+
+        registry = json.loads((pkg_root / "drivers" / "registry.json").read_text(encoding="utf-8"))
+        static = [e for e in registry.values() if isinstance(e, dict) and e.get("deployKind") == "static"]
+        assert static and all(e["operands"]["watch"]["to"] == ["deploy", "watch"] for e in static)
+        assert 'sub -eq "watch"' not in _read(pkg_root / "cli" / "stack-kit.ps1")
 
 
 class TestToolkitModules:

@@ -35,6 +35,7 @@ from lib.credentials import module_credentials
 from lib.manifest_defaults import flatten_defaults
 from lib.modules import (
     driver_default_role,
+    driver_delivery,
     driver_home,
     driver_registry,
     infer_cli_aliases,
@@ -179,6 +180,13 @@ def _drivers() -> dict[str, str]:
         simulator = layout_simulator_for_type(typ)
         if simulator:
             out[f"driver:{typ}:layoutSimulator"] = simulator
+        ladder = driver_delivery(typ)
+        out[f"driver:{typ}:rungs"] = _lines(ladder)
+        for rung, how in ladder.items():
+            out[f"driver:{typ}:rung:{rung}"] = json.dumps(how, sort_keys=True)
+        for word, rewrite in (entry.get("operands") or {}).items():
+            if isinstance(rewrite, dict) and isinstance(rewrite.get("to"), list):
+                out[f"driver:{typ}:operand:{word}"] = json.dumps(rewrite, sort_keys=True)
     return out
 
 

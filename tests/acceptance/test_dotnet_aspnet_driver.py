@@ -33,7 +33,7 @@ class TestRegistryEntry:
         assert entry["roles"] == ["api"]
         assert entry["runtime"] == "powershell"
         assert entry["deployKind"] == "artifact"
-        assert entry["deployArgs"] == ["artifact"]
+        assert entry["delivery"]["release"] == {"command": "deploy", "args": ["artifact"]}
         assert {"run", "check", "deploy"} <= set(entry["commands"])
 
     def test_declared_scripts_exist(self) -> None:

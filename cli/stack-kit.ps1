@@ -104,134 +104,118 @@ function Show-Help {
 $bash = "${env:ProgramFiles}\Git\bin\bash.exe"
 
 if (-not (Test-Path $bash)) { $bash = "${env:ProgramFiles}\Git\usr\bin\bash.exe" }
+# Off Windows (or with Git elsewhere) the bash on PATH -- never the WSL launcher in System32.
+if (-not (Test-Path $bash)) {
+    $found = Get-Command bash -ErrorAction SilentlyContinue | Where-Object { $_.Source -notmatch 'System32' } | Select-Object -First 1
+    if ($found) { $bash = $found.Source }
+}
 
 
+
+function Invoke-DriverScript {
+    # Runs one driver script by what it IS: a .sh under bash, a .ps1 in this session. A PowerShell
+    # script's `-Name value` operands bind to the parameters it declares (a switch takes no value);
+    # every other operand stays positional, in order. No driver is named here (ADR-001 K6).
+    param([string]$Script, [string[]]$Operands = @())
+    if ($Script -like '*.sh') {
+        if (-not (Test-Path $bash)) { Write-Host "  Git Bash required for $Script" -ForegroundColor Red; exit 1 }
+        & $bash $Script @Operands
+        return
+    }
+    $declared = (Get-Command $Script).Parameters
+    $common = [System.Management.Automation.PSCmdlet]::CommonParameters + [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+    $named = @{}
+    $positional = [System.Collections.ArrayList]@()
+    for ($i = 0; $i -lt $Operands.Count; $i++) {
+        $t = [string]$Operands[$i]
+        if ($t -match '^-([A-Za-z]\w*)$' -and $declared.ContainsKey($Matches[1]) -and $Matches[1] -notin $common) {
+            $p = $declared[$Matches[1]]
+            if ($p.ParameterType -eq [switch]) { $named[$p.Name] = $true; continue }
+            if ($i + 1 -lt $Operands.Count) { $named[$p.Name] = [string]$Operands[++$i]; continue }
+        }
+        [void]$positional.Add($t)
+    }
+    # A PowerShell driver reports failure by THROWING; a throw sets no $LASTEXITCODE, so without
+    # this a failed command exited 0 (seen with dotnet-aspnet deploy).
+    $global:LASTEXITCODE = 0
+    $posArgs = @($positional)
+    & $Script @posArgs @named
+}
 
 function Invoke-ModuleDriver {
-
     param([string]$ModuleId, [string[]]$DriverArgs)
 
     if (-not (Get-ModuleManifestEntry $ModuleId)) {
-
         Write-Host "  Unknown module: $ModuleId" -ForegroundColor Red
-
-        Write-Host "  Defined in stack-kit.json modules.*"
-
+        Write-Host "  Defined in $((Get-KitIdentity).manifestFilename) modules.*"
         exit 1
-
     }
-
-    $sub = if ($DriverArgs.Count -gt 0) { $DriverArgs[0] } else { "deploy" }
-
-    $rest = @()
-    if ($DriverArgs.Count -gt 1) {
-        $rest = [string[]]@($DriverArgs | Select-Object -Skip 1)
-    }
-
-    # node-vite: "<alias> watch" -> deploy watch; "<alias> dev watch" -> dev.ps1
     $modType = Get-ModuleType $ModuleId
-    if ($sub -eq "run") {
-        $env:STACK_KIT_MODULE_ID = $ModuleId
-        $runScript = Get-DriverCommandPath -ModuleId $ModuleId -Command "run"
-        & $runScript @rest
-        exit $LASTEXITCODE
+    $sub = if ($DriverArgs.Count -gt 0) { $DriverArgs[0] } else { "deploy" }
+    $rest = @()
+    if ($DriverArgs.Count -gt 1) { $rest = [string[]]@($DriverArgs | Select-Object -Skip 1) }
+
+    # An operand the driver DECLARES as another (e.g. a bare `watch`): rewritten, and said so.
+    $rewrite = Get-KitContextValue "driver:$($modType):operand:$sub"
+    if ($rewrite) {
+        $rw = $rewrite | ConvertFrom-Json
+        if ($rw.hint) { Write-Host ""; Write-Host "  Hint: $($rw.hint)" -ForegroundColor Yellow; Write-Host "" }
+        $to = @($rw.to | ForEach-Object { [string]$_ })
+        $sub = $to[0]
+        $rest = @($to | Select-Object -Skip 1) + $rest
     }
 
-    if ($sub -eq "watch" -and $modType -eq "node-vite") {
-        Write-Host ""
-        Write-Host "  Hint: <alias> watch -> <alias> deploy watch (static dist on server)" -ForegroundColor Yellow
-        Write-Host "        <alias> dev watch -> source rsync to remote dev container" -ForegroundColor Yellow
-        Write-Host ""
-        $env:STACK_KIT_MODULE_ID = $ModuleId
-        $deployScript = Get-DriverCommandPath -ModuleId $ModuleId -Command "deploy"
-        & $deployScript watch @rest
-        exit $LASTEXITCODE
-    }
-    if ($sub -eq "watch" -and $modType -eq "java-boot") {
-        Write-Host ""
-        Write-Host "  Hint: <alias> watch -> <alias> dev watch (rsync + bootRun in workspace/)" -ForegroundColor Yellow
-        Write-Host "        <alias> deploy watch -> bootJar + runtime/ publish loop" -ForegroundColor Yellow
-        Write-Host ""
-        $env:STACK_KIT_MODULE_ID = $ModuleId
-        $devScript = Get-DriverCommandPath -ModuleId $ModuleId -Command "dev"
-        & $bash $devScript watch @rest
-        exit $LASTEXITCODE
-    }
-
-    # java-boot: "<alias> deploy watch" — JAR publish loop (subcommand under deploy)
-    if ($sub -eq "deploy" -and $modType -eq "java-boot" -and $rest.Count -gt 0 -and $rest[0] -eq "watch") {
-        $env:STACK_KIT_MODULE_ID = $ModuleId
-        $deployScript = Get-DriverCommandPath -ModuleId $ModuleId -Command "deploy"
-        & $bash $deployScript watch @($rest | Select-Object -Skip 1)
-        exit $LASTEXITCODE
-    }
-
-    $valid = @{}
-
-    foreach ($c in Get-DriverCapabilities $ModuleId) { $valid[$c] = 1 }
-
-    if (-not $valid.ContainsKey($sub)) {
-
-        Write-Host "  Unknown subcommand: $sub (module $ModuleId, type $modType)" -ForegroundColor Red
-
-        Write-Host "  Valid: $($valid.Keys -join ' | ')"
-        if ($modType -eq "node-vite") {
-            Write-Host "  Frontend watch: deploy watch | dev watch  (see docs/FE-WATCH.md)" -ForegroundColor Gray
-        }
-
-        exit 1
-
-    }
-
-    $type = Get-ModuleType $ModuleId
-
-    $reg = Get-Content (Get-DriverRegistryPath) -Raw | ConvertFrom-Json
-
-    $runtime = $reg.$type.runtime
-
-    $script = Get-DriverCommandPath -ModuleId $ModuleId -Command $sub
-
-    $env:STACK_KIT_MODULE_ID = $ModuleId
-
-    if ($runtime -eq "bash") {
-
-        if (-not (Test-Path $bash)) { Write-Host "Git Bash required for driver $type"; exit 1 }
-
-        & $bash $script @rest
-
-    } else {
-        # A PowerShell driver reports failure by THROWING; a throw sets no $LASTEXITCODE,
-        # so without this a failed command exited 0 (seen with dotnet-aspnet deploy).
-        $global:LASTEXITCODE = 0
-        try {
-        if ($type -eq "node-vite" -and $sub -eq "deploy") {
-            $feEnv = "prod"
-            $feArgs = [System.Collections.ArrayList]@()
-            for ($i = 0; $i -lt $rest.Count; $i++) {
-                $a = [string]$rest[$i]
-                if ($a -eq "-Environment" -and ($i + 1) -lt $rest.Count) {
-                    $feEnv = [string]$rest[$i + 1]
-                    $i++
-                    continue
-                }
-                [void]$feArgs.Add($a)
-            }
-            if ($feArgs.Count -gt 0) {
-                & $script -Arg1 ([string]$feArgs[0]) -Environment ([string]$feEnv)
-            } else {
-                & $script -Environment ([string]$feEnv)
-            }
-        } else {
-            & $script @rest
-        }
-        } catch {
-            Write-Host "[$ModuleId $sub] $($_.Exception.Message)" -ForegroundColor Red
+    # The delivery ladder the driver DECLARES: `deliver <rung> [--env dev|prod] [--plan] [operands]`.
+    if ($sub -eq "deliver") {
+        $rungs = @(Get-KitContextLines "driver:$($modType):rungs")
+        $rung = if ($rest.Count -gt 0) { [string]$rest[0] } else { "" }
+        $declaredRung = Get-KitContextValue "driver:$($modType):rung:$rung"
+        if (-not $declaredRung) {
+            Write-Host "  Driver '$modType' declares no delivery rung '$rung' (declared: $($rungs -join ', '))" -ForegroundColor Red
             exit 1
         }
+        $how = $declaredRung | ConvertFrom-Json
+        if ($how.pending) {
+            Write-Host "  Rung '$rung' of driver '$modType' is declared but not built: $($how.pending)" -ForegroundColor Red
+            exit 1
+        }
+        $environment = "prod"; $plan = $false; $extra = [System.Collections.ArrayList]@()
+        for ($i = 1; $i -lt $rest.Count; $i++) {
+            switch ([string]$rest[$i]) {
+                "--plan" { $plan = $true }
+                "--env" { $environment = [string]$rest[++$i] }
+                default { [void]$extra.Add([string]$rest[$i]) }
+            }
+        }
+        if ($how.via) {
+            $line = "stack-kit $($how.via) boot $ModuleId"
+            if ($plan) { Write-Host "  deliver $rung -> $line"; exit 0 }
+            & (Join-Path $PSScriptRoot "stack-kit.ps1") $how.via boot $ModuleId @extra
+            exit $LASTEXITCODE
+        }
+        $sub = [string]$how.command
+        $rest = @(@($how.args) | Where-Object { $null -ne $_ } | ForEach-Object { ([string]$_).Replace("{environment}", $environment) }) + @($extra)
+        if ($plan) {
+            Write-Host "  deliver $rung -> $sub $($rest -join ' ')  ($(Get-DriverCommandPath -ModuleId $ModuleId -Command $sub))"
+            exit 0
+        }
     }
 
+    $caps = @(Get-DriverCapabilities $ModuleId)
+    if ($sub -notin $caps) {
+        Write-Host "  Unknown subcommand: $sub (module $ModuleId, type $modType)" -ForegroundColor Red
+        Write-Host "  Valid: $($caps -join ' | ') | deliver <$(@(Get-KitContextLines "driver:$($modType):rungs") -join '|')>"
+        exit 1
+    }
+    $script = Get-DriverCommandPath -ModuleId $ModuleId -Command $sub
+    $env:STACK_KIT_MODULE_ID = $ModuleId
+    try {
+        Invoke-DriverScript -Script $script -Operands $rest
+    } catch {
+        Write-Host "[$ModuleId $sub] $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
     exit $LASTEXITCODE
-
 }
 
 

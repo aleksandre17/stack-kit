@@ -44,8 +44,8 @@ def deploy_step_for_module(manifest: dict[str, Any], module_id: str) -> dict[str
     """The deploy step for a module — argv comes from what its DRIVER declares.
 
     The interpreter knows there is a `deploy` command and that a driver may need
-    extra argv; it does not know any driver's name. A driver that declares no
-    `deployArgs` deploys with none.
+    extra argv; it does not know any driver's name. A driver whose `release` rung declares no
+    `args` deploys with none.
     """
     cfg = _modules(manifest).get(module_id) or {}
     typ = str(cfg.get("type") or "")
