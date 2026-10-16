@@ -3,14 +3,15 @@
 
 A driver declares how its module is packaged (registry `package`: a driver `command` with `args`,
 `{out}` the module's staging directory, and the `artifacts` it leaves -- globs from the module
-directory, or `{out}` itself) and how a release of it runs (`container`: a recipe template, or a
-static image serving it). `pack` turns what the package step left into ONE archive per commit,
+directory, or `{out}` itself) and how a release of it runs (`container`: a recipe template; a web
+server's with its `serverConfig`, rendered beside it). `pack` turns what the package step left into ONE archive per commit,
 `.stack-kit/artifacts/<module>-<release>.tgz`, sha256 beside it:
 
     release.json          the provenance: module, release id, commit, `git describe`, dirty, services,
                           and what the module's `package.exclude` kept out (`excluded`)
     <service>/...         each service's tree: its artifacts (under its `context`) and its recipe --
                           the module's own Dockerfile, or the driver's template rendered for it
+                          (a web server's also its rendered config, `server.conf`, which the recipe COPYs)
 
 The release id is the commit (`-dirty` when the checkout was): a deploy of it ships exactly these
 bytes, and a release to an environment that requires a clean checkout refuses a dirty one.
@@ -39,6 +40,8 @@ from lib import identity  # noqa: E402
 
 OUT = "{out}"
 RELEASE_JSON = "release.json"
+#: Where a web server's release carries its rendered config: the name its recipe COPYs ({config}).
+SERVER_CONFIG = "server.conf"
 
 
 class PackageError(ValueError):
@@ -164,7 +167,8 @@ def _artifact(tree: dict[str, Any], spec: dict[str, Any], where: str) -> str:
 
 def recipe(root: Path, manifest: dict, service: Any, tree: dict[str, Any], *, artifact: str | None = None) -> dict[str, bytes]:
     """The files a service's release adds to its artifacts: its container recipe (the module's own
-    Dockerfile, else the driver's template rendered for this module), or its static server config.
+    Dockerfile, else the driver's template rendered for this module) and, for a web server, its
+    rendered server config (`serverConfig`), which the recipe COPYs -- one source for both.
     `artifact`: the artifact's name when no tree is packaged yet (a projection: its declared glob)."""
     from lib import templating
     from lib.delivery.model import driver_home
@@ -172,25 +176,29 @@ def recipe(root: Path, manifest: dict, service: Any, tree: dict[str, Any], *, ar
     cfg = manifest["modules"][service.module]
     spec = service.spec
     where = f"modules.{service.module} service {service.id}"
-    if service.kind == "build":
-        if spec.get("dockerfile"):
-            own = root / cfg["path"] / str(spec["dockerfile"])
-            if not own.is_file():
-                raise PackageError(f"{where}: container.dockerfile {spec['dockerfile']} is not there")
-            return {"Dockerfile": own.read_bytes()}
-        template = driver_home(service.driver) / str(spec["template"])
-        if not template.is_file():
-            raise PackageError(f"{where}: driver template {spec['template']} is not there")
-        extra = {"artifact": artifact if artifact is not None else _artifact(tree, spec, where), "port": str(spec.get("port") or ""),
-                 "entry": templating.render(str(spec.get("entry") or ""), cfg),
-                 "healthcheck": _probe(spec, where)}
-        return {"Dockerfile": templating.render(template.read_text(encoding="utf-8"), cfg, extra).encode("utf-8")}
-    if service.kind == "static" and (spec.get("static") or {}).get("config"):
-        conf = driver_home(service.driver) / str(spec["static"]["config"])
-        extra = {"port": str(spec.get("port") or ""), "mount": str(spec["static"].get("mount") or ""),
+    if service.kind != "build":
+        return {}
+    added: dict[str, bytes] = {}
+    if spec.get("serverConfig"):
+        conf = driver_home(service.driver) / str(spec["serverConfig"])
+        if not conf.is_file():
+            raise PackageError(f"{where}: driver server config {spec['serverConfig']} is not there")
+        extra = {"port": str(spec.get("port") or ""), "mount": str(spec.get("webRoot") or ""),
                  "proxy": _proxy_blocks(manifest, spec, where)}
-        return {".stack-kit/static.conf": templating.render(conf.read_text(encoding="utf-8"), cfg, extra).encode("utf-8")}
-    return {}
+        added[SERVER_CONFIG] = templating.render(conf.read_text(encoding="utf-8"), cfg, extra).encode("utf-8")
+    if spec.get("dockerfile"):
+        own = root / cfg["path"] / str(spec["dockerfile"])
+        if not own.is_file():
+            raise PackageError(f"{where}: container.dockerfile {spec['dockerfile']} is not there")
+        return {"Dockerfile": own.read_bytes(), **added}
+    template = driver_home(service.driver) / str(spec["template"])
+    if not template.is_file():
+        raise PackageError(f"{where}: driver template {spec['template']} is not there")
+    extra = {"artifact": artifact if artifact is not None else _artifact(tree, spec, where), "port": str(spec.get("port") or ""),
+             "entry": templating.render(str(spec.get("entry") or ""), cfg),
+             "healthcheck": _probe(spec, where), "serve": str(spec.get("serve") or ".").strip("/") or ".",
+             "webRoot": str(spec.get("webRoot") or "").rstrip("/"), "config": SERVER_CONFIG}
+    return {"Dockerfile": templating.render(template.read_text(encoding="utf-8"), cfg, extra).encode("utf-8"), **added}
 
 
 def _probe(spec: dict, where: str) -> str:
@@ -231,7 +239,30 @@ def _proxy_blocks(manifest: dict, spec: dict, where: str) -> str:
     return "\n".join(blocks)
 
 
-def pack(root: Path, manifest: dict, module_id: str) -> Path:
+def local_tree(root: Path, module_id: str) -> Path:
+    """`.stack-kit/local/<module>/`: the release trees the local stack builds its images from."""
+    return artifacts_dir(root).parent / "local" / module_id
+
+
+def stage(root: Path, manifest: dict, module_id: str) -> Path:
+    """Write the module's release trees -- the bytes `pack` would archive, from what the package step
+    left -- under `local_tree`, so the local stack builds the same recipe a release does."""
+    import shutil
+
+    members, _services, _kept_out = _members(root, manifest, module_id)
+    dest = local_tree(root, module_id)
+    if dest.exists():
+        shutil.rmtree(dest)
+    for name, data in sorted(members.items()):
+        f = dest / name
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(data)
+    return dest
+
+
+def _members(root: Path, manifest: dict, module_id: str) -> tuple[dict[str, bytes], dict[str, Any], list[str]]:
+    """({`<service>/<path>`: bytes} of every service's tree and recipe, the services, what the
+    module's exclusions kept out) -- the release's content, checked."""
     from lib.delivery.model import module_services
 
     spec = declared(manifest, module_id)
@@ -242,7 +273,6 @@ def pack(root: Path, manifest: dict, module_id: str) -> Path:
     if not files:
         raise PackageError(f"{module_id}: the package step left none of {spec.get('artifacts')} -- run it first "
                            f"(`{identity.KIT_NAME} package {module_id}`)")
-    prov = provenance(root)
     members: dict[str, bytes] = {}
     services: dict[str, Any] = {}
     for service in module_services(manifest, module_id):
@@ -250,15 +280,15 @@ def pack(root: Path, manifest: dict, module_id: str) -> Path:
         if not tree:
             raise PackageError(f"{module_id}: service {service.id} has no artifact under its context "
                                f"'{service.context or '.'}'")
-        if service.kind == "static" and service.spec.get("builtChecks"):
+        if service.spec.get("builtChecks"):
             from lib.delivery.checks import built_static
 
             baked = built_static({rel: p.read_bytes() for rel, p in tree.items()}, service.spec.get("allowBaked"))
             if baked:
                 raise PackageError(f"{module_id}: the built app carries addresses -- they are runtime config, "
                                    f"not the bundle's (container.allowBaked lists any that must stay):\n  " + "\n  ".join(baked))
-        if service.kind == "static" and service.spec.get("serve"):
-            # A static server whose root holds no index.html answers 403 at `/` while its own health
+        if service.spec.get("serverConfig") and service.spec.get("serve"):
+            # A web server whose root holds no index.html answers 403 at `/` while its own health
             # probe stays green -- refused here, naming where the build really put the app.
             served = str(service.spec["serve"]).strip("/")
             if f"{served}/index.html" not in tree:
@@ -272,6 +302,13 @@ def pack(root: Path, manifest: dict, module_id: str) -> Path:
         for rel, data in added.items():
             members[f"{service.id}/{rel}"] = data
         services[service.id] = {"kind": service.kind, "files": len(tree) + len(added)}
+    return members, services, kept_out
+
+
+def pack(root: Path, manifest: dict, module_id: str) -> Path:
+    members, services, kept_out = _members(root, manifest, module_id)
+    patterns = exclusions(manifest, module_id)
+    prov = provenance(root)
     meta = {"schema": 1, "module": module_id, **prov, "services": services,
             "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     if patterns:  # the provenance says what the module kept out, and by which rule

@@ -100,6 +100,20 @@ def test_the_commands_block_is_literal_lines_with_a_required_test(tmp_path: Path
     assert command_line_problems(tmp_path, broken) == ["commands.build: names tools/missing.ps1, which is not there"]
 
 
+def test_the_commands_block_accepts_validate_and_lint_as_literal_lines() -> None:
+    # A host declares `commands.validate` so agent-kit's stack-kit adapter can vouch for
+    # `stack-kit:validate` as the enforcer of a host law; `lint` sits beside build and test.
+    from lib.schema_check import validate as schema_validate
+
+    schema = json.loads((PKG / "manifest.schema.json").read_text(encoding="utf-8"))["properties"]["commands"]
+    full = {"build": "pwsh ops/cli/stack-kit.ps1 build", "test": "pwsh ops/cli/stack-kit.ps1 test",
+            "lint": "pwsh ops/cli/stack-kit.ps1 lint", "validate": "pwsh ops/cli/stack-kit.ps1 validate"}
+    assert schema_validate(full, schema) == []
+    assert schema_validate({**full, "validate": ""}, schema), "an empty validate line passed"
+    assert schema_validate({**full, "validate": ["pwsh", "validate"]}, schema), "a non-string validate passed"
+    assert schema_validate({"validate": full["validate"]}, schema), "validate without test passed"
+
+
 def test_the_scaffold_declares_the_commands_through_the_host_launcher() -> None:
     scaffold = json.loads((PKG / "scaffold" / "stack-kit.json").read_text(encoding="utf-8"))
     assert scaffold["commands"]["test"].endswith("ops/cli/stack-kit.ps1 test")

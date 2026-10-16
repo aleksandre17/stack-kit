@@ -16,7 +16,7 @@ drivers/
 
 Everything a module of it needs, and nothing the kit spells: `commands` (lifecycle steps and its
 own, each a script run by its runtime), `package` (how one commit becomes one archive),
-`container` (how a release runs: a recipe template rendered per module, or a static image),
+`container` (how a release runs: a recipe template rendered per module; a web server's with its `serverConfig`),
 `dev` (its remote dev container, caches, excludes, reactions to a change), `delivery` (rungs,
 usually `via` a kit verb), `ci.setup`, `detect`, `vscode` (its launch configuration as data, the `values` it reads from the
 module's files, its `label`; lib/vscode_gen.py holds no debugger), `migrations`, `outputs`,

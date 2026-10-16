@@ -2,7 +2,7 @@
 (ADR-001 amendment 13).
 
     the driver   (registry `container`, `dev`)    how its modules are built into an image or served:
-                 a recipe template, a static image, an internal port, a command, a healthcheck
+                 a recipe template (a web server's with its server config), an internal port, a command
     the module   (manifest `modules.<id>`)         `container` overrides, `services` (several from
                  one module, each with its `context`), `runtimeConfig`, `credentials`
     the stack    (manifest `stack.services`)       services no module builds (an object store, a
@@ -26,7 +26,7 @@ DEFAULTS = KIT / "config" / "delivery.json"
 
 #: The fields a service declaration may carry -- driver `container`, module `container`, a module's
 #: `services.<id>`, a stack service -- one vocabulary at every level, a later level winning.
-SERVICE_FIELDS = ("template", "dockerfile", "static", "image", "port", "command", "entry", "healthcheck",
+SERVICE_FIELDS = ("template", "dockerfile", "serverConfig", "webRoot", "image", "port", "command", "entry", "healthcheck",
                   "environment", "volumes", "logs", "serve", "dependsOn", "healthWait", "keep", "context",
                   "artifact", "artifactExclude", "networks", "tier", "healthPath", "probe", "proxy", "builtChecks",
                   "allowBaked")
@@ -48,7 +48,7 @@ class Service:
     id: str
     module: str | None            # None: a stack service no module builds
     tier: str
-    kind: str                     # "build" (an image built from a release), "static" (a release served), "image"
+    kind: str                     # "build" (an image built from a release), "image" (a declared image)
     spec: dict[str, Any]          # the merged service declaration (SERVICE_FIELDS)
     driver: str = ""
     runtime_config: list[dict[str, Any]] = field(default_factory=list)
@@ -100,8 +100,11 @@ def module_services(manifest: dict[str, Any], module_id: str) -> list[Service]:
         spec = {**base, **(declared.get(sid) or {})}
         port = {"port": str(spec.get("port") or "")}  # a probe keeps its {path} for the recipe to fill
         spec = {k: v if k == "probe" else templating.render_tree(v, cfg, port) for k, v in spec.items()}
-        kind = "static" if spec.get("static") else ("image" if spec.get("image") and not spec.get("template")
-                                                     and not spec.get("dockerfile") else "build")
+        if spec.get("static"):  # retired in 2.4.0 (ADR-001 amendment 18): one recipe shape for every module
+            raise ModelError(f"modules.{module_id} ({typ}): service '{sid}' declares `container.static`, retired in "
+                             f"2.4.0 -- a release is an image built from its driver's recipe (a web server's "
+                             f"`template` with its `serverConfig`); remove the field")
+        kind = "image" if spec.get("image") and not spec.get("template") and not spec.get("dockerfile") else "build"
         if kind == "build" and not (spec.get("template") or spec.get("dockerfile")):
             raise ModelError(f"modules.{module_id} ({typ}): service '{sid}' has no container recipe -- its driver "
                              f"declares no `container.template` and the module no `container.dockerfile`")

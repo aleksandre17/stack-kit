@@ -17,6 +17,26 @@ def _init(a: Args) -> int:
     return tools.powershell_script("toolkit/init/Invoke-ProjectInit.ps1", ["-PackageRoot", str(tools.KIT), *a.raw])
 
 
+def stage_releases(ctx) -> int:
+    """Stage the release tree of every stack module whose driver runs its release image locally
+    (`compose.fromRelease`): the local stack builds the recipe a deploy builds, from the same bytes."""
+    from lib import package
+    from lib.compose_identity import stack_compose_module_ids
+    from lib.modules import driver_capability
+
+    for mid in stack_compose_module_ids(ctx.manifest):
+        cfg = (ctx.manifest.get("modules") or {}).get(mid)
+        if not isinstance(cfg, dict) or not (driver_capability(str(cfg.get("type") or ""), "compose", {}) or {}).get("fromRelease"):
+            continue
+        try:
+            where = package.stage(ctx.root, ctx.manifest, mid)
+        except (package.PackageError, ValueError) as e:
+            print(f"  [stack] {mid}: {e}")
+            return 2
+        print(f"  [stack] {mid}: release tree staged in {where.relative_to(ctx.root).as_posix()}")
+    return 0
+
+
 def _stack(a: Args) -> int:
     """The local development stack: compose-gen's files under stack.composeDir, every module
     folder's env files of the environment, run by this machine's declared compose invocation."""
@@ -39,6 +59,8 @@ def _stack(a: Args) -> int:
     cmd = targets.local_commands(ctx.manifest)["compose"]
     if not cmd:
         print("  [stack] no target runtime is declared `local` (catalogs.targetRuntimes)")
+        return 2
+    if any(x in ("up", "build", "create") for x in rest) and stage_releases(ctx):
         return 2
     print(f"\n  {naming.project_slug(ctx.manifest, ctx.root)} stack ({env})")
     for line in stack_endpoint_lines(ctx):

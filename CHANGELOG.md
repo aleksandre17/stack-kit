@@ -1,5 +1,44 @@
 # Changelog — stack-kit
 
+## 2.4.0 — 2026-10-16
+
+Every deployable module, UI modules included, runs an image built from its driver's recipe, so one
+recipe serves the local docker stack, a dev release and prod (ADR-001 amendment 18).
+
+### Added
+
+- `commands.validate` in the manifest schema (beside `build`, `test`, `lint`): the line a host's law
+  names as its enforcer `stack-kit:validate`, for agent-kit's stack-kit adapter to vouch for.
+
+### Changed
+
+- `node-spa` and `node-vite` release as `build` services: the shared recipe
+  `drivers/_shared/static/Dockerfile` (pinned `nginxinc/nginx-unprivileged`, the `serve` directory
+  COPYed to the web root, the rendered `server.conf` COPYed to nginx's config, `USER nginx`,
+  `HEALTHCHECK` on `/healthz`). The image is built on the target from the release; `rollback` moves
+  `current` as for an api.
+- The release carries the rendered config as `server.conf` beside its `Dockerfile` (was
+  `.stack-kit/static.conf`); `render` projects both `ops/containers/<module>/Dockerfile` and
+  `server.conf`, and a release refuses either stale.
+- The local stack: a driver declaring `compose.fromRelease` (both UI drivers) uses the
+  `module_ui_release` compose-gen template -- built from the release tree `stack up` stages in
+  `.stack-kit/local/<module>/<service>/` from what `package` left, a compose link per proxied
+  service. `<module> run` and `dev up` are unchanged.
+- Driver `container` vocabulary: `serverConfig` and `webRoot` (a web server's config template and
+  root).
+
+### Removed
+
+- The `static` service kind and `container.static {image, mount, config, configMount}`: a
+  declaration of it is refused naming the recipe. The `module_ui_stack_dev` / `module_ui_stack_prod`
+  compose templates and `node-vite`'s `compose.dockerfiles`.
+
+### Migration
+
+- Run `render` and commit `ops/containers/<ui-module>/Dockerfile`. Remove any `container.static` of
+  your own. Regenerate the local compose (`compose-gen`) and run `package <ui-module>` before
+  `stack up`.
+
 ## 2.3.0 — 2026-10-16
 
 What a project uses from a shared platform it does not own is a declaration (ADR-001 amendment 17).

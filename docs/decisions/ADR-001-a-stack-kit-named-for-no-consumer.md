@@ -1006,4 +1006,61 @@ preflight (present, missing, planned), nuke and regenerate, the projection and i
 recorded transport (`tests/unit/test_consumes.py`). The platform's own application of the routes
 document is the platform's.
 
-**Amendment 17.1 (2026-10-16):** `render` also projects each static service's web server config (`projections.serverConfig`, default `ops/containers/{module}/server.conf`); a release refuses one that differs from what it ships. A static service runs a pinned server image with the release's files mounted read-only, so it has no Dockerfile of its own -- its config is the part a reviewer needs to see. Rejected: building an image per UI release (an image build on the host for files a pinned server already serves).
+**Amendment 17.1 (2026-10-16):** `render` also projects each static service's web server config (`projections.serverConfig`, default `ops/containers/{module}/server.conf`); a release refuses one that differs from what it ships. A static service runs a pinned server image with the release's files mounted read-only, so it has no Dockerfile of its own -- its config is the part a reviewer needs to see. Rejected: building an image per UI release (an image build on the host for files a pinned server already serves). *(Superseded by amendment 18: the owner chose one recipe shape for every module.)*
+
+## Amendment 18 — every deployable module runs an image built from its driver's recipe (2026-10-16, owner-delegated)
+
+**Context.** Until 2.3.x a UI module (`node-spa`, `node-vite`) deployed as `static`: a pinned nginx
+image with the release's files and its rendered server config mounted read-only, and no Dockerfile.
+Every other module ran an image built on the target from its release by its driver's recipe. Two
+pipeline shapes meant two code paths in the model, the stack compose, the image-pin check, drift and
+the projections, and the local stack ran the UI from a host-owned Dockerfile with `development` /
+`production` targets -- a third shape that no release ever ran (12-factor X: dev/prod parity).
+
+**Decision.**
+
+1. **A UI release is a `build` service.** `node-spa` and `node-vite` declare
+   `container.template: ../_shared/static/Dockerfile` -- one shared recipe: `FROM` the pinned
+   `nginxinc/nginx-unprivileged`, `COPY {serve}/` to the web root (`container.webRoot`), `COPY` the
+   rendered server config (`server.conf`) to nginx's config path, `USER nginx`, `EXPOSE {port}`,
+   `HEALTHCHECK` through the driver's `probe.http` on `healthPath: /healthz` (the config always
+   answers it). The image is built on the target from the release, exactly as an api's; `rollback`
+   moves `current` and the stack runs that release's image.
+2. **One source for the config.** `container.serverConfig` (the driver's `spa.conf`) is rendered
+   with `container.serve` / `container.proxy` into the release beside the recipe, which COPYs it.
+   `render` projects both `ops/containers/<module>/Dockerfile` and `server.conf`; a release refuses
+   either one stale (exit 5). The built-SPA checks (no baked address, `allowBaked`) and the
+   `index.html`-under-`serve` check keep refusing a package, now keyed on the facts
+   (`builtChecks`, `serverConfig`) rather than on a kind.
+3. **The local stack builds the same recipe.** A driver that declares `compose.fromRelease` gets the
+   `module_ui_release` compose-gen template for both profiles: its build context is the release
+   tree `stack up` stages from what `package` left (`.stack-kit/local/<module>/<service>/`,
+   `package.stage` -- the bytes `pack` would archive), its port the service's internal one, and a
+   compose `link` per proxied service under the service id the rendered config names, so the same
+   `proxy_pass` resolves locally and on a target. `<module> run` (the toolchain on the machine) and
+   `dev up` (the driver's dev container) are unchanged: the hot-reload loop stays the toolchain's.
+4. **`static` goes.** After (1) no kit driver declares it, and the owner wants one pipeline shape;
+   under the value rule (no machinery without a user) the kind is removed, not kept as a declared
+   alternative. A manifest or driver that still declares `container.static` is refused by the model
+   with a message naming the recipe, never silently ignored. The `module_ui_stack_dev` /
+   `module_ui_stack_prod` compose templates and `node-vite`'s `compose.dockerfiles` go with it (a
+   host's own compose catalog may still carry templates of its own). The `static` *target runtime*
+   (a release and its `current` pointer, served by something else) is a different fact and stays.
+
+*Rejected:* keeping `static` as `container.mode: static|build` (two shapes for every check, drift
+and projection to carry, with no declared user once the drivers move; a host that wants a mounted
+release can declare its own driver); building the local UI from the module directory with the
+projected Dockerfile (the rendered `server.conf` lies outside that build context -- an
+`additional_contexts` workaround would make the local recipe differ from the release's);
+a multi-stage recipe that runs the Node build inside the image (the package is built once per
+commit and promoted; a rebuild per environment is what amendment 11 refuses).
+
+*What a host does:* nothing in its manifest unless it declared `container.static` itself (remove
+it). It runs `render` once and commits the new `ops/containers/<ui-module>/Dockerfile` (and the
+unchanged `server.conf`); a host whose compose catalog relied on the removed UI templates or on a
+UI module's own `Dockerfile` with `development` / `production` targets regenerates with
+`compose-gen` and runs `package <ui-module>` before `stack up`.
+
+*Unproven:* no real image was built or run by the suite: the recipe, the release on the recorded
+transport (shipped, built, current, rolled back), the local stack's compose and its staged tree
+are proven by `tests/unit/test_ui_release.py`.

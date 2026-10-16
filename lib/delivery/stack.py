@@ -77,17 +77,6 @@ def service_document(service: Service, *, project: str, environment: str, target
         doc.update({"image": naming.remote_image(project, environment, service.id, state.release),
                     "build": {"context": posixpath.join(unit["releases"], state.release)}})
         doc["labels"]["org.opencontainers.image.revision"] = revision
-    elif service.kind == "static":
-        if not state.release:
-            raise StackError(f"service {service.id}: no release to serve")
-        static = spec.get("static") or {}
-        release_dir = posixpath.join(unit["releases"], state.release)
-        doc["image"] = static["image"]
-        serve = str(spec.get("serve") or "").strip("/")
-        volumes.append(f"{posixpath.join(release_dir, serve) if serve else release_dir}:{static['mount']}:ro")
-        if static.get("config"):
-            volumes.append(f"{posixpath.join(release_dir, '.stack-kit/static.conf')}:{static['configMount']}:ro")
-        doc["labels"]["org.opencontainers.image.revision"] = revision
     else:
         doc["image"] = spec["image"]
     if spec.get("command") and not state.workspace:

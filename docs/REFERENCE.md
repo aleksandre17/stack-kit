@@ -99,7 +99,7 @@ stack; `opsModules` its registry rows).
 | `dotnet-aspnet` | `dotnet publish` into `{out}` | `container/Dockerfile` on the ASP.NET runtime | `dotnet watch` in the SDK image |
 | `java-boot` | `build`, the boot jar | `container/Dockerfile` on a JRE | `bootRun` in a JDK image; Java sources `rebuild` |
 | `node-api` | `build`, `dist/**` + manifest + lockfile | `container/Dockerfile`, production dependencies | the `dev` script |
-| `node-spa`, `node-vite` | `build`, `dist/**` | a static image serving `serve` (SPA routes to `index.html`) | the `start` / `dev` script |
+| `node-spa`, `node-vite` | `build`, `dist/**` | an image built from the shared recipe (`drivers/_shared/static/Dockerfile`): pinned unprivileged nginx serving `serve` (SPA routes to `index.html`), its rendered `server.conf` COPYed in | the `start` / `dev` script |
 
 Adding a driver: copy `drivers/_template/`, declare it in `drivers/registry.json` (or the host's own
 registry), give it a `container` recipe and a `dev`; nothing else changes. Per-driver detail:

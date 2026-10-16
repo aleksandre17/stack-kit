@@ -70,7 +70,7 @@
       "migrations": { "type": "object" },
       "compose": { "type": "object" },
       "nginx": { "type": "object" },
-      "container": { "type": "object", "description": "How a release of the driver's modules runs (ADR-001 amendment 13): a recipe `template` (driver-relative, rendered per module: {toolchain.version|...}, {artifact}, {port}, {entry}), or a `static` image serving it; `port`, `artifact`, `entry`, `healthcheck`, `serve`" },
+      "container": { "type": "object", "description": "How a release of the driver's modules runs (ADR-001 amendment 13): a recipe `template` (driver-relative, rendered per module: {toolchain.version|...}, {artifact}, {port}, {entry}, {healthcheck}; a web server's also {serve}, {webRoot}, {config}); `port`, `artifact`, `entry`, `probe`, `healthPath`, `serve`, and a web server's `serverConfig` (its config template, rendered into the release beside the recipe) and `webRoot`. A `static` image serving a mounted release was retired in 2.4.0 (ADR-001 amendment 18)" },
       "dev": { "type": "object", "description": "Remote dev of the driver's modules: `image`, `command`, `build`, `port`, `caches` {name: mount}, `excludes`, `reactions` [{globs, do}]" },
       "outputs": { "type": "array", "items": { "type": "string", "minLength": 1, "pattern": "^[^!]" }, "description": "What the driver's toolchain writes: gitignore-style patterns relative to the module path (`bin/` a directory of that name at any depth). Never tracked (validate refuses a tracked file one matches), never drafted from, never synced" },
       "audit": {

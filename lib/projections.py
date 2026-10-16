@@ -74,16 +74,15 @@ def _build_services(manifest: dict[str, Any], unrenderable: list[str]) -> list[A
     return out
 
 
-def _static_services(manifest: dict[str, Any], unrenderable: list[str]) -> list[Any]:
-    """Static services that ship a server config their driver renders (a UI module's web server)."""
+def _web_services(manifest: dict[str, Any], unrenderable: list[str]) -> list[Any]:
+    """Services that ship a server config their driver renders (a UI module's web server)."""
     from lib.delivery.model import deployable, module_services
 
     out = []
     for mid in (manifest.get("modules") or {}):
         try:
             if deployable(manifest, mid):
-                out += [s for s in module_services(manifest, mid)
-                        if s.kind == "static" and (s.spec.get("static") or {}).get("config")]
+                out += [s for s in module_services(manifest, mid) if s.kind == "build" and s.spec.get("serverConfig")]
         except (ValueError, KeyError, TypeError) as e:
             unrenderable.append(f"modules.{mid}: {e}")
     return out
@@ -92,23 +91,23 @@ def _static_services(manifest: dict[str, Any], unrenderable: list[str]) -> list[
 def server_config_sources(root: Path, manifest: dict[str, Any], service: Any) -> list[str]:
     from lib.delivery.model import driver_home
 
-    tpl = driver_home(service.driver) / str(service.spec["static"]["config"])
+    tpl = driver_home(service.driver) / str(service.spec["serverConfig"])
     try:
         shown = tpl.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
-        shown = f"{identity.KIT_NAME} drivers/{service.driver}/{service.spec['static']['config']}"
+        shown = f"{identity.KIT_NAME} drivers/{service.driver}/{service.spec['serverConfig']}"
     return [shown, f"{identity.MANIFEST_FILENAME} modules.{service.module}.container"]
 
 
 def server_config(root: Path, manifest: dict[str, Any], service: Any) -> bytes:
-    """The static service's effective server config, exactly as its release ships it."""
+    """The web server's effective config, exactly as its release ships it (and its recipe COPYs)."""
     from lib import package
 
     return package.recipe(root, manifest, service, {})[SERVER_CONFIG_MEMBER]
 
 
-#: Where a static release carries its rendered server config (lib/package.py).
-SERVER_CONFIG_MEMBER = ".stack-kit/static.conf"
+#: Where a web server's release carries its rendered config -- lib/package.py's name, its one home.
+from lib.package import SERVER_CONFIG as SERVER_CONFIG_MEMBER  # noqa: E402
 
 
 def container_path(manifest: dict[str, Any], service: Any) -> str:
@@ -216,7 +215,7 @@ def rendered(root: Path, manifest: dict[str, Any], unrenderable: list[str] | Non
             out[container_path(manifest, s)] = header(recipe_sources(root, manifest, s)).encode("utf-8") + recipe(root, manifest, s)
         except (ValueError, KeyError, OSError) as e:
             said.append(f"{s.id}: {e}")
-    for s in _static_services(manifest, said):
+    for s in _web_services(manifest, said):
         try:
             out[place(manifest, "serverConfig", module=str(s.module), service=s.id)] = (
                 header(server_config_sources(root, manifest, s)).encode("utf-8") + server_config(root, manifest, s))
@@ -303,7 +302,7 @@ def release_problems(ctx, svc: list[Any], rid: str, trees: dict[str, dict[str, b
             if f.is_file() and shipped is not None:
                 if body(f.read_bytes().replace(b"\r\n", b"\n")) != symbolic_recipe(shipped, s, trees[s.id]):
                     out.append(f"{s.id}: the recipe this release ships differs from {f.relative_to(ctx.root).as_posix()}")
-        if s.kind == "static":
+        if s.kind == "build" and s.spec.get("serverConfig"):
             f = ctx.root / place(ctx.manifest, "serverConfig", module=str(s.module), service=s.id)
             shipped = (trees.get(s.id) or {}).get(SERVER_CONFIG_MEMBER)
             if f.is_file() and shipped is not None and body(f.read_bytes().replace(b"\r\n", b"\n")) != shipped:

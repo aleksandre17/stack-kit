@@ -8,7 +8,8 @@ bundler, no output directory and no dev-server port: the package says, the drive
 |---|---|---|
 | `build`, `test`, `lint` | `<pm> run <script>` in the module directory | registry `packageScripts`; a module renames one in `node.scripts.<step>` (`""` = none) |
 | `run` (= `hybrid boot`) | the `start` script, with the module's `.env` + `.env.dev` in the process | the kit's host runner, then `ps1/hybrid.ps1` |
-| `deploy` (`deliver release`) | the kit's release: `build` packages `dist/**` once per commit; a static image serves `container.serve` (default `dist`; Angular: `dist/<app>/browser`), every app route answered by `index.html`; per-environment values are runtime config, mounted read-only | registry `package`, `container` |
+| `deploy` (`deliver release`) | the kit's release: `build` packages `dist/**` once per commit; its image is built on the target from the release by the shared recipe (`drivers/_shared/static/Dockerfile`): the pinned unprivileged nginx serving `container.serve` (default `dist`; Angular: `dist/<app>/browser`), every app route answered by `index.html`, its rendered `server.conf` COPYed in; per-environment values are runtime config, mounted read-only | registry `package`, `container` |
+| `stack up` (the local docker stack) | the same recipe, built from the release tree `package` left (staged in `.stack-kit/local/<module>/`) -- the UI runs locally in docker as it runs on a target | registry `compose` (`fromRelease`) |
 | `dev up` (`deliver remote-dev`) | the `start` script with `--host 0.0.0.0` in a Node container on port 4200, the source synced into the workspace | registry `dev` |
 
 `<pm>` is `node.packageManager`, else the one whose lockfile is nearest above the module

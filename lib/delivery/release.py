@@ -223,9 +223,7 @@ def images_floating(ctx: Delivery, svc: list[Service], trees: dict[str, dict[str
     digest = ctx.flag("requireDigests")
     images: list[str] = []
     for s in [*svc, *(x for x in running.services(ctx) if x.module is None)]:
-        if s.kind == "static":
-            images.append(str((s.spec.get("static") or {}).get("image") or ""))
-        elif s.kind == "image":
+        if s.kind == "image":
             images.append(str(s.spec.get("image") or ""))
         recipe = (trees.get(s.id) or {}).get("Dockerfile")
         if recipe:

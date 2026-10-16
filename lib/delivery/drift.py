@@ -66,7 +66,7 @@ def drift(ctx: Delivery) -> list[str]:
         r = ctx.transport.exec(ctx.engine("inspect", "-f", "{{.Config.Image}}", name), readonly=True)
         image = r.out.strip() if r.code == 0 else ""
         expected = (naming.remote_image(ctx.project, ctx.environment, s.id, state.release) if s.kind == "build"
-                    else (s.spec.get("static") or {}).get("image") or s.spec.get("image"))
+                    else s.spec.get("image"))
         if image != expected:
             out.append(f"{s.id}: runs {image or 'nothing'}, its current release says {expected}")
     return out

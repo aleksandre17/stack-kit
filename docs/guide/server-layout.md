@@ -25,7 +25,8 @@ template in it:
   {project}/                              this project's tree, marked .stack-kit-project
     {environment}/                        one disjoint tree per environment
       {tier}/{service}/
-        releases/<commit>/                one release per commit
+        releases/<commit>/                one release per commit: its files and the recipe its image
+                                          is built from on the target (a UI's with its server.conf)
         current -> releases/<commit>      what runs; `release rollback` moves it
         runtime/  logs/  workspace/       runtime config, logs, the remote-dev source
       stack/compose.yml  stack/env/       the environment's one compose file and its env files

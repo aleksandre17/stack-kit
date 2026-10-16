@@ -46,9 +46,11 @@
     {
       "standard": "12-Factor",
       "clause": "X dev/prod parity",
-      "mechanism": "one layout and one compose per environment; remote dev runs the driver's dev image, not the release image",
+      "mechanism": "one layout and one compose per environment; every deployable module, UI included, runs an image built from its driver's recipe -- the local stack builds the same recipe from the same release tree; remote dev runs the driver's dev image, not the release image",
       "evidence": [
-        "tests/unit/test_remote_dev.py::test_dev_up_runs_the_workspace_and_down_returns_to_nothing"
+        "tests/unit/test_remote_dev.py::test_dev_up_runs_the_workspace_and_down_returns_to_nothing",
+        "tests/unit/test_ui_release.py::test_a_ui_release_ships_builds_and_rolls_back_like_any_build_service",
+        "tests/unit/test_ui_release.py::test_the_local_stack_builds_the_ui_from_the_same_recipe"
       ],
       "status": "partial",
       "why": "the dev container is the toolchain's image with the source mounted, by design (hot reload); the release image is prod's"
@@ -223,7 +225,7 @@
       "clause": "hardened SPA nginx",
       "mechanism": "hardened SPA nginx",
       "evidence": [
-        "tests/unit/test_cd.py::test_a_static_release_is_hardened_and_proxies_its_api_same_origin"
+        "tests/unit/test_ui_release.py::test_a_ui_release_is_an_image_built_from_its_drivers_recipe_hardened_and_proxied"
       ],
       "status": "conformant"
     },
@@ -349,7 +351,7 @@
       "clause": "built-SPA checks (no http://, no IP)",
       "mechanism": "built-SPA checks (no http://, no IP)",
       "evidence": [
-        "tests/unit/test_cd.py::test_a_static_release_is_hardened_and_proxies_its_api_same_origin"
+        "tests/unit/test_ui_release.py::test_a_ui_release_is_an_image_built_from_its_drivers_recipe_hardened_and_proxied"
       ],
       "status": "conformant"
     },

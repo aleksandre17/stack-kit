@@ -116,6 +116,31 @@ def _credential_blocks(
     return vol_block, env_block
 
 
+def from_release(driver_type: str) -> bool:
+    """Whether the local stack runs the module's release image (`compose.fromRelease`): built from
+    the release tree `stack` stages (lib/package.py `stage`), by the recipe a deploy builds."""
+    from lib.modules import driver_capability
+
+    return bool((driver_capability(driver_type, "compose", {}) or {}).get("fromRelease"))
+
+
+def _release_fmt(ctx: ProjectContext, module_id: str, compose_dir: Path) -> dict[str, str]:
+    """The release template's values: the staged tree as the build context, the service's internal
+    port, and a link per proxied service (its local compose name under the service id the rendered
+    server config proxies to -- the name it has on a target's stack)."""
+    from lib import package
+    from lib.delivery.model import all_services, module_services
+
+    svc = module_services(ctx.manifest, module_id)[0]
+    by_id = {s.id: s for s in all_services(ctx.manifest)}
+    links = [f"      - {resolve_module_service_name(str(by_id[sid].module), ctx.manifest, ctx.root)}:{sid}"
+             for sid in sorted({str(v) for v in (svc.spec.get("proxy") or {}).values()})
+             if sid in by_id and by_id[sid].module]
+    return {"release_context": _rel_posix(compose_dir, package.local_tree(ctx.root, module_id) / svc.id),
+            "container_port": str(svc.spec.get("port") or ""),
+            "release_links": ("    links:\n" + "\n".join(links) + "\n") if links else ""}
+
+
 def _template_for(driver_type: str, role: str, profile: str, cat: dict[str, Any]) -> str:
     """The template the module's DRIVER declares for its role and profile (`compose.templates`; a
     project driver declares its own), from the kit's templates or the host's own."""
@@ -207,6 +232,7 @@ def render_module_service(
             else fmt_global["api_service"]
         ),
         "app_dev_mount": module_context,
+        **(_release_fmt(ctx, module_id, compose_dir) if from_release(driver_type) else {}),
     }
     return tpl.format(**fmt)
 

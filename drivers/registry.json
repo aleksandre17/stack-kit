@@ -244,7 +244,7 @@
     ]
   },
   "node-vite": {
-    "label": "Node — SPA dev remote + static deploy (Vite, Angular, Nx)",
+    "label": "Node — SPA dev remote + nginx release image (Vite, Angular, Nx)",
     "roles": [
       "ui"
     ],
@@ -341,36 +341,26 @@
     "compose": {
       "templates": {
         "ui": {
-          "dev": "module_ui_stack_dev",
-          "prod": "module_ui_stack_prod"
+          "dev": "module_ui_release",
+          "prod": "module_ui_release"
         }
       },
-      "dockerfiles": {
-        "dev": "Dockerfile",
-        "prod": "Dockerfile"
-      }
+      "fromRelease": true
     },
     "nginx": {
       "serves": true
     },
     "container": {
-      "static": {
-        "image": "nginxinc/nginx-unprivileged:1.27-alpine",
-        "mount": "/usr/share/nginx/html",
-        "config": "../_shared/static/spa.conf",
-        "configMount": "/etc/nginx/conf.d/default.conf"
-      },
+      "template": "../_shared/static/Dockerfile",
+      "serverConfig": "../_shared/static/spa.conf",
+      "webRoot": "/usr/share/nginx/html",
       "serve": "dist",
       "port": 8080,
       "builtChecks": true,
-      "healthcheck": {
-        "test": [
-          "CMD-SHELL",
-          "wget -q -O /dev/null http://127.0.0.1:{port}/healthz || exit 1"
-        ],
-        "interval": "10s",
-        "timeout": "3s",
-        "retries": 3
+      "healthPath": "/healthz",
+      "probe": {
+        "tcp": "nc -z 127.0.0.1 {port} || exit 1",
+        "http": "wget -q -O /dev/null http://127.0.0.1:{port}{path} || exit 1"
       }
     },
     "dev": {
@@ -777,24 +767,26 @@
         "dist/**"
       ]
     },
-    "container": {
-      "static": {
-        "image": "nginxinc/nginx-unprivileged:1.27-alpine",
-        "mount": "/usr/share/nginx/html",
-        "config": "../_shared/static/spa.conf",
-        "configMount": "/etc/nginx/conf.d/default.conf"
+    "compose": {
+      "templates": {
+        "ui": {
+          "dev": "module_ui_release",
+          "prod": "module_ui_release"
+        }
       },
+      "fromRelease": true
+    },
+    "container": {
+      "template": "../_shared/static/Dockerfile",
+      "serverConfig": "../_shared/static/spa.conf",
+      "webRoot": "/usr/share/nginx/html",
       "serve": "dist",
       "port": 8080,
       "builtChecks": true,
-      "healthcheck": {
-        "test": [
-          "CMD-SHELL",
-          "wget -q -O /dev/null http://127.0.0.1:{port}/healthz || exit 1"
-        ],
-        "interval": "10s",
-        "timeout": "3s",
-        "retries": 3
+      "healthPath": "/healthz",
+      "probe": {
+        "tcp": "nc -z 127.0.0.1 {port} || exit 1",
+        "http": "wget -q -O /dev/null http://127.0.0.1:{port}{path} || exit 1"
       }
     },
     "dev": {

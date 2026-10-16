@@ -484,8 +484,8 @@
             "type": "object",
             "description": "This module's own configuration, by name, for the host's tools: the kit validates its shape as an object and reads nothing in it"
           },
-          "container": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, static {image, mount, config, configMount}, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns, healthPath (the recipe's probe asks it; else the port), proxy {path: service} (a static app's same-origin reverse proxy), builtChecks, allowBaked" },
-          "services": { "type": "object", "description": "Several services from one module, by id, each over `container` (its `context`: the subdirectory of the artifacts it is built from)", "additionalProperties": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, static {image, mount, config, configMount}, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns, healthPath (the recipe's probe asks it; else the port), proxy {path: service} (a static app's same-origin reverse proxy), builtChecks, allowBaked" } },
+          "container": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, serverConfig, webRoot, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns, healthPath (the recipe's probe asks it; else the port), proxy {path: service} (a web server's same-origin reverse proxy), builtChecks, allowBaked" },
+          "services": { "type": "object", "description": "Several services from one module, by id, each over `container` (its `context`: the subdirectory of the artifacts it is built from)", "additionalProperties": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, serverConfig, webRoot, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns, healthPath (the recipe's probe asks it; else the port), proxy {path: service} (a web server's same-origin reverse proxy), builtChecks, allowBaked" } },
           "dev": { "type": "object", "description": "Remote dev over the driver's `dev`: image, command, build, port, debugPort, caches {name: mount}, excludes, reactions [{globs, do: hot-reload|restart|rebuild}], environment, debounceMs" },
           "credentialPatterns": { "type": "array", "items": { "type": "string" }, "description": "Which files of the secrets folder are credentials (default config/delivery.json)" },
           "outputs": { "type": "array", "items": { "type": "string", "minLength": 1, "pattern": "^[^!]" }, "description": "What this module's build writes beyond its driver's `outputs` (gitignore-style, relative to the module path): an extension, never a removal; validate refuses a tracked file one matches" }
@@ -754,12 +754,13 @@
     },
     "commands": {
       "type": "object",
-      "description": "The host's own command lines, as literal strings any tool runs verbatim from the host root (the agent kit's detector reads `commands.test`, required, and `commands.build`). `stack-kit init` writes them through the host launcher.",
+      "description": "The host's own command lines, as literal strings any tool runs verbatim from the host root (the agent kit's detector reads `commands.test`, required, `commands.build`, and `commands.validate` -- the enforcer `stack-kit:validate` of a host law). `stack-kit init` writes them through the host launcher.",
       "required": ["test"],
       "properties": {
         "build": { "type": "string", "minLength": 1 },
         "test": { "type": "string", "minLength": 1 },
         "lint": { "type": "string", "minLength": 1 },
+        "validate": { "type": "string", "minLength": 1, "description": "The line that validates the host against its declarations (`<launcher> validate`): what a host law's enforcer `stack-kit:validate` runs" },
         "run": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false

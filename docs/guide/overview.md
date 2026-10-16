@@ -18,7 +18,10 @@ toolchain:
 
 - how its presence is detected;
 - its lint, build, test, audit and package commands;
-- its release container recipe (multi-stage, non-root `USER`, `HEALTHCHECK`);
+- its release container recipe (multi-stage where a stage does work, non-root `USER`, `HEALTHCHECK`):
+  every deployable module runs an image built from it, a UI module's included -- the pinned
+  unprivileged nginx with the built app and its rendered server config -- so the local stack, a dev
+  release and prod run the same recipe;
 - its dev container (image, command, caches, sync excludes, reactions to changes);
 - the files its build writes (`outputs`; `validate` refuses them when tracked);
 - its health probe.
