@@ -89,7 +89,8 @@ under `{root}/{project}`, refused otherwise (`lib/targets/layout.py`).
 `commands` (script, or `{script, runtime}`), `packageScripts`, `hybrid.script`, `package`
 `{command, args, artifacts}` (`{out}`: the staging directory), `container` (above), `dev` (above),
 `generated` (directories its tools write), `delivery` (rung -> `{via}` a kit verb, `{command, args}`,
-or `{pending}`), `ci.setup`, `detect`, `vscode.launch`, `migrations`, `compose` (the local stack).
+or `{pending}`), `ci.setup`, `detect`, `vscode` (`launch` as data, `values`, `label`, `optional`), `migrations`, `compose` (the local
+stack; `opsModules` its registry rows).
 
 | Driver | Package | Release runs | Remote dev |
 |---|---|---|---|

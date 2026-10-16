@@ -30,12 +30,26 @@
       "vscode": {
         "type": "object",
         "properties": {
-          "launch": {
-            "oneOf": [
-              { "type": "string", "minLength": 1 },
-              { "type": "object", "description": "A launch configuration as data: {placeholders} {module}, {path}, {label}, {script} are filled per module" }
-            ]
-          }
+          "launch": { "type": "object", "description": "The launch configuration as data, rendered per module by the kit's template grammar over the module's entry and {module}, {path}, {label}, {script}, {envFile} and each declared value (a former launch-kind string is no longer built: declare the data)" },
+          "label": { "type": "string", "description": "The launch's name, rendered (the module's debug.label wins; else the module id)" },
+          "values": {
+            "type": "object",
+            "description": "name -> its sources, the first that yields one wins (lib/vscode_gen.py): field (exists), driver, value, glob (single | as dotted under), file + capture",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "field": { "type": "string" }, "exists": { "type": "boolean" }, "driver": { "type": "string" },
+                  "value": { "type": "string" }, "glob": { "type": "string" }, "single": { "type": "boolean" },
+                  "as": { "enum": ["path", "dotted"] }, "under": { "type": "string" },
+                  "file": { "type": "array", "items": { "type": "string" } }, "capture": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "optional": { "type": "array", "items": { "type": "string" }, "description": "Launch keys dropped when they have no value" }
         },
         "additionalProperties": false
       },

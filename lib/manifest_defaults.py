@@ -58,6 +58,7 @@ CONVENTION_DEFAULTS = (
     "ci.waitStackHealth",
     "vscode.folder",
     "vscode.cliScript",
+    "vscode.terminalLaunchType",
 )
 
 

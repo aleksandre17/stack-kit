@@ -4,7 +4,7 @@ Held here:
   * the registry entry is complete and every declared script exists;
   * the shared hybrid runner reaches it through the declared ``hybrid.script`` — the
     runner itself names no new driver;
-  * VS Code launch is built from the declared ``dotnet`` launch kind;
+  * VS Code launch is the driver's declared launch data;
   * a project with no ``compose`` section validates (compose is optional).
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 from lib.modules import driver_commands, driver_registry
 from lib.project_context import ProjectContext
 from lib.validate_manifest import _validate_required
-from lib.vscode_gen import LAUNCH_BUILDERS, build_launch_json
+from lib.vscode_gen import build_launch_json
 from conftest import PKG
 
 DRIVER = "dotnet-aspnet"
@@ -42,8 +42,8 @@ class TestRegistryEntry:
         for rel in [*entry["commands"].values(), entry["hybrid"]["script"]]:
             assert (PKG / "drivers" / DRIVER / rel).is_file(), rel
 
-    def test_launch_kind_has_a_builder(self) -> None:
-        assert driver_registry()[DRIVER]["vscode"]["launch"] in LAUNCH_BUILDERS
+    def test_launch_is_declared_as_data(self) -> None:
+        assert isinstance(driver_registry()[DRIVER]["vscode"]["launch"], dict)
 
 
 class TestHybridRunnerStaysDeclarative:

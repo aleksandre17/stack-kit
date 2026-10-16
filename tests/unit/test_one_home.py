@@ -19,11 +19,7 @@ TOOLS = re.compile(r"\b(gradlew?|jar|java|node|npm|pnpm|npx|yarn|dotnet|bootjar|
                    re.IGNORECASE)
 #: Generic code that still names a tool, each with why -- a ratchet: an entry whose file no longer
 #: names one fails, so the list only shrinks.
-OWED = {
-    "lib/vscode_gen.py": "VS Code debugger types per toolchain: its builders move into each driver's vscode.launch data",
-    "compose/manifest_compose.py": "local compose-gen's ops.modules registry rows (a driver's compose.opsModules)",
-    "compose/sync_ops_modules.py": "local compose-gen's shared-submodule row",
-}
+OWED: dict[str, str] = {}
 
 
 def _tracked(*globs: str) -> list[str]:

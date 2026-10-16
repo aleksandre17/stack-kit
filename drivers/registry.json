@@ -16,7 +16,53 @@
     },
     "tasks": {},
     "vscode": {
-      "launch": "java"
+      "label": "{module}: Spring Boot",
+      "values": {
+        "mainClass": [
+          {
+            "field": "debug.java.mainClass"
+          },
+          {
+            "field": "debug.mainClass"
+          },
+          {
+            "glob": "src/main/java/**/*Application.java",
+            "as": "dotted",
+            "under": "src/main/java"
+          }
+        ],
+        "projectName": [
+          {
+            "field": "debug.java.projectName"
+          },
+          {
+            "field": "debug.projectName"
+          },
+          {
+            "file": [
+              "settings.gradle.kts",
+              "settings.gradle"
+            ],
+            "capture": "rootProject\\.name\\s*=\\s*[\"']([^\"']+)[\"']"
+          }
+        ]
+      },
+      "launch": {
+        "name": "{label}",
+        "type": "java",
+        "request": "launch",
+        "mainClass": "{mainClass}",
+        "cwd": "{path}",
+        "projectName": "{projectName}",
+        "envFile": "{envFile}",
+        "env": {
+          "SPRING_PROFILES_ACTIVE": "{hybrid.springProfiles}"
+        }
+      },
+      "optional": [
+        "projectName",
+        "env"
+      ]
     },
     "migrations": {
       "globs": [
@@ -114,7 +160,15 @@
           "prod": "module_java_worker_prod"
         }
       },
-      "opsModules": "boot"
+      "opsModules": {
+        "kind": "boot",
+        "columns": "compose_service|gradle_module|type|dockerfile|enabled",
+        "embeddedWorker": "{worker_service}|worker|boot|worker/Dockerfile|yes",
+        "shared": {
+          "marker": "shared/build.gradle.kts",
+          "row": "|shared|library||yes"
+        }
+      }
     },
     "container": {
       "template": "container/Dockerfile",
@@ -186,7 +240,30 @@
     },
     "tasks": {},
     "vscode": {
-      "launch": "node-terminal"
+      "label": "{module}: npm run {script}",
+      "values": {
+        "script": [
+          {
+            "field": "debug.npmScript"
+          },
+          {
+            "field": "debug.script"
+          },
+          {
+            "driver": "packageScripts.start"
+          },
+          {
+            "value": "dev"
+          }
+        ]
+      },
+      "launch": {
+        "name": "{label}",
+        "type": "node-terminal",
+        "request": "launch",
+        "command": "npm run {script}",
+        "cwd": "{path}"
+      }
     },
     "delivery": {
       "local": {
@@ -325,7 +402,30 @@
     },
     "tasks": {},
     "vscode": {
-      "launch": "node-terminal"
+      "label": "{module}: npm run {script}",
+      "values": {
+        "script": [
+          {
+            "field": "debug.npmScript"
+          },
+          {
+            "field": "debug.script"
+          },
+          {
+            "driver": "packageScripts.start"
+          },
+          {
+            "value": "dev"
+          }
+        ]
+      },
+      "launch": {
+        "name": "{label}",
+        "type": "node-terminal",
+        "request": "launch",
+        "command": "npm run {script}",
+        "cwd": "{path}"
+      }
     },
     "delivery": {
       "local": {
@@ -442,7 +542,29 @@
     },
     "tasks": {},
     "vscode": {
-      "launch": "dotnet"
+      "label": "{module}: dotnet run",
+      "values": {
+        "project": [
+          {
+            "field": "dotnet.project",
+            "exists": true
+          },
+          {
+            "glob": "*.csproj",
+            "single": true
+          }
+        ]
+      },
+      "launch": {
+        "name": "{label}",
+        "type": "dotnet",
+        "request": "launch",
+        "projectPath": "{path}/{project}",
+        "launchConfigurationId": "TargetFramework=;{dotnet.launchProfile}"
+      },
+      "optional": [
+        "launchConfigurationId"
+      ]
     },
     "migrations": {
       "globs": [
@@ -573,7 +695,30 @@
     },
     "tasks": {},
     "vscode": {
-      "launch": "node-terminal"
+      "label": "{module}: npm run {script}",
+      "values": {
+        "script": [
+          {
+            "field": "debug.npmScript"
+          },
+          {
+            "field": "debug.script"
+          },
+          {
+            "driver": "packageScripts.start"
+          },
+          {
+            "value": "dev"
+          }
+        ]
+      },
+      "launch": {
+        "name": "{label}",
+        "type": "node-terminal",
+        "request": "launch",
+        "command": "npm run {script}",
+        "cwd": "{path}"
+      }
     },
     "delivery": {
       "local": {

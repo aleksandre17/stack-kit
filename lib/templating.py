@@ -29,7 +29,8 @@ def _filter(value: str, name: str) -> str:
     raise ValueError(f"template filter ':{name}' is not one of :stem, :majorminor")
 
 
-def _lookup(cur: Any, dotted: str) -> Any:
+def lookup(cur: Any, dotted: str) -> Any:
+    """A dotted path into a declaration, or None."""
     for part in dotted.split("."):
         cur = cur.get(part) if isinstance(cur, dict) else None
     return cur
@@ -46,7 +47,7 @@ def render(template: str, module: dict[str, Any], extra: dict[str, str] | None =
         defaults = [p for p in parts if not p.startswith(":")]
         value = extra.get(path)
         if value in (None, ""):
-            found = _lookup(module, path)
+            found = lookup(module, path)
             value = str(found) if found not in (None, "") else None
         if value in (None, ""):
             if not defaults:

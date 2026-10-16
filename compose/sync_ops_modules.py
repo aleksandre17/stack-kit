@@ -12,19 +12,27 @@ from build import find_project_root, global_fmt, load_catalog  # noqa: E402
 from manifest_compose import ops_modules_lines  # noqa: E402
 
 HEADER = "# GENERATED — do not edit. Run: stack-kit compose-gen\n"
-SHARED = "|shared|library||yes\n"
+COLUMNS = "compose_service|module|type|dockerfile|enabled"
+
+
+def _owner(manifest: dict) -> tuple[dict, dict]:
+    """The first module whose driver declares ops modules, and that declaration."""
+    from manifest_compose import ops_modules_declaration
+
+    for m in (manifest.get("modules") or {}).values():
+        decl = ops_modules_declaration(str(m.get("type") or "")) if isinstance(m, dict) else {}
+        if decl:
+            return m, decl
+    return {}, {}
 
 
 def _shared_module_line(root: Path, manifest: dict) -> str | None:
-    """Emit shared Gradle submodule row only when the consumer still has apps/backend/shared."""
-    modules = manifest.get("modules") or {}
-    # The module that may carry a shared build module: the first whose driver declares ops modules.
-    from manifest_compose import _ops_modules_kind
-
-    jvm = next((m for m in modules.values() if isinstance(m, dict) and _ops_modules_kind(str(m.get("type") or ""))), {})
-    rel = jvm.get("path") or "apps/backend"
-    if (root / rel / "shared" / "build.gradle.kts").is_file():
-        return SHARED.rstrip()
+    """The shared build module's row, as the driver declares it (`opsModules.shared`: a `marker` file
+    under the module and the `row`), only when the module still carries the marker."""
+    module, decl = _owner(manifest)
+    shared = decl.get("shared") if isinstance(decl.get("shared"), dict) else {}
+    if shared.get("marker") and module.get("path") and (root / module["path"] / shared["marker"]).is_file():
+        return str(shared.get("row") or "").rstrip() or None
     return None
 
 
@@ -44,7 +52,7 @@ def main() -> int:
     from lib.compose_identity import effective_compose_features
 
     features = effective_compose_features(manifest, catalog_features)
-    lines = [HEADER.rstrip(), "# Format: compose_service|gradle_module|type|dockerfile|enabled"]
+    lines = [HEADER.rstrip(), "# Format: " + str(_owner(manifest)[1].get("columns") or COLUMNS)]
     lines.extend(ops_modules_lines(ctx, fmt, features))
     shared_line = _shared_module_line(root, manifest)
     if shared_line:

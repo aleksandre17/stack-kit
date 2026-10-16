@@ -17,7 +17,7 @@ from lib.config_gen import DEFAULT_MANAGEMENT_ENDPOINTS, _management_endpoints
 from lib.identity import MANIFEST_FILENAME, manifest_filenames
 from lib.modules import driver_default_role, driver_registry
 from lib.project_context import ProjectContext
-from lib.vscode_gen import LAUNCH_BUILDERS, build_tasks_json
+from lib.vscode_gen import build_tasks_json
 from conftest import PKG
 
 
@@ -88,8 +88,8 @@ def test_every_driver_declares_a_role_and_launch_kind() -> None:
     for driver_id, entry in driver_registry().items():
         assert entry.get("roles"), f"{driver_id} declares no roles"
         assert driver_default_role(driver_id), f"{driver_id} role is not a known role"
-        kind = (entry.get("vscode") or {}).get("launch")
-        assert kind in LAUNCH_BUILDERS, f"{driver_id} declares unknown launch kind {kind!r}"
+        launch = (entry.get("vscode") or {}).get("launch")
+        assert isinstance(launch, dict), f"{driver_id} declares no launch data ({launch!r})"
 
 
 def test_declared_watch_tasks_reach_a_real_driver_command() -> None:

@@ -150,3 +150,21 @@ def test_resolve_service_names() -> None:
     assert resolve_module_service_name("backend", manifest, Path("x")) == "x-api"
     assert resolve_module_service_name("retrieval", manifest, Path("x")) == "x-retrieval"
     assert resolve_module_service_name("ingestion", manifest, Path("x")) == "x-ingestion"
+
+
+def test_the_ops_modules_rows_are_the_drivers_declaration(tmp_path: Path) -> None:
+    """The registry rows' kind, header, embedded worker and shared build module are declared by the
+    driver (`compose.opsModules`); a driver that declares none gets none (ADR-001 amendment 16)."""
+    from compose.manifest_compose import ops_modules_declaration
+    from compose.sync_ops_modules import _owner, _shared_module_line
+
+    decl = ops_modules_declaration("java-boot")
+    assert decl["kind"] and decl["embeddedWorker"] and decl["shared"]["marker"]
+    assert ops_modules_declaration("node-vite") == {}
+    manifest = {"modules": {"web": {"type": "node-vite", "path": "web"}, "api": {"type": "java-boot", "path": "api"}}}
+    assert _owner(manifest)[0]["path"] == "api"
+    assert _shared_module_line(tmp_path, manifest) is None
+    marker = tmp_path / "api" / decl["shared"]["marker"]
+    marker.parent.mkdir(parents=True)
+    marker.write_text("", encoding="utf-8")
+    assert _shared_module_line(tmp_path, manifest) == decl["shared"]["row"]

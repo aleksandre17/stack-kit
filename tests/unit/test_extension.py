@@ -141,7 +141,7 @@ def test_a_driver_declares_its_launch_configuration_as_data(tmp_path, monkeypatc
     (root / "apps" / "pysvc").mkdir(parents=True)
     (root / identity.MANIFEST_FILENAME).write_text(json.dumps(manifest), encoding="utf-8")
     monkeypatch.setenv(identity.env_name("PROJECT_ROOT"), str(root))
-    cfg = vscode_gen.LAUNCH_BUILDERS["data"](ProjectContext.discover(root), "pysvc", {})
+    cfg = vscode_gen.build_launch(ProjectContext.discover(root), "pysvc")
     assert cfg == {"type": "debugpy", "request": "launch", "name": "pysvc", "cwd": "${workspaceFolder}/apps/pysvc",
                    "module": "pysvc.main"}
 

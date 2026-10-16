@@ -1,5 +1,25 @@
 #!/usr/bin/env python3
-"""Generate .vscode/launch.json and tasks.json from the project manifest (manifest-driven)."""
+"""Generate .vscode/launch.json and tasks.json from the project manifest (manifest-driven).
+
+A module's launch configuration is its driver's DECLARATION (`vscode` in its registry entry), never
+a builder here (ADR-001 amendment 16): `launch` is the configuration as data, every string rendered
+by the kit's one template grammar (lib/templating.py) over the module's manifest entry and these
+values -- `{module}`, `{path}` (the module's folder under `${workspaceFolder}`), `{label}`,
+`{script}`, `{envFile}` (the module's run-default env file) and each value the driver declares under
+`values`. A value is the first of its sources that yields one:
+
+    {"field": "a.b"}                 the module's manifest entry; `"exists": true` -- a module file,
+                                     and a declared one that is missing is an absence, never a fallthrough
+    {"driver": "a.b"}                the driver's own registry entry
+    {"value": "x"}                   a literal
+    {"glob": "p/**/*.x", ...}        module files: `single` (exactly one, else none) or the shortest
+                                     path; `as: "dotted"` with `under` gives the dotted name below it
+    {"file": ["a", "b"], "capture": "re"}  the first group of `re` in the first of the files that has it
+
+`label` is the module's `debug.label`, else the driver's `label` rendered, else the module id. A key
+listed in `optional` is dropped when it has no value; any other missing value is an honest absence
+of the launch, not a guess. The kit names no debugger and no tool.
+"""
 from __future__ import annotations
 
 import json
@@ -7,6 +27,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from lib import templating
 from lib.manifest_defaults import default_field, read_nested
 from lib.modules import driver_package_scripts, driver_registry, infer_cli_aliases, modules_by_role
 from lib.project_context import ProjectContext
@@ -14,105 +35,6 @@ from lib.project_context import ProjectContext
 
 def _posix_rel(root: Path, path: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
-
-
-def _gradle_project_name(module_dir: Path) -> str | None:
-    for name in ("settings.gradle.kts", "settings.gradle"):
-        f = module_dir / name
-        if not f.is_file():
-            continue
-        text = f.read_text(encoding="utf-8", errors="replace")
-        m = re.search(r'rootProject\.name\s*=\s*["\']([^"\']+)["\']', text)
-        if m:
-            return m.group(1)
-    return None
-
-
-def _detect_spring_main_class(module_dir: Path) -> str | None:
-    java_root = module_dir / "src" / "main" / "java"
-    if not java_root.is_dir():
-        return None
-    candidates: list[Path] = []
-    for p in java_root.rglob("*Application.java"):
-        if p.is_file():
-            candidates.append(p)
-    if not candidates:
-        return None
-    # Prefer shortest path / typical Spring Boot entry
-    pick = sorted(candidates, key=lambda x: (len(x.parts), x.name))[0]
-    rel = pick.relative_to(java_root)
-    return ".".join(rel.with_suffix("").parts)
-
-
-def _module_debug_cfg(manifest: dict[str, Any], module_id: str) -> dict[str, Any]:
-    cfg = (manifest.get("modules") or {}).get(module_id) or {}
-    if not isinstance(cfg, dict):
-        return {}
-    dbg = cfg.get("debug")
-    return dbg if isinstance(dbg, dict) else {}
-
-
-def _launch_node_terminal(
-    ctx: ProjectContext, module_id: str, aliases: dict[str, str]
-) -> dict[str, Any]:
-    rel = _posix_rel(ctx.root, ctx.module_path(module_id))
-    dbg = _module_debug_cfg(ctx.manifest, module_id)
-    # The module's debug script, else the start script its driver declares, else `dev`.
-    typ = str(((ctx.manifest.get("modules") or {}).get(module_id) or {}).get("type") or "")
-    declared = driver_package_scripts(typ).get("start")
-    script = str(dbg.get("npmScript") or dbg.get("script") or declared or "dev")
-    label = str(dbg.get("label") or f"{module_id}: npm run {script}")
-    return {
-        "name": label,
-        "type": "node-terminal",
-        "request": "launch",
-        "command": f"npm run {script}",
-        "cwd": "${workspaceFolder}/" + rel,
-    }
-
-
-def _launch_java(
-    ctx: ProjectContext, module_id: str, aliases: dict[str, str]
-) -> dict[str, Any] | None:
-    mod_dir = ctx.module_path(module_id)
-    dbg = _module_debug_cfg(ctx.manifest, module_id)
-    java_dbg = dbg.get("java") if isinstance(dbg.get("java"), dict) else dbg
-    main = None
-    project = None
-    if isinstance(java_dbg, dict):
-        main = java_dbg.get("mainClass")
-        project = java_dbg.get("projectName")
-    if not main:
-        main = dbg.get("mainClass")
-    if not project:
-        project = dbg.get("projectName")
-    if not main:
-        main = _detect_spring_main_class(mod_dir)
-    if not project:
-        project = _gradle_project_name(mod_dir)
-    if not main:
-        return None
-    rel = _posix_rel(ctx.root, mod_dir)
-    label = str(dbg.get("label") or f"{module_id}: Spring Boot")
-    cfg: dict[str, Any] = {
-        "name": label,
-        "type": "java",
-        "request": "launch",
-        "mainClass": main,
-        "cwd": "${workspaceFolder}/" + rel,
-    }
-    if project:
-        cfg["projectName"] = project
-    env_file = dbg.get("envFile")
-    if env_file:
-        cfg["envFile"] = "${workspaceFolder}/" + str(env_file).replace("\\", "/")
-    else:
-        dev_env = ctx.secrets_module_dir(module_id) / ".env.dev"
-        cfg["envFile"] = "${workspaceFolder}/" + _posix_rel(ctx.root, dev_env)
-    profiles = read_nested(ctx.manifest, f"modules.{module_id}.hybrid.springProfiles", "")
-    if profiles:
-        cfg["env"] = {"SPRING_PROFILES_ACTIVE": profiles}
-    return cfg
 
 
 def _stack_kit_script_rel(ctx: ProjectContext) -> str:
@@ -145,20 +67,6 @@ def _pick_module_by_role(ctx: ProjectContext, role: str, override: str = "") -> 
         return override
     ids = modules_by_role(ctx.manifest, role)
     return ids[0] if ids else None
-
-
-def _find_launch_name_for_module(
-    configs: list[dict[str, Any]], module_id: str, ctx: ProjectContext
-) -> str | None:
-    rel = _posix_rel(ctx.root, ctx.module_path(module_id))
-    kind = _launch_kind(read_nested(ctx.manifest, f"modules.{module_id}.type", ""))
-    for cfg in configs:
-        cwd = str(cfg.get("cwd", "")).replace("\\", "/")
-        if not cwd.endswith(rel):
-            continue
-        if kind and cfg.get("type") == kind:
-            return cfg["name"]
-    return None
 
 
 TUNNEL_TASK_LABEL = "stack-kit: infra tunnel"
@@ -195,46 +103,15 @@ def _infra_tunnel_task(ctx: ProjectContext) -> dict[str, Any]:
     }
 
 
-def _dotnet_project_file(module_dir: Path, declared: str | None) -> Path | None:
-    """The project file a module DECLARES (dotnet.project), else its single *.csproj."""
-    if declared:
-        candidate = module_dir / declared
-        return candidate if candidate.is_file() else None
-    found = sorted(module_dir.glob("*.csproj"))
-    return found[0] if len(found) == 1 else None
+def _module_entry(ctx: ProjectContext, module_id: str) -> dict[str, Any]:
+    cfg = (ctx.manifest.get("modules") or {}).get(module_id) or {}
+    return cfg if isinstance(cfg, dict) else {}
 
 
-def _launch_dotnet(
-    ctx: ProjectContext, module_id: str, aliases: dict[str, str]
-) -> dict[str, Any] | None:
-    """C# Dev Kit launch ("type": "dotnet") for an SDK-style project."""
-    mod_dir = ctx.module_path(module_id)
-    declared = read_nested(ctx.manifest, f"modules.{module_id}.dotnet.project", "")
-    project = _dotnet_project_file(mod_dir, str(declared) if declared else None)
-    if project is None:
-        return None
-    dbg = _module_debug_cfg(ctx.manifest, module_id)
-    label = str(dbg.get("label") or f"{module_id}: dotnet run")
-    cfg: dict[str, Any] = {
-        "name": label,
-        "type": "dotnet",
-        "request": "launch",
-        "projectPath": "${workspaceFolder}/" + _posix_rel(ctx.root, project),
-    }
-    profile = read_nested(ctx.manifest, f"modules.{module_id}.dotnet.launchProfile", "")
-    if profile:
-        cfg["launchConfigurationId"] = f"TargetFramework=;{profile}"
-    return cfg
-
-
-# Launch builders are keyed by the launch KIND a driver DECLARES in
-# drivers/registry.json ("vscode": {"launch": ...}). A new driver becomes debuggable by
-# declaring a kind it already supports; the generator holds no driver name of its own.
-LAUNCH_BUILDERS = {
-    "node-terminal": _launch_node_terminal,
-    "java": _launch_java,
-    "dotnet": _launch_dotnet,
-}
+def _module_debug_cfg(manifest: dict[str, Any], module_id: str) -> dict[str, Any]:
+    cfg = (manifest.get("modules") or {}).get(module_id) or {}
+    dbg = cfg.get("debug") if isinstance(cfg, dict) else None
+    return dbg if isinstance(dbg, dict) else {}
 
 
 def _driver_vscode(driver_id: str) -> dict[str, Any]:
@@ -243,38 +120,95 @@ def _driver_vscode(driver_id: str) -> dict[str, Any]:
     return vs if isinstance(vs, dict) else {}
 
 
-def _launch_kind(driver_id: str) -> str:
-    launch = _driver_vscode(driver_id).get("launch")
-    return launch if isinstance(launch, str) else ("data" if isinstance(launch, dict) else "")
+class _Absent(Exception):
+    """A declared value whose authoritative source is missing: no fallthrough to the next source."""
 
 
-def _launch_from_data(ctx: ProjectContext, module_id: str, aliases: dict[str, str]) -> dict[str, Any] | None:
-    """A launch configuration the driver declares as data (`vscode.launch` an object): every string in
-    it has {module}, {path}, {label} and {script} filled for the module. A new driver needs no builder."""
-    typ = str(((ctx.manifest.get("modules") or {}).get(module_id) or {}).get("type") or "")
-    template = _driver_vscode(typ).get("launch")
+def _source(src: dict[str, Any], module_dir: Path, module: dict[str, Any], driver: dict[str, Any]) -> str | None:
+    if "value" in src:
+        return str(src["value"])
+    if "field" in src or "driver" in src:
+        found = templating.lookup(module, str(src["field"])) if "field" in src else templating.lookup(driver, str(src["driver"]))
+        if found in (None, ""):
+            return None
+        if src.get("exists") and not (module_dir / str(found)).is_file():
+            raise _Absent(str(src.get("field")))
+        return str(found)
+    if "glob" in src:
+        hits = sorted((p for p in module_dir.glob(str(src["glob"])) if p.is_file()),
+                      key=lambda p: (len(p.relative_to(module_dir).parts), p.name))
+        if src.get("single"):
+            hits = hits if len(hits) == 1 else []
+        if not hits:
+            return None
+        rel = hits[0].relative_to(module_dir)
+        if src.get("as") == "dotted":
+            return ".".join(rel.relative_to(str(src.get("under") or ".")).with_suffix("").parts)
+        return rel.as_posix()
+    if "file" in src:
+        names = src["file"] if isinstance(src["file"], list) else [src["file"]]
+        for name in names:
+            f = module_dir / str(name)
+            text = f.read_text(encoding="utf-8", errors="replace") if f.is_file() else ""
+            m = re.search(str(src.get("capture") or "(.+)"), text)
+            if m:
+                return m.group(1)
+        return None
+    raise ValueError(f"vscode.values: a source is one of value, field, driver, glob, file -- not {sorted(src)}")
+
+
+def _values(declared: dict[str, Any], module_dir: Path, module: dict[str, Any], driver: dict[str, Any]) -> dict[str, str]:
+    """Each declared value: the first of its sources that yields one (an absent value is left out)."""
+    out: dict[str, str] = {}
+    for name, sources in declared.items():
+        try:
+            for src in sources if isinstance(sources, list) else [sources]:
+                found = _source(src, module_dir, module, driver)
+                if found not in (None, ""):
+                    out[str(name)] = found
+                    break
+        except _Absent:
+            continue
+    return out
+
+
+def build_launch(ctx: ProjectContext, module_id: str) -> dict[str, Any] | None:
+    """The module's launch configuration as its driver declares it (`vscode.launch` data), or None:
+    a driver that declares none, or a required value with no source, is an honest absence."""
+    module = _module_entry(ctx, module_id)
+    typ = str(module.get("type") or "")
+    driver = driver_registry().get(typ) or {}
+    vs = _driver_vscode(typ)
+    template = vs.get("launch")
+    if not isinstance(template, dict):
+        return None
+    module_dir = ctx.module_path(module_id)
     dbg = _module_debug_cfg(ctx.manifest, module_id)
-    values = {"module": module_id, "path": "${workspaceFolder}/" + _posix_rel(ctx.root, ctx.module_path(module_id)),
-              "label": str(dbg.get("label") or module_id),
-              "script": str(dbg.get("npmScript") or dbg.get("script") or driver_package_scripts(typ).get("start") or "")}
-
-    def fill(cur: Any) -> Any:
-        if isinstance(cur, str):
-            for k, v in values.items():
-                cur = cur.replace("{" + k + "}", v)
-            return cur
-        if isinstance(cur, list):
-            return [fill(n) for n in cur]
-        if isinstance(cur, dict):
-            return {k: fill(v) for k, v in cur.items()}
-        return cur
-
-    cfg = fill(template)
-    cfg.setdefault("name", values["label"])
+    env_file = dbg.get("envFile")
+    env_rel = str(env_file).replace("\\", "/") if env_file else _posix_rel(ctx.root, ctx.secrets_module_dir(module_id) / ".env.dev")
+    extra: dict[str, str] = {
+        "module": module_id,
+        "path": "${workspaceFolder}/" + _posix_rel(ctx.root, module_dir),
+        "script": str(dbg.get("npmScript") or dbg.get("script") or driver_package_scripts(typ).get("start") or ""),
+        "envFile": "${workspaceFolder}/" + env_rel,
+    }
+    declared = vs.get("values") if isinstance(vs.get("values"), dict) else {}
+    extra.update(_values(declared, module_dir, module, driver))
+    try:
+        label = str(dbg.get("label") or (templating.render(str(vs["label"]), module, extra) if vs.get("label") else module_id))
+    except ValueError:
+        return None
+    extra["label"] = label
+    optional = {str(k) for k in vs.get("optional") or []}
+    cfg: dict[str, Any] = {}
+    for key, value in template.items():
+        try:
+            cfg[key] = templating.render_tree(value, module, extra)
+        except ValueError:
+            if key not in optional:
+                return None
+    cfg.setdefault("name", label)
     return cfg
-
-
-LAUNCH_BUILDERS["data"] = _launch_from_data
 
 
 def _driver_watch_tasks(driver_id: str) -> dict[str, list[str]]:
@@ -287,91 +221,64 @@ def _driver_watch_tasks(driver_id: str) -> dict[str, list[str]]:
     return out
 
 
+def _kit_launch(ctx: ProjectContext, name: str, command: str) -> dict[str, Any]:
+    """A launch that runs one kit command in the debug terminal; its type is the manifest's
+    `vscode.terminalLaunchType`, else the convention's (the scaffold manifest)."""
+    kind = read_nested(ctx.manifest, "vscode.terminalLaunchType", "") or default_field("vscode.terminalLaunchType")
+    return {"name": name, "type": kind, "request": "launch", "command": command, "cwd": "${workspaceFolder}"}
+
+
 def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
     from lib import catalogs
 
     compound_roles = catalogs.flagged("roles", "launchCompound", ctx.manifest)
+    boot = _boot_order(ctx)
     aliases = infer_cli_aliases(ctx.manifest)
     configs: list[dict[str, Any]] = []
-    compounds_members: list[str] = []
+    launch_of: dict[str, str] = {}
+    by_role: dict[str, list[str]] = {}
 
     for mid in ctx.list_module_ids():
-        typ = read_nested(ctx.manifest, f"modules.{mid}.type", "")
-        builder = LAUNCH_BUILDERS.get(_launch_kind(typ))
-        if builder is None:
-            continue  # driver declares no launch kind — an honest absence, not a guess
-        cfg = builder(ctx, mid, aliases)
+        cfg = build_launch(ctx, mid)
         if not cfg:
-            continue
+            continue  # the driver declares no launch, or a value it needs has no source
         configs.append(cfg)
-        if read_nested(ctx.manifest, f"modules.{mid}.role", "") in compound_roles:
-            compounds_members.append(cfg["name"])
+        launch_of[mid] = cfg["name"]
+        role = read_nested(ctx.manifest, f"modules.{mid}.role", "")
+        if role in compound_roles:
+            by_role.setdefault(role, []).append(cfg["name"])
 
     gs = _stack_kit_script_rel(ctx)
-    configs.extend(
-        [
-            {
-                "name": "stack-kit: stack (compose dev)",
-                "type": "node-terminal",
-                "request": "launch",
-                "command": f'powershell -ExecutionPolicy Bypass -File "${{workspaceFolder}}/{gs}" stack up -d --build',
-                "cwd": "${workspaceFolder}",
-            },
-        ]
-    )
+    run = f'powershell -ExecutionPolicy Bypass -File "${{workspaceFolder}}/{gs}"'
+    configs.append(_kit_launch(ctx, "stack-kit: stack (compose dev)", f"{run} stack up -d --build"))
     for alias, _target in sorted(aliases.items()):
-        configs.append(
-            {
-                "name": f"stack-kit: {alias} check",
-                "type": "node-terminal",
-                "request": "launch",
-                "command": f'powershell -ExecutionPolicy Bypass -File "${{workspaceFolder}}/{gs}" {alias} check',
-                "cwd": "${workspaceFolder}",
-            }
-        )
+        configs.append(_kit_launch(ctx, f"stack-kit: {alias} check", f"{run} {alias} check"))
 
     out: dict[str, Any] = {"version": "0.2.0", "configurations": configs}
-    if len(compounds_members) >= 2:
-        ui_names = [
-            c["name"]
-            for c in configs
-            if c.get("type") == "node-terminal" and "npm run" in c.get("command", "")
-        ]
-        api_names = [
-            c["name"]
-            for c in configs
-            if c.get("type") == "java"
-        ]
-        pick = (api_names[:1] + ui_names[:1]) or compounds_members[:2]
-        out["compounds"] = [
-            {
-                "name": "Full stack (local)",
-                "configurations": pick,
-                "stopAll": True,
-            }
-        ]
+    if sum(len(v) for v in by_role.values()) >= 2:
+        # the first launch of each compounded role, in the roles catalog's boot order
+        order = sorted(by_role, key=lambda r: (boot.get(r, len(boot) + 1), r))
+        out["compounds"] = [{"name": "Full stack (local)", "configurations": [by_role[r][0] for r in order],
+                             "stopAll": True}]
 
     if _stack_infra_services(ctx):
         hybrid = _vscode_hybrid_cfg(ctx)
         api_id = _pick_module_by_role(ctx, "api", str(hybrid.get("apiModule") or ""))
         ui_id = _pick_module_by_role(ctx, "ui", str(hybrid.get("uiModule") or ""))
-        if api_id and ui_id:
-            api_launch = _find_launch_name_for_module(configs, api_id, ctx)
-            ui_launch = _find_launch_name_for_module(configs, ui_id, ctx)
-            if api_launch and ui_launch:
-                compound_name = str(
-                    hybrid.get("compoundName")
-                    or "Hybrid: infra tunnel + API + UI"
-                )
-                pre_launch = str(hybrid.get("preLaunchTask") or TUNNEL_TASK_LABEL)
-                hybrid_compound = {
-                    "name": compound_name,
-                    "configurations": [api_launch, ui_launch],
-                    "preLaunchTask": pre_launch,
-                    "stopAll": True,
-                }
-                out.setdefault("compounds", []).append(hybrid_compound)
+        if api_id in launch_of and ui_id in launch_of:
+            out.setdefault("compounds", []).append({
+                "name": str(hybrid.get("compoundName") or "Hybrid: infra tunnel + API + UI"),
+                "configurations": [launch_of[api_id], launch_of[ui_id]],
+                "preLaunchTask": str(hybrid.get("preLaunchTask") or TUNNEL_TASK_LABEL),
+                "stopAll": True,
+            })
     return out
+
+
+def _boot_order(ctx: ProjectContext) -> dict[str, int]:
+    from lib import catalogs
+
+    return {r: i for i, r in enumerate(catalogs.ordered("roles", "bootOrder", ctx.manifest))}
 
 
 def build_tasks_json(ctx: ProjectContext) -> dict[str, Any]:

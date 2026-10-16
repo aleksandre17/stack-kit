@@ -788,9 +788,25 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
 
 **Owed after amendment 15 (one line each):**
 - The delivery against a real docker host (the layout's `unproven`); Windows/IIS delivery (`iis` pending).
-- `lib/vscode_gen.py` and two compose-gen helpers still name tools (the shrinking list in `test_one_home.py`).
+- ~~`lib/vscode_gen.py` and two compose-gen helpers still name tools~~ -- closed by amendment 16.1.
 - SQL Server's restore check is VERIFYONLY, not a throwaway restore; no fresh-chain migration replay.
 - No separate live-parity CI job; java-boot declares no dependency audit.
 - The image scanner's digest is the host's to pin; the kit ships no default scanner.
 - The kit's schemas are draft-07, not JSON Schema 2020-12; commit messages are not machine-checked.
 - Extension points: agent-kit's registry is mirrored by field names only; no shared schema file yet.
+
+## Amendment 16 — the owed list after amendment 15, closed where it can be (2026-10-16, owner-delegated)
+
+1. **No generic file names a tool.** A module's VS Code launch is its driver's declaration
+   (`vscode.launch` as data, rendered by the one template grammar), with the `values` it reads from
+   the module's files -- `field` (`exists`: a declared file that is missing is an absence, never a
+   fallthrough), `driver`, `value`, `glob` (`single`, or the shortest; `as: dotted` under a root),
+   `file` + `capture` -- its `label`, and the keys that are `optional`. The three builders in
+   `lib/vscode_gen.py` (and the Full-stack compound that picked launches by debugger type) are gone:
+   the compound takes the first launch of each compounded role in the roles catalog's boot order;
+   the kit's own terminal launch type is a convention default (`vscode.terminalLaunchType`, the
+   scaffold manifest). The local compose-gen's ops.modules rows -- kind, header columns, the
+   embedded worker row, the shared build module's marker and row -- are `compose.opsModules` of the
+   driver that owns them. `test_one_home.py`'s owed list is empty. *Rejected:* a builder per launch
+   kind registered by drivers in code (a second grammar beside the registry); keeping the string kinds
+   as aliases (two homes for one launch -- a former kind is now a schema error naming the data form).

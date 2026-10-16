@@ -66,7 +66,8 @@
   },
   "vscode": {
     "folder": ".vscode",
-    "cliScript": "tools/stack-kit.ps1"
+    "cliScript": "tools/stack-kit.ps1",
+    "terminalLaunchType": "node-terminal"
   },
   "deploy": {
     "targets": "ops/deploy/targets.json"

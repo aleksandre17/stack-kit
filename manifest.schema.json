@@ -453,6 +453,7 @@
       "properties": {
         "folder": { "type": "string" },
         "cliScript": { "type": "string" },
+        "terminalLaunchType": { "type": "string", "minLength": 1, "description": "The VS Code launch type that runs a kit command in the debug terminal (convention: the scaffold manifest's)" },
         "hybrid": {
           "type": "object",
           "description": "P0-infra-07 hybrid compound (tunnel preLaunch + API + UI)",

@@ -316,11 +316,21 @@ def build_single_module_compose(
     )
 
 
-def _ops_modules_kind(driver_type: str) -> str:
-    """The artifact kind a driver's modules take in the generated ops.modules registry, or ""."""
+def ops_modules_declaration(driver_type: str) -> dict[str, Any]:
+    """What a driver declares for the generated ops.modules registry (`compose.opsModules`): its
+    `kind`, the `columns` header, the `embeddedWorker` row and the `shared` build module row
+    (`marker` under the module, `row`). A bare string is the kind alone. The kit names no build tool."""
     from lib.modules import driver_capability
 
-    return str((driver_capability(driver_type, "compose", {}) or {}).get("opsModules") or "")
+    value = (driver_capability(driver_type, "compose", {}) or {}).get("opsModules")
+    if isinstance(value, str):
+        return {"kind": value} if value else {}
+    return value if isinstance(value, dict) and value.get("kind") else {}
+
+
+def _ops_modules_kind(driver_type: str) -> str:
+    """The artifact kind a driver's modules take in the generated ops.modules registry, or ""."""
+    return str(ops_modules_declaration(driver_type).get("kind") or "")
 
 
 def ops_modules_lines(
@@ -328,8 +338,8 @@ def ops_modules_lines(
     fmt_global: dict[str, str],
     features: dict[str, Any],
 ) -> list[str]:
-    """Gradle/docker registry lines for the modules whose driver declares `compose.opsModules`, plus the
-    embedded backend worker."""
+    """Build/container registry lines for the modules whose driver declares `compose.opsModules`, plus
+    the embedded backend worker row the primary api module's driver declares."""
     lines: list[str] = []
     module_ids = stack_compose_module_ids(ctx.manifest)
     mods = ctx.manifest.get("modules") or {}
@@ -345,10 +355,9 @@ def ops_modules_lines(
             df_prod = f"src/{df_prod}"
         # A standalone module builds its own artifact kind; the embedded backend worker is appended below.
         lines.append(f"{service}||{_ops_modules_kind(str(cfg.get('type')))}|{df_prod}|yes")
-    if embedded_worker_enabled(ctx.manifest, features) and primary_api_module_id(
-        ctx.manifest, module_ids
-    ):
-        lines.append(
-            f"{fmt_global['worker_service']}|worker|boot|worker/Dockerfile|yes"
-        )
+    primary = primary_api_module_id(ctx.manifest, module_ids)
+    if embedded_worker_enabled(ctx.manifest, features) and primary:
+        row = ops_modules_declaration(str((mods.get(primary) or {}).get("type") or "")).get("embeddedWorker")
+        if row:
+            lines.append(str(row).format_map(fmt_global))
     return lines
