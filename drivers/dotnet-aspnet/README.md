@@ -9,8 +9,9 @@ Runtime: PowerShell (Windows PowerShell 5.1+ or pwsh).
 |---|---|
 | `run` | Shared hybrid runner: imports `<secrets>/<secretsModule>/.env.prod` then `.env.dev` into the process, then `dotnet run --project <project> [--launch-profile <p>]` (declared as `hybrid.script` in `drivers/registry.json`) |
 | `check` | Pre-flight: dotnet SDK, module path, resolvable project file, secrets dir / `.env.dev` (warnings) |
-| `deploy artifact` | `dotnet publish` into `<project>/build/publish/<moduleId>/<short-sha>/`, verifies declared `publishExpect` paths, writes `release.json`. Refuses a dirty tree unless `-AllowDirty` |
-| `deploy remote` | **Refused** — delivery to a host is not declared by this driver yet |
+| `package` | `dotnet publish` into the kit's staging directory (`-Output {out}`), verifies the declared `publishExpect` paths, writes `release.json`; `stack-kit package <module>` then archives it with its provenance |
+| `deploy` (`deliver release`) | the kit's release: `container/Dockerfile` runs the published assembly (`{dotnet.project}` stem) on the ASP.NET runtime of the module's `toolchain.version`, internal port 8080 |
+| `dev up` (`deliver remote-dev`) | `dotnet watch run` in the SDK image, the source synced into the workspace, NuGet's cache a named volume; a project file change restarts it |
 
 ASP.NET Core reads configuration from environment variables with `__` as the section separator,
 so `ConnectionStrings__DefaultConnection=...` in `.env.dev` reaches the app without being written
@@ -40,7 +41,7 @@ All `dotnet.*` keys are optional. Without `project`, the module path must contai
 
 ## Not declared (yet)
 
-- remote delivery (IIS, VM, container) — `deploy remote` refuses;
+- Windows/IIS delivery — the `iis` target runtime is pending;
 - VS Code launch (`vscode.launch`) — no `coreclr` builder in `lib/vscode_gen.py` yet, so the
   driver declares none rather than a kind nothing renders;
 - compose templates — this driver has no `compose-catalog.json` entry.

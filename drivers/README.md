@@ -1,73 +1,41 @@
 # Module drivers
 
-**Driver type** = stack toolchain (`java-boot`, `node-vite`, `node-api`, …).  
-**Module id** = project key in `stack-kit.json` (`backend`, `frontend`, `bff`, …).  
-**Role** (`api`, `ui`, `worker`) is documented in the registry only — the manifest always sets `type` explicitly.
+**Driver type** = a toolchain (`java-boot`, `node-vite`, `node-spa`, `node-api`, `dotnet-aspnet`).
+**Module id** = the host's key in `stack-kit.json`. **Role** (`api`, `ui`, `worker`, ...) is the
+module's; its server **tier** is the role's (`config/catalogs/roles.json`).
 
 ```
 drivers/
-  registry.json          # type → runtime + commands (see registry.schema.json)
-  java-boot/             # JVM / Spring — typical API
-  node-vite/             # Vite UI with remote dev and static deploy
-  node-spa/              # any SPA by its package.json scripts (Angular CLI, Vite, React, Vue)
-  node-api/              # Node HTTP service (pnpm build, image deploy)
-  dotnet-aspnet/         # ASP.NET Core (dotnet run, publish artifact)
-  _template/             # copy when adding a new type
+  registry.json          # every driver's declaration (registry.schema.json)
+  <type>/                # its scripts (lifecycle steps, the host run's launch step) and container/ recipes
+  _shared/               # runners a driver family shares (package-scripts)
+  _template/             # copy when adding a type
 ```
 
-## Rules (architecture does not break when you add stacks)
+## What a driver declares
 
-1. **Never** infer driver type from folder name `backend` / `frontend`. Only `modules.<id>.type` in `stack-kit.json`.
-2. **Multiple APIs** are fine: e.g. `backend` → `java-boot`, `gateway` → `node-api` — different module ids, different types.
-3. **CLI**: `stack-kit mod <moduleId> <command> …` always works; `fe` / `be` are optional aliases via `cli.aliases`.
-4. **Commands** allowed per module = keys in `registry.json` → `commands` for that type (no hardcoded `modules` only on backend).
-5. **Full-stack remote deploy** = `stackDeploy.steps` in manifest (not hardcoded be/fe in scripts).
+Everything a module of it needs, and nothing the kit spells: `commands` (lifecycle steps and its
+own, each a script run by its runtime), `package` (how one commit becomes one archive),
+`container` (how a release runs: a recipe template rendered per module, or a static image),
+`dev` (its remote dev container, caches, excludes, reactions to a change), `delivery` (rungs,
+usually `via` a kit verb), `ci.setup`, `detect`, `vscode.launch`, `migrations`, `generated`.
 
-## Add a new driver (e.g. Node backend)
+## Rules
 
-1. Copy `drivers/_template/` → `drivers/node-api/` (or start from `node-vite` / `java-boot`).
-2. Implement `_init` + `deploy` / `manage` / `compose` / `check` (only what you need).
-3. Register in `registry.json`:
+1. Never infer a driver from a folder name: only `modules.<id>.type`.
+2. Several APIs are several modules, each with its own type.
+3. `stack-kit mod <moduleId> <command>` runs a command the driver declares; `deploy`, `dev`, `ops`
+   are the kit's verbs over every driver alike -- a driver ships no deploy, dev or manage script.
 
-```json
-"node-api": {
-  "label": "Node — HTTP API (npm/pnpm, dist or container)",
-  "roles": ["api"],
-  "runtime": "powershell",
-  "commands": {
-    "deploy": "ps1/deploy.ps1",
-    "manage": "ps1/manage.ps1",
-    "compose": "ps1/compose.ps1",
-    "check": "ps1/check.ps1"
-  }
-}
-```
+## Add a driver
 
-4. Point the module at the new type:
-
-```json
-"modules": {
-  "backend": { "type": "node-api", "path": "backend", "secretsModule": "backend" }
-}
-```
-
-5. Adjust `stackDeploy.steps` if this module replaces Java in remote deploy.
-6. `.\tools\stack-kit.ps1 help` — lists types and per-module capabilities.
-
-## Switch backend Java → Node (example)
-
-Only manifest + driver folder change; `stack-kit be` still targets `modules.backend` via `cli.aliases.be`.
-
-| Before | After |
-|--------|--------|
-| `"type": "java-boot"` | `"type": "node-api"` |
-| `drivers/java-boot/` | `drivers/node-api/` (implemented) |
-
-Frontend stays `node-vite`; catalog / compose may need catalog entries for the new service — that is the project's `ops/compose/`, not the driver registry.
+1. Copy `drivers/_template/` -> `drivers/<type>/` (or declare it in the host's own registry,
+   `drivers.registry`, beside its folder -- the kit untouched).
+2. Declare it in the registry: `label`, `roles`, `commands`, `package`, `container` (with its
+   recipe under `container/`), `dev`, `delivery` (`release: {via: release}`, `remote-dev: {via: dev}`).
+3. Point a module at it (`"type": "<type>"`); `stack-kit validate`, `stack-kit deploy <module> --plan`.
 
 ## Resolution
 
-- One resolver: `lib/resolution.py` reads `drivers/registry.json`; `lib/drivers.ps1` and `lib/drivers.sh` look its answers up
-- List types: `python3 kits/stack-kit/lib/resolve_cli.py driver-types`
-
-See [docs/REFERENCE.md, Drivers](../docs/REFERENCE.md#drivers).
+One resolver (`lib/resolution/`) reads the composed registry (`lib/modules.py`); `lib/drivers.ps1`
+looks its answers up. See [docs/REFERENCE.md, Drivers](../docs/REFERENCE.md#drivers).

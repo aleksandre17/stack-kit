@@ -41,8 +41,8 @@ CI job: `ops-package-tests` in `.github/workflows/ci.yml`.
 The suite runs against a **synthetic, self-contained reference consumer** under
 `tests/fixtures/golden-consumer/` — not the live project manifest. This keeps the
 kit's tests validating the kit's *machinery* independent of any consumer's module
-set. `conftest.py` self-provisions the two gitignored/volatile bits at session
-start (the `kits/stack-kit` junction and `ops/config/deploy.env`), so a fresh
+set. `conftest.py` self-provisions the one gitignored bit at session
+start (the `kits/stack-kit` junction), so a fresh
 checkout runs green with no setup. Point `STACK_KIT_PROJECT_ROOT` at a real repo
 only to smoke-test an adoption.
 

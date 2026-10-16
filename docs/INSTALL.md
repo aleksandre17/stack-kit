@@ -16,11 +16,11 @@ The kit holds ops machinery only. Application code, real env values and secrets 
 
 | Tool | Needed for | Notes |
 |---|---|---|
-| Python 3.10+ | every command | The one resolver is Python (`lib/resolution.py`); the bash and PowerShell libraries ask it through `lib/resolve_cli.py`. Also `validate`, `migrate`, `compose-gen`, `vscode-gen`, `config-gen`, `nginx-gen`. PowerShell looks for `py -3`, then `python3`, then `python` (`lib/stack-kit-python.ps1`). |
-| PowerShell 7+ (`pwsh`) | the CLI, every PowerShell driver step (`dotnet-aspnet`, `node-vite`, `node-spa`, the lifecycle steps), `init`, `dev`, `hybrid`, `layout`, `config-gen`, `infra <mode>`, `help` | Any OS; the scaffold's `commands` and the generated CI call `pwsh`. On Windows, Windows PowerShell 5.1 also runs the CLI (`powershell -File ...`; every non-ASCII script carries a BOM so 5.1 reads it as UTF-8). `cli/stack-kit.sh` hands every verb it does not implement to `pwsh`, else `powershell` (see [Launchers](#launchers)). |
-| Bash | `java-boot` and `node-api` drivers, `stack-deploy`, `infra` (no arguments = prereqs), `layout migrate`, `layout cleanup` | On Windows: Git for Windows. The CLI uses `%ProgramFiles%\Git\bin\bash.exe`, else `%ProgramFiles%\Git\usr\bin\bash.exe`; missing → `Git Bash required`. |
-| Docker + compose | `stack`, `<module> compose`, `infra`, CI integration, every remote deploy (on the server) | Optional for manifest-only work. Bash scripts use `docker compose`, else `docker-compose`. |
-| SSH + rsync | remote deploy, remote dev, `infra remote`, `infra tunnel` | Keys under `ops/config/ssh/` ([ADOPT.md#configuration](ADOPT.md#configuration)). |
+| Python 3.10+ | every command | The CLI is Python (`cli/stack_kit.py` -> `lib/cli/`); the launchers only find it (`py -3`, `python3`, `python`). |
+| PowerShell 7+ (`pwsh`) | PowerShell driver scripts (`dotnet-aspnet`, the package-script runner, the host run), `init`, local `dev up --mode`, `infra local` | Any OS; on Windows, Windows PowerShell 5.1 also runs them (every non-ASCII script carries a BOM). |
+| Bash | a driver command written in bash, `init` on a machine without PowerShell | On Windows: Git for Windows (`%ProgramFiles%\Git\bin\bash.exe`). |
+| OpenSSH (ssh, tar) | every remote verb: `deploy`, `release`, `ops`, `dev`, `targets --init/--verify`, `layout migrate`, `infra remote`, tunnels | rsync is used for a remote-dev sync when both ends have it, else the kit's own index + tar stream; a key under `ops/config/ssh/` or the agent ([ADOPT.md#configuration](ADOPT.md#configuration)). |
+| Docker + compose | the local stack (`stack`, `dev up --mode docker`, `infra local`) and, on a target, every release | The compose invocation is declared (`config/catalogs/targetRuntimes.json`, a target's `compose`): a host with only the standalone binary declares `["docker-compose"]`. |
 | Node + npm / Java + Gradle / .NET SDK | building the host's own apps | In the host's `apps/*`, never in the kit. |
 
 ## Vendor the kit
@@ -56,9 +56,10 @@ cp -r /tmp/stack-kit <host>/kits/stack-kit
 | `ops/cli/stack-kit.ps1` | `kits/stack-kit/cli/stack-kit.ps1` | canonical project entry |
 | `ops/cli/stack-kit.sh` | `kits/stack-kit/cli/stack-kit.sh` | bash entry |
 
-A hand-written PowerShell launcher must forward the kit CLI's two parameters, `Command` and `CliRest`,
-from a SIMPLE param block: an advanced one (any `[Parameter()]`) adds PowerShell's common parameters,
-and an operand such as `-d` then binds as `-Debug` and is lost.
+Both kit launchers (`cli/stack-kit.ps1`, `cli/stack-kit.sh`) do one thing: find Python and run
+`cli/stack_kit.py` with the command line unchanged, so every verb is the same CLI from PowerShell,
+bash and CI. A hand-written PowerShell launcher forwards the kit CLI's two parameters, `Command`
+and `CliRest`, from a SIMPLE param block (an advanced one binds an operand such as `-d` as `-Debug`):
 
 ```powershell
 param([string]$Command = "help", [string[]]$CliRest = @())
@@ -68,23 +69,13 @@ $Root = Split-Path $PSScriptRoot -Parent
 exit $LASTEXITCODE
 ```
 
-An optional `tools/stack-kit.sh` (not scaffolded):
+and a POSIX one:
 
 ```bash
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 export STACK_KIT_PROJECT_ROOT="$ROOT"
 exec bash "$ROOT/kits/stack-kit/cli/stack-kit.sh" "$@"
 ```
-
-What `cli/stack-kit.sh` does itself, and what it hands on:
-
-| Verbs | Runs |
-|---|---|
-| `init` | `toolkit/init/init.sh` → the PowerShell init when `powershell.exe` exists, else a bash fallback (scaffold + seed + compose-gen; no nginx-gen, no `.gitignore` merge) |
-| `validate`, `migrate`, `vscode-gen`, `compose-gen`, `nginx-gen` | `python3` directly |
-| `stack`, `stack-deploy` | bash (`toolkit/stack/compose.sh`, `toolkit/deploy/stack-remote.sh`) |
-| `infra` | no arguments: `toolkit/infra/ensure-prereqs.sh`; with arguments: `pwsh`, else `powershell.exe` |
-| anything else (`help`, `mod`, aliases, `dev`, `hybrid`, `layout`, `config-gen`) | `powershell -File <host>/tools/stack-kit.ps1`, else the kit's `cli/stack-kit.ps1` |
 
 Linux/macOS: call `kits/stack-kit/cli/stack-kit.sh` from the host root, or set `STACK_KIT_PROJECT_ROOT`.
 
@@ -109,12 +100,12 @@ What `init` writes and its flags: [ADOPT.md#bootstrap-with-init](ADOPT.md#bootst
 Daily commands once adopted:
 
 ```powershell
-.\tools\stack-kit.ps1 mod backend check
-.\tools\stack-kit.ps1 mod frontend compose up -d
-.\tools\stack-kit.ps1 stack up -d --build
+.\tools\stack-kit.ps1 build
+.\tools\stack-kit.ps1 dev up api --mode hybrid
+.\tools\stack-kit.ps1 deploy api --env dev --plan
 ```
 
-Aliases (`fe`, `be`, …) come from the host's `cli.aliases` ([REFERENCE.md#commands](REFERENCE.md#commands)).
+Every verb, its options and exit codes: [OPERATIONS.md](OPERATIONS.md).
 
 ## Verify the kit
 
@@ -130,4 +121,4 @@ cd kits/stack-kit && PYTHONPATH=. pytest tests -q
 bash kits/stack-kit/tests/run-kit-tests.sh       # installs pytest if missing; -v --tb=short
 ```
 
-Dev-mode smoke: [GOLDEN-PATHS.md#smoke](GOLDEN-PATHS.md#smoke). Release gate: [ADOPT.md#maturity](ADOPT.md#maturity).
+What the suite proves, and what it cannot: [GOLDEN-PATHS.md#smoke](GOLDEN-PATHS.md#smoke).

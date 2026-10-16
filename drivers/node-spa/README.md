@@ -8,7 +8,8 @@ bundler, no output directory and no dev-server port: the package says, the drive
 |---|---|---|
 | `build`, `test`, `lint` | `<pm> run <script>` in the module directory | registry `packageScripts`; a module renames one in `node.scripts.<step>` (`""` = none) |
 | `run` (= `hybrid boot`) | the `start` script, with the module's `.env` + `.env.dev` in the process | the kit's host runner, then `ps1/hybrid.ps1` |
-| `deliver release` | pending: a static deploy needs the build output directory declared and proven first | — |
+| `deploy` (`deliver release`) | the kit's release: `build` packages `dist/**` once per commit; a static image serves `container.serve` (default `dist`; Angular: `dist/<app>/browser`), every app route answered by `index.html`; per-environment values are runtime config, mounted read-only | registry `package`, `container` |
+| `dev up` (`deliver remote-dev`) | the `start` script with `--host 0.0.0.0` in a Node container on port 4200, the source synced into the workspace | registry `dev` |
 
 `<pm>` is `node.packageManager`, else the one whose lockfile is nearest above the module
 (`pnpm-lock.yaml`, `yarn.lock`, `package-lock.json`), else npm. When `node_modules` is absent the

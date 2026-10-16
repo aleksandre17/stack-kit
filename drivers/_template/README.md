@@ -1,54 +1,39 @@
 # New driver template
 
-Copy this folder to `drivers/<your-type>/` (e.g. `node-api`, `go-fiber`).
+Copy this folder to `drivers/<your-type>/` (e.g. `go-fiber`), or declare the driver in the host's
+own registry (`drivers.registry`) beside its folder -- the kit untouched.
 
 ## Layout
 
 ```
 <your-type>/
   README.md
-  _init.sh | _init.ps1     # STACK_KIT_MODULE_ID, ops.config, toolkit _common
-  sh/  or  ps1/            # deploy, manage, compose, check, …
+  ps1/ or sh/              # the lifecycle steps the toolchain needs (build, test, lint, package)
+  container/Dockerfile     # the release recipe, rendered per module ({toolchain.version|...}, {artifact}, {port}, {entry})
 ```
 
 ## Registry entry
-
-Add to `drivers/registry.json`:
 
 ```json
 "<your-type>": {
   "label": "Human-readable stack name",
   "roles": ["api"],
-  "runtime": "bash",
-  "commands": {
-    "deploy": "sh/deploy.sh",
-    "manage": "sh/manage.sh"
-  }
+  "commands": { "build": "sh/build.sh", "test": "sh/test.sh" },
+  "package": { "command": "build", "artifacts": ["out/**"] },
+  "container": { "template": "container/Dockerfile", "port": 8080 },
+  "dev": { "image": "<dev image>", "command": ["<dev server>"], "port": 8080, "caches": {}, "excludes": ["out/"] },
+  "delivery": { "release": { "via": "release" }, "remote-dev": { "via": "dev" } }
 }
 ```
 
-`runtime`: `bash` (Git Bash on Windows) or `powershell`.
+A command runs by its script's runtime (`config/runtimes.json`). The kit's verbs -- `deploy`,
+`dev`, `ops`, `release` -- run every driver alike from these declarations; a driver ships no
+deploy, dev or manage script.
 
 ## Manifest
 
 ```json
-"modules": {
-  "my-service": {
-    "type": "<your-type>",
-    "path": "my-service",
-    "secretsModule": "my-service"
-  }
-}
+"modules": { "my-service": { "type": "<your-type>", "role": "api", "path": "my-service", "secretsModule": "my-service" } }
 ```
 
-Optional CLI shortcut:
-
-```json
-"cli": { "aliases": { "api": "my-service" } }
-```
-
-## Reuse toolkit
-
-Deploy/manage logic should call `kits/stack-kit/toolkit/` (SSH, env, compose-cli) — do not fork copy into the driver unless stack-specific (Gradle vs npm).
-
-Reference implementations: `java-boot/`, `node-vite/`.
+Then `stack-kit validate` and `stack-kit deploy my-service --plan`. Reference implementations: `dotnet-aspnet/`, `java-boot/`.
