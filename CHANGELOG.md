@@ -30,6 +30,9 @@ amendment 16). Each change is a declaration; the migration below names what a ho
   files go where the host's module lives (else the layout profile's `tiers`, else `apps/<tier>`).
 - `config/vendored.json`: agent-kit's `extension-points.schema.json`, byte for byte, its origin and
   sha256 tested; the registry validates against it.
+- Build output is never tracked: each driver declares `outputs` (what its toolchain writes,
+  gitignore-style, relative to the module), a module adds its own in `modules.<id>.outputs`, and
+  validate refuses every tracked file one matches, with its count and the fix.
 
 ### Changed
 
@@ -40,6 +43,8 @@ amendment 16). Each change is a declaration; the migration below names what a ho
 - The extension-point registry is in the shared shape (`schema_version`, `required_by` one profile --
   `init` the base -- companions by the `<id>-entry` rule).
 - sqlcmd reads its password from `SQLCMDPASSWORD`, never an argument.
+- A driver's `generated` directories are its `outputs` patterns (`bin/`, `node_modules/`), read by
+  validate, draft and the remote-dev sync alike.
 
 ### Migration
 
@@ -50,6 +55,8 @@ amendment 16). Each change is a declaration; the migration below names what a ho
 3. A host with `config.keys` runs `stack-kit render` once and commits the projections: its
    hand-written `.env.example` files are now projections of the catalogue (validate reports drift).
 4. A java-boot module locks its dependencies (Gradle `dependencyLocking`) for its audit to run.
+5. A host driver that declares `generated` renames it `outputs`, each entry a pattern (`build/`); a
+   host that tracks build output untracks it as validate names (`git rm -r --cached <dir>`).
 
 ## 2.1.0 — 2026-10-16
 

@@ -4,6 +4,17 @@
   "rows": [
     {
       "standard": "12-Factor",
+      "clause": "I codebase: build output is never tracked",
+      "mechanism": "each driver declares what its toolchain writes (`outputs`), a module adds its own (`modules.<id>.outputs`, never a removal); validate refuses every tracked file one matches, counted per output, with the `git rm -r --cached` and .gitignore fix",
+      "evidence": [
+        "tests/unit/test_tracked_outputs.py::test_a_tracked_output_is_refused_counted_with_its_fix",
+        "tests/unit/test_tracked_outputs.py::test_a_host_added_output_is_honoured_and_extends_the_drivers",
+        "tests/unit/test_tracked_outputs.py::test_validate_refuses_a_tracked_output"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "12-Factor",
       "clause": "III config",
       "mechanism": "env files per environment; the injection contract STACK_KIT_ENV_FILE_<FOLDER>_<ENV>; one home per value",
       "evidence": [

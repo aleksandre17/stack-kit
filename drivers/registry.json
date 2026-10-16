@@ -238,11 +238,9 @@
         }
       ]
     },
-    "generated": [
-      "build",
-      ".gradle",
-      "out",
-      "target"
+    "outputs": [
+      "build/",
+      ".gradle/"
     ]
   },
   "node-vite": {
@@ -402,9 +400,9 @@
         }
       ]
     },
-    "generated": [
-      "node_modules",
-      "dist"
+    "outputs": [
+      "node_modules/",
+      "dist/"
     ]
   },
   "node-api": {
@@ -535,9 +533,9 @@
         }
       ]
     },
-    "generated": [
-      "node_modules",
-      "dist"
+    "outputs": [
+      "node_modules/",
+      "dist/"
     ]
   },
   "dotnet-aspnet": {
@@ -688,9 +686,9 @@
         }
       ]
     },
-    "generated": [
-      "bin",
-      "obj"
+    "outputs": [
+      "bin/",
+      "obj/"
     ]
   },
   "node-spa": {
@@ -826,10 +824,10 @@
         }
       ]
     },
-    "generated": [
-      "node_modules",
-      "dist",
-      ".angular"
+    "outputs": [
+      "node_modules/",
+      "dist/",
+      ".angular/"
     ]
   }
 }

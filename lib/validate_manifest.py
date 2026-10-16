@@ -272,6 +272,10 @@ def validate_manifest(
     errs.extend(f"config: {f}" for f in runtime_config_problems(ctx.root, ctx.manifest))
     warnings.extend(f"config: {k}" for k in keys.known)
     warnings.extend(f"config: {s}" for s in _shared_data_sources(ctx))
+    # Build output is never tracked: each driver declares what its toolchain writes (amendment 16.12).
+    from lib import tracked_outputs
+
+    errs.extend(f"outputs: {p}" for p in tracked_outputs.problems(ctx.root, ctx.manifest, registry))
     from lib import secret_scan
 
     pattern_errors, pattern_warnings = secret_scan.pattern_problems(ctx.root, ctx.manifest)

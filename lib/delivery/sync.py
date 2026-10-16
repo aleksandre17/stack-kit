@@ -2,7 +2,7 @@
 
 One exclude list (`excludes`): the kit's never-ship patterns (env files, keys, credential files --
 config/delivery.json `neverShip` and `credentialPatterns`), the driver's `dev.excludes` and
-`generated` directories, the module's own `dev.excludes`, and the module's .gitignore. What it
+`outputs`, the module's own `dev.excludes`, and the module's .gitignore. What it
 names is never sent, and never deleted on the server either (a dependency directory the dev
 container fills inside the workspace survives every sync).
 
@@ -55,7 +55,7 @@ def excludes(service: Service, module_dir: Path) -> list[str]:
 
     d = defaults()
     out = [*d["neverShip"], *d["credentialPatterns"], *(service.dev.get("excludes") or []),
-           *(f"{g.strip('/')}/" for g in driver_capability(service.driver, "generated", []) or []),
+           *(driver_capability(service.driver, "outputs", []) or []),
            *_gitignore(module_dir)]
     return list(dict.fromkeys(str(p) for p in out))
 

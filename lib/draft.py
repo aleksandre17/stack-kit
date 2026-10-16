@@ -36,10 +36,10 @@ KIT = Path(__file__).resolve().parents[1]
 PROFILES = KIT / "config" / "layout-profiles"
 #: Directories that are never a module's own evidence: build output, dependencies, VCS.
 def never() -> set[str]:
-    """Directories never drafted from: git's, and every one a driver declares its tools generate."""
+    """What is never drafted from: git's directory, and every output a driver declares its toolchain writes."""
     from lib.modules import driver_registry
 
-    return {".git", *(str(g) for d in driver_registry().values() for g in d.get("generated") or [])}
+    return {".git/", *(str(g) for d in driver_registry().values() for g in d.get("outputs") or [])}
 
 
 class DraftRefused(ValueError):
@@ -57,8 +57,10 @@ def repository_files(root: Path, package: str | None) -> list[str]:
         files = None
     if files is None:
         files = [p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()]
-    skip = never()
-    out = [f for f in files if not skip.intersection(f.split("/")[:-1])]
+    from lib.delivery.sync import excluded
+
+    skip = sorted(never())
+    out = [f for f in files if not excluded(f, skip)]
     if package:
         out = [f for f in out if not (f + "/").startswith(package.rstrip("/") + "/")]
     nested = {posixpath.dirname(f) for f in out

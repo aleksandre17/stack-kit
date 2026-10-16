@@ -931,6 +931,7 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    compose catalog. *Not changed:* the scaffold manifest's sample modules keep `apps/<tier>` -- it is
    the convention-defaults source, and a host with modules of its own never takes it.
    *Rejected:* a template per layout (the same files twice).
+12. **Build output is never tracked** (`lib/tracked_outputs.py`): each driver declares what its toolchain writes as `outputs` (gitignore-style, relative to the module; the former `generated` directories, now also what draft and the remote-dev sync skip), a module adds its own in `modules.<id>.outputs` (never a removal), and validate refuses every file git tracks under a module that an output matches -- one error per output, its file count, `git rm -r --cached` and the .gitignore line. *Rejected:* a kit-wide list of build directories (a new driver would be unknown to it; the driver is the one that knows).
 
 **Owed after amendment 16 (one line each, the truth at 2.2.0):**
 - Every delivery, restore and replay is proven against the recorded transport only: unproven against a real docker host, SQL Server or Postgres.

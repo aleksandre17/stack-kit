@@ -88,7 +88,7 @@ under `{root}/{project}`, refused otherwise (`lib/targets/layout.py`).
 **Authority: [drivers/registry.json](../drivers/registry.json).** A driver declares `label`, `roles`,
 `commands` (script, or `{script, runtime}`), `packageScripts`, `hybrid.script`, `package`
 `{command, args, artifacts}` (`{out}`: the staging directory), `container` (above), `dev` (above),
-`generated` (directories its tools write), `delivery` (rung -> `{via}` a kit verb, `{command, args}`,
+`outputs` (what its toolchain writes, gitignore-style, relative to the module; validate refuses a tracked match, a module adds its own in `modules.<id>.outputs`), `delivery` (rung -> `{via}` a kit verb, `{command, args}`,
 or `{pending}`), `ci.setup`, `detect`, `vscode` (`launch` as data, `values`, `label`, `optional`), `migrations`, `compose` (the local
 stack; `opsModules` its registry rows).
 
