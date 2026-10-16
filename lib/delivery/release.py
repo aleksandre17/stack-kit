@@ -76,6 +76,9 @@ def _start(ctx: Delivery, svc: list[Service], release: str, revision: str) -> li
     if not ctx.commands["compose"]:
         return []
     running.build_missing(ctx, svc, release)
+    from lib.delivery import scan
+
+    scan.scan(ctx, svc, release)
     migrate(ctx, svc)
     running.up(ctx, [s.id for s in svc])
     return [] if ctx.plan else running.wait_healthy(ctx, svc)

@@ -267,6 +267,9 @@ def validate_manifest(
     ext_errors, ext_notices = extend.problems(ctx.root, ctx.manifest)
     errs.extend(ext_errors)
     warnings.extend(ext_notices)
+    from lib.delivery import scan as image_scan
+
+    errs.extend(f"security: {p}" for p in image_scan.problems(ctx.manifest))
     # A value has one home (amendment 13): a former one present is refused, naming `migrate`.
     from lib import legacy
 
