@@ -366,9 +366,11 @@ def _ignored(root: Path, rels: list[str]) -> set[str]:
         return set()
     import subprocess
 
-    ran = subprocess.run(["git", "-C", str(root), "check-ignore", "--stdin"], input="\n".join(rels),
-                         capture_output=True, text=True)
-    return {line.strip() for line in ran.stdout.splitlines() if line.strip()}
+    # Bytes, not text: text mode on Windows turns each "\n" into "\r\n", and git then reads every path
+    # but the last with a trailing "\r" -- a path that is never ignored.
+    ran = subprocess.run(["git", "-C", str(root), "check-ignore", "--stdin"], input="\n".join(rels).encode("utf-8"),
+                         capture_output=True)
+    return {line.strip() for line in ran.stdout.decode("utf-8", "replace").splitlines() if line.strip()}
 
 
 def _companions_of(rel: str) -> bool:

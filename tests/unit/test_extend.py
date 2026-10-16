@@ -116,4 +116,6 @@ def test_an_ignored_file_is_machine_state_not_an_undeclared_extension(root):
     subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
     (root / ".gitignore").write_text("*.local.txt\n", encoding="utf-8")
     (root / "ops/compose/infra/services/notes.local.txt").write_text("x", encoding="utf-8")
-    assert "ops/compose/infra/services/notes.local.txt" not in extend.undeclared(root, manifest(root))
+    (root / "ops/compose/infra/services/more.local.txt").write_text("x", encoding="utf-8")
+    found = extend.undeclared(root, manifest(root))
+    assert not [u for u in found if u.endswith(".local.txt")], found  # every ignored file, not only the last
