@@ -37,12 +37,20 @@ def confirm(args: Args, question: str) -> bool:
     if not sys.stdin.isatty():
         print(f"  [refused] {question} -- needs confirmation; pass --yes to answer it (no terminal to ask)", file=sys.stderr)
         return False
-    reply = input(f"  {question} [y/N] ").strip().lower()
+    try:
+        reply = input(f"  {question} [y/N] ").strip().lower()
+    except EOFError:
+        # A console that reports a terminal but delivers no line (a pipe under some Windows hosts)
+        # is no answer, and no answer is a refusal -- never a traceback.
+        print(f"\n  [refused] {question} -- no answer was read; pass --yes to answer it", file=sys.stderr)
+        return False
     return reply in ("y", "yes")
 
 
 def run(args: Args, what: str, action: Callable[[Delivery], int], *, destructive: bool = False,
-        module: str = "", plan_first: bool = True) -> int:
+        module: str = "", plan_first: bool = True, read_only: bool = False) -> int:
+    """`read_only`: the verb changes nothing on the server, so an environment that asks first is
+    never asked -- a confirmation guards a change, and a reading is not one."""
     try:
         ctx = context(args)
     except (DeliveryError, LayoutError) as e:
@@ -62,7 +70,7 @@ def run(args: Args, what: str, action: Callable[[Delivery], int], *, destructive
         if args.has("--plan"):
             print("[plan] nothing was changed (--plan)")
             return 0
-        if destructive or ctx.flag("confirm"):
+        if destructive or (ctx.flag("confirm") and not read_only):
             why = "it removes" if destructive else f"{ctx.environment} asks first"
             if not confirm(args, f"{what} in {ctx.environment} on {ctx.target_name} ({why}) -- proceed?"):
                 return 2

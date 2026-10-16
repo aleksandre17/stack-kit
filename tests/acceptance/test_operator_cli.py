@@ -82,6 +82,33 @@ def test_a_confirming_environment_refuses_without_a_terminal_unless_yes(cli):
     assert f"{ROOT}/shop/staging/edge/edge/current" in _server(cli)["links"]
 
 
+
+def test_a_reading_is_never_asked_to_confirm(cli):
+    # verify, status, release list and logs change nothing: a confirming environment does not ask.
+    for argv in (("targets", "--verify"), ("ops", "status"), ("release", "list")):
+        ran = cli(*argv, "--env", "staging")
+        assert "pass --yes" not in ran.stderr and "Traceback" not in ran.stderr, argv + (ran.stderr,)
+
+
+def test_no_answer_is_a_refusal_not_a_traceback(monkeypatch, capsys):
+    from lib.cli import remote
+
+    class Args:
+        def has(self, flag):
+            return False
+
+    class Console:
+        def isatty(self):
+            return True
+
+        def readline(self):
+            return ""
+
+    monkeypatch.setattr(remote.sys, "stdin", Console())
+    monkeypatch.setattr("builtins.input", lambda prompt="": (_ for _ in ()).throw(EOFError()))
+    assert remote.confirm(Args(), "nuke") is False
+    assert "pass --yes" in capsys.readouterr().err
+
 def test_remote_dev_up_and_sync(cli):
     ran = cli("dev", "up", "edge", "--plan")
     assert ran.returncode == 0, ran.stdout + ran.stderr

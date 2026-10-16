@@ -139,7 +139,7 @@ def _release(a: Args) -> int:
                 for line in release.listing(ctx, rest):
                     print(line)
             return 0
-        return remote.run(a, "release list", show, plan_first=False)
+        return remote.run(a, "release list", show, plan_first=False, read_only=True)
     if sub == "rollback":
         to = a.value("--to")
         return remote.run(a, f"rollback {' '.join(rest) or 'all'}{' to ' + to if to else ''}",
@@ -161,11 +161,11 @@ def _ops(a: Args) -> int:
                 for line in manage.status(ctx, rest):
                     print(line)
             return 0
-        return remote.run(a, "status", show, plan_first=False)
+        return remote.run(a, "status", show, plan_first=False, read_only=True)
     if sub == "logs":
         return remote.run(a, "logs", lambda ctx: 0 if ctx.plan else manage.logs(ctx, rest, follow=a.has("--follow"),
                                                                                tail=int(a.value("--tail", "200"))),
-                          plan_first=False)
+                          plan_first=False, read_only=True)
     if sub in ("start", "stop", "restart"):
         return remote.run(a, f"{sub} {' '.join(rest) or 'all'}", lambda ctx: manage.lifecycle(ctx, sub, rest))
     if sub == "restart-check":
@@ -209,7 +209,7 @@ def _targets(a: Args) -> int:
                 print(f"  {line}")
             print(f"[verify] {ctx.places.project_dir}: " + (f"{len(drift)} drift(s)" if drift else "matches the declared tree"))
             return 1 if drift else 0
-        return remote.run(a, "verify", check, plan_first=False)
+        return remote.run(a, "verify", check, plan_first=False, read_only=True)
     try:
         data = targets.load(root, manifest)
     except targets.TargetError as e:
