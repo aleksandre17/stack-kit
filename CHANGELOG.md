@@ -1,6 +1,58 @@
 # Changelog — stack-kit
 
-## 1.2.0-dev — unreleased
+## 2.0.0 — 2026-10-16
+
+One generic pipeline, one operator CLI, one home per value (ADR-001 amendment 13). Breaking.
+
+### Migration (one command, once)
+
+1. `stack-kit validate` names every former home a host still carries.
+2. `stack-kit migrate --apply` carries them and removes them: deploy.env's server and ssh become a
+   target in `ops/deploy/targets.json`; `DEPLOY_PROJECT` (else `COMPOSE_PROJECT_NAME`) becomes the
+   manifest's `project`; a folder's `DEPLOY_HOST_PORT` becomes the target's `ports`, its `DEPLOY_PATH`
+   a `legacyLayout` unit; `COMPOSE_*_SERVICE`, `DOCKER_NETWORK`, `INFRA_SLUG`, `DEPLOY_LAYOUT`,
+   `stack.networkName`, `stackDeploy`, `roles.serviceOverride` are dropped (derived now); the former
+   manifest filename and fields are renamed. Env files keep every other key.
+3. On a server laid out before: `stack-kit layout migrate --target <t> --env <e>` (the plan), then
+   `--approve`. A new tree: `stack-kit targets --init --env <e>`.
+4. A host whose server has only the standalone compose declares `"compose": ["docker-compose"]` on
+   its target. The local stack's app host port is `APP_HOST_PORT` (was `DEPLOY_HOST_PORT`).
+
+### Added
+
+- `lib/delivery/`: package -> ship -> up -> health; `releases/<commit>` + `current`, `release
+  list|rollback`, prune to `keep`, rollback on failed health where the environment declares it,
+  one compose file per environment, env files 600, runtime config and credentials read-only,
+  namespaced names, preflights (marker, runtime, ports, disk), `targets --init`, `targets --verify`
+  (the declared state against the host, read-only), `ops status|logs|start|stop|restart|rebuild|rm|nuke`,
+  remote dev (`dev up|down|sync|watch|logs|status|shell|tunnel`; rsync or the index + tar fallback),
+  `infra remote` and `infra tunnel` in the layout, `layout migrate` from a declared `legacyLayout`.
+- The tier: `config/catalogs/tiers.json`, each role's `tier`; the unit `{env}/{tier}/{service}`;
+  `backups/`, `stack/state.json`.
+- Drivers declare `container` (a recipe template under `container/`, or a static image) and `dev`;
+  every packaging driver (dotnet-aspnet, java-boot, node-api, node-spa, node-vite) releases through the kit.
+- The CLI is `lib/cli/` (discovered verbs, plan before acting, `--plan`, `--yes`, exit codes 0-6,
+  the run record); `help --markdown` renders `docs/OPERATIONS.md`; ci-gen deploys through
+  `deploy --artifact --yes` with a `workflow_dispatch` environment choice.
+- Environments declare `requireClean`, `rollbackOnFailure`, `confirm`; target runtimes declare
+  `engine`, `compose`, `stack`, `local`; targets declare `compose`, `engine`, `healthWait`,
+  `minFreeMb`, `legacyLayout`; the manifest declares `project`, `stack.services`, module
+  `container`/`services`/`dev`/`credentialPatterns`, runtimeConfig `mount`.
+- Tests: one home per fact (deny-by-default, with sensors), no import cycle, docs drift, the
+  operator CLI end to end, the engine against a recorded server through a driver the kit does not ship.
+
+### Removed
+
+- Every read of deploy.env, `.env.deploy`, DEPLOY_*, COMPOSE_*, DOCKER_NETWORK, INFRA_SLUG and of the
+  kit's former names (`legacyRemovedIn` 2.0.0); `cli/geostat.*`.
+- Every driver deploy/dev/manage/compose/check script; `toolkit/deploy`, `toolkit/bash`,
+  `toolkit/powershell`, `toolkit/layout`, `toolkit/stack`, `toolkit/templates`,
+  `toolkit/infra/ensure-prereqs.sh`, `gen_server_compose.py`; `lib/deploy_paths.py`,
+  `lib/stack_deploy.py`, `lib/migrate_layout_*`, `lib/ssh.*`, `lib/drivers.sh`, `lib/runs.ps1`,
+  `contracts/`; `unpack`, `stack-deploy`, `layout` (simulators, cleanup); the registry's `deployKind`,
+  `layoutSimulator`, `promotes`.
+
+## 1.2.0 — 2026-10-16
 
 ### Extension is a declaration (ADR-001 amendment 12)
 

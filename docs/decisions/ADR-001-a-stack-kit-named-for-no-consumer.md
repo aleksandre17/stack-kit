@@ -663,3 +663,80 @@ remove the import cycles behind the function-local imports (`modules` <-> `proje
 `modules` -> `stack_deploy`, `catalogs` -> `project_context`); fold the per-ecosystem deploy pipelines
 in `toolkit/deploy/` (`node-upload.sh` "mirror of upload.sh", `node-docker-up.sh`, `pnpm-build.sh`
 beside `gradle-build.sh`) into one generic container pipeline whose steps a driver declares.
+
+## Amendment 13 — one generic pipeline, one operator CLI, one home per value (2026-10-16, owner-delegated)
+
+**Context.** After amendment 12 every extension point was a declaration, but delivery was not: each
+driver shipped its own deploy, dev and manage scripts (`toolkit/deploy/*`, `node-upload.sh` beside
+`upload.sh`, `gradle-build.sh` beside `pnpm-build.sh`, the PowerShell and bash manage helpers), a
+value could live in four places (the manifest, deploy.env, a folder's `.env.deploy`, a process
+variable), the server layout had no tier, a release was a folder of versioned jars, and the CLI was
+one 659-line PowerShell file. The platform host the hosts share is one root holding many projects'
+tier-first folders; its compose is the standalone binary; Windows developers have no rsync.
+
+**Decision.**
+
+1. **One home per value.** Every name is `lib/naming.py`'s (the manifest's `project`, else the
+   folder); every remote path is `lib/targets/layout.py`'s, strictly under `{root}/{project}`; the
+   engine and compose invocations are the target runtime's declaration (a target's `compose` over it);
+   the local ones the runtime flagged `local`. deploy.env, `.env.deploy`, DEPLOY_*, COMPOSE_*_SERVICE,
+   COMPOSE_PROJECT_NAME, DOCKER_NETWORK, INFRA_SLUG, `stack.networkName`, `roles.serviceOverride` and
+   the kit's former names are no longer read: each is a `validate` error naming `migrate`, the one
+   reader left, which carries it (the manifest's `project`, a target, its `ports`, its `legacyLayout`)
+   and removes it. Held deny-by-default (`tests/unit/test_one_home.py`): no generic script names a tool,
+   each declaration file has one reader, a former key is spelled only by `lib/legacy.py` and
+   `lib/migrate_legacy.py`, no remote path is composed outside the layout, no import cycle.
+2. **Tiers.** `config/catalogs/tiers.json` (backend, frontend; host-overlayable); each role names its
+   tier; a unit is `{root}/{project}/{environment}/{tier}/{service}` with `releases/<commit>`,
+   `current`, `runtime/`, `logs/`, `workspace/`; an environment holds `stack/` (`compose.yml`,
+   `env/<service>.env`, `state.json`), `infra/`, `backups/`. `targets --plan` renders it.
+3. **One generic pipeline** (`lib/delivery/`): package (the driver's `package` step, then one archive
+   per commit with `release.json`: commit, `git describe`, dirty, services, each service's tree with
+   its recipe -- the module's Dockerfile or the driver's template rendered for it) -> ship
+   (`releases/<id>.partial`, then moved) -> env file (600), runtime config and credentials (read-only
+   mounts) -> `current` -> the environment's one compose file (derived JSON, namespaced) -> build an
+   image only when the engine lacks it -> up -> health (the engine's status; no healthcheck = running)
+   -> prune to `keep`, never `current`. An environment declares `requireClean`, `rollbackOnFailure`,
+   `confirm`. Drivers declare `container` and `dev`; every packaging driver releases `via: release`.
+4. **Remote dev** on the same layout: `dev up/down/sync/watch/logs/status/shell/tunnel`; a sync is rsync
+   when both ends have it, else an index (size, mtime, hash) + one tar stream over ssh, deletions held
+   inside the workspace, one exclude list (never env files, keys, credentials; the driver's and the
+   module's excludes; its .gitignore); `watch` polls, debounces, reacts as declared (hot-reload,
+   restart, rebuild), reconnects and resyncs.
+5. **The operator interface is one CLI** (`lib/cli/`: discovered verbs, each with `--help`, options,
+   exit codes, examples). A remote verb prints its plan -- every path and command -- before it acts;
+   `--plan` stops there; a confirming environment asks on a terminal and refuses without one unless
+   `--yes`. `cli/stack-kit.ps1` and `.sh` only find Python. CD calls the same CLI (`deploy
+   --artifact --yes`) with a `workflow_dispatch` environment choice and GitHub Environments.
+   `docs/OPERATIONS.md` is rendered from the registry and drift-tested.
+6. **Ownership on a shared root.** Nothing acts on `{root}`. `targets --init` claims an absent or
+   empty project directory with `.stack-kit-project`; a non-empty one without it is refused, as is one
+   another project marked; `rm`/`nuke` act only inside a claimed environment. `layout migrate` moves
+   only what a target's `legacyLayout` declares as this project's, never a direct child of the root,
+   plan by default, `--approve` to apply. `targets --verify` reads the declared state against the host
+   -- places, marker, compose file, env and runtime-config digests, each service's running release,
+   runtime, ports, disk -- read-only.
+7. **The splits owed by amendment 12.** `lib/targets/` (declaration, layout, remote), `lib/resolution/`
+   (context, resolver, infra), `lib/cli/` (main, registry, verbs); a leaf `lib/project_root.py`; no
+   import cycle. Removed: every driver deploy/dev/manage/compose/check script, `toolkit/deploy`,
+   `toolkit/bash`, `toolkit/powershell`, `toolkit/layout` (the 855-line simulator superseded by
+   `targets --plan`), `toolkit/stack`, `gen_server_compose.py`, `ensure-prereqs.sh`, `deploy_paths`,
+   `stack_deploy`, the per-driver migrate scripts, `package unpack`, the `promotes` concept.
+
+**Proof.** A recording transport with a fake engine (`lib/delivery/fake_server.py`) and a directory
+standing in for a server (`LocalTransport`, the sync fallback end to end): releases, idempotence (a
+second release changes nothing), prune, rollback on failed health, provenance refusals, the marker on
+a shared root with foreign tier-first folders, the port preflight with many foreign ports, the
+declared compose invocation, migrate-layout, verify, remote dev and watch with a lost connection --
+through a project-declared driver, tier, environment and target runtime the kit does not ship.
+
+**Unproven, and only this:** the layout's `unproven` -- the delivery against a real docker host.
+**Pending:** Windows/IIS delivery (the `iis` runtime). **Owed:** `lib/vscode_gen.py` and two
+compose-gen helpers still name tools (a shrinking list in `test_one_home.py`).
+
+*Rejected:* a YAML library for the stack (compose reads JSON); one compose file per unit (the
+environment's network, ports and dependencies are one document); image registries (the platform has
+none; a release builds its image once on the host from the shipped bytes, skipped when present);
+`--reconcile` (drift is undone by the verb that owns it); keeping deploy.env as a read fallback (two
+homes drift; the error plus `migrate` costs one command once); a PowerShell CLI with Python helpers
+(two languages for one dispatch).
