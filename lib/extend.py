@@ -1,5 +1,11 @@
-"""Extension points: every place a host extends the kit, one grammar (ADR-001 amendment 15; the
-shape agent-kit shares: config/extension-points.schema.json).
+"""Extension points: every place a host extends the kit, one grammar (ADR-001 amendments 15, 16.4;
+config/extension-points.json is in the shape agent-kit shares -- config/extension-points.schema.json,
+vendored byte for byte from agent-kit, its origin and sha256 in config/vendored.json).
+
+`required_by` names the profile that requires a point answered: `init` is the base every host has
+(init lays the point down, and every declared profile requires it), any other value only that
+profile (`extend.profile`). A point `<id>-entry` is the companion of `<id>`: made with it, under the
+same name (an infra service's manifest entry, a driver's registry entry).
 
 A host file -- or an entry inside one (`file#/json/pointer`) -- is created from its template on
 demand, never as a tree of empty files; the answers only the host can give are <<pending: ...>>
@@ -27,6 +33,10 @@ REGISTRY = KIT / "config" / "extension-points.json"
 LOCK = "ops/stack-kit/extensions.lock.json"
 PENDING = re.compile(r"<<pending:\s*([^>]*)>>")
 _FIELD = re.compile(r"\{([A-Za-z0-9_.]+)\|([^}]*)\}")
+#: The base profile: what init lays down, required by every profile.
+INIT = "init"
+#: A point `<id>` + this suffix is made with `<id>`, under the same name.
+COMPANION = "-entry"
 
 
 class ExtendError(ValueError):
@@ -163,8 +173,8 @@ def make(root: Path, manifest: dict[str, Any], point_id: str, name: str = "", *,
                 _set(doc, p.pointer, value)
                 (root / p.file).parent.mkdir(parents=True, exist_ok=True)
                 (root / p.file).write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
-    for comp in [c for c in (point.get("companions") or "").split(",") if c.strip()]:
-        said += make(root, manifest, comp.strip(), name, plan=plan)
+    if point_id + COMPANION in points():
+        said += make(root, manifest, point_id + COMPANION, name, plan=plan)
     return said
 
 
@@ -304,7 +314,7 @@ def init(root: Path, *, plan: bool = False) -> list[str]:
     """What init lays down: every point required by `init`, then each infra service the manifest selects."""
     said = []
     for point in points().values():
-        if "init" in (point.get("required_by") or []):
+        if point.get("required_by") == INIT:
             said += make(root, {}, point["id"], plan=plan)
     manifest = _load(root, Path(MANIFEST_FILENAME))
     for svc in ((manifest.get("stack") or {}).get("infra") or {}).get("services") or []:
@@ -321,7 +331,7 @@ def problems(root: Path, manifest: dict[str, Any]) -> tuple[list[str], list[str]
     errors, notices = [], []
     for row in listing(root, manifest):
         point = row["point"]
-        required = profile and profile in (point.get("required_by") or [])
+        required = bool(profile) and point.get("required_by") in (INIT, profile)
         if row["status"] == "drafted":
             line = f"extension {point['id']}{' ' + row['name'] if row['name'] else ''}: pending -- " + "; ".join(row["pending"])
             (errors if required else notices).append(line)

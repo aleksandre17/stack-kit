@@ -1,0 +1,13 @@
+{
+  "$comment": "Files the kit holds that another kit owns (ADR-001 amendment 16.4): each byte-identical to its origin at the recorded commit, its sha256 recorded and tested (tests/unit/test_vendored.py). Never edited here: a change is made at the origin and taken again.",
+  "schema": 1,
+  "files": {
+    "config/extension-points.schema.json": {
+      "origin": "https://github.com/aleksandre17/agent-kit.git",
+      "path": "kit/schemas/extension-points.schema.json",
+      "commit": "3b1593f9d987dffd2a3fe84e07cea34cee568b87",
+      "sha256": "959c6aa0e01b087da8a925d61408047f7406acd511503a3d990b1dad3b08196e",
+      "sibling": "../agent-kit"
+    }
+  }
+}

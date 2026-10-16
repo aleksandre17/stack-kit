@@ -793,7 +793,7 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
 - No separate live-parity CI job. (~~java-boot declares no dependency audit~~ -- closed by amendment 16.2.)
 - The image scanner's digest is the host's to pin; the kit ships no default scanner.
 - The kit's schemas are draft-07, not JSON Schema 2020-12; commit messages are not machine-checked.
-- Extension points: agent-kit's registry is mirrored by field names only; no shared schema file yet.
+- ~~Extension points: mirrored by field names only~~ -- the shared schema is vendored and the registry validated against it (amendment 16.4).
 
 ## Amendment 16 — the owed list after amendment 15, closed where it can be (2026-10-16, owner-delegated)
 
@@ -836,3 +836,16 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    shared host, for no isolation a database name does not give); `DBCC CHECKDB` in the check (hours
    on a large database; the host may add it as an anchor). *Unproven:* against a real SQL Server or
    Postgres -- the suite proves the commands and their order with the recorded transport only.
+4. **One extension-point shape, vendored from its origin.** `config/extension-points.schema.json` is
+   agent-kit's `kit/schemas/extension-points.schema.json`, byte for byte (commit `3b1593f`, sha256
+   `959c6aa0...196e`), recorded in `config/vendored.json`; `tests/unit/test_vendored.py` holds the bytes
+   to the record, compares the origin where its checkout sits beside the kit, and validates
+   `config/extension-points.json` against it. The kit-local schema it replaces is gone, and the
+   registry moved into the shared shape: `schema_version`; `schema` and `template` always present
+   (`null` for none); `required_by` one profile or `null` -- `init` is the base profile (init lays the
+   point down, every declared profile requires it), so `targets` is `init` and `target` `release`;
+   no `$comment`; `companions` became a rule of ids (`<id>-entry` is made with `<id>`), since the
+   shared shape has no field for it. *Rejected:* a stack-kit overlay schema adding `companions` and
+   array `required_by` (a second shape for one registry); deriving the registry at run time from
+   other declarations as agent-kit does (stack-kit's points are declared nowhere else -- the file is
+   their one home).

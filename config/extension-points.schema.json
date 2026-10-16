@@ -1,32 +1,37 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "extension points (shared shape of agent-kit and stack-kit)",
-  "description": "Every place a host extends the kit, declared once. A host file or entry is created from its template on demand (`extend <point> [<name>]`), carries <<pending: question>> markers for the answers only the host can give, and is upgraded by a 3-way merge when the template changes. The kit copy is never edited: the served result is the kit's base composed with the host's extensions as `merges_into` says.",
+  "$id": "extension-points",
+  "title": "EXTENSION POINTS -- the one shape both kits declare where, and how, a host extends them",
+  "description": "Shared by agent-kit and stack-kit (one handwriting): a registry of points, each with its purpose, the host path its file or members go to (`{name}` for a member), the template it is scaffolded from, the schema it keeps, its cardinality, whether the host's profile requires it answered, and how the kit merges it into what it serves. A point is scaffolded on demand; a template carries PENDING markers (`<!-- pending: ... -->`, `\"<pending: ...>\"`) for the answers only the host gives; a newer template merges three ways into the host's file and never overwrites it. The kit's own copy is never edited. Each kit derives its registry from its own declarations and prints it in this shape.",
   "type": "object",
+  "additionalProperties": false,
   "required": [
-    "schema",
+    "schema_version",
     "points"
   ],
   "properties": {
-    "schema": {
+    "schema_version": {
+      "type": "integer",
       "const": 1
     },
     "points": {
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": [
           "id",
           "purpose",
           "host_path",
           "template",
+          "schema",
           "cardinality",
+          "required_by",
           "merges_into"
         ],
         "properties": {
           "id": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9-]*$"
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
           },
           "purpose": {
             "type": "string",
@@ -34,47 +39,39 @@
           },
           "host_path": {
             "type": "string",
-            "minLength": 1,
-            "description": "Where the host's file goes, from the host root; <name> for a `many` point; `file#/json/pointer` for an entry inside a JSON file (`-` appends to an array); {manifest.field|default} for a path the manifest names"
+            "minLength": 1
           },
           "template": {
-            "type": "string",
-            "minLength": 1,
-            "description": "The kit file it is made from (scaffold/..., config/extension-templates/...); <name> picks a named template"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "schema": {
-            "type": "string",
-            "description": "What validates the result (a schema file, or a pointer into one)"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "cardinality": {
+            "type": "string",
             "enum": [
               "one",
               "many"
             ]
           },
           "required_by": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "The profiles that require it answered (`init`: created by init)"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "merges_into": {
             "type": "string",
-            "minLength": 1,
-            "description": "How the kit serves it: instance | overlay | catalog | registry | list"
-          },
-          "companions": {
-            "type": "string",
-            "description": "Points made with this one, under the same name (comma-separated ids), e.g. an infra service's manifest entry"
+            "minLength": 1
           }
-        },
-        "additionalProperties": false
+        }
       }
-    },
-    "$comment": {
-      "type": "string"
     }
-  },
-  "additionalProperties": false
+  }
 }

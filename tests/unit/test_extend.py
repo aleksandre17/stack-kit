@@ -30,7 +30,7 @@ def manifest(r: Path) -> dict:
 def test_the_registry_has_the_shared_shape():
     reg = json.loads((PKG / "config" / "extension-points.json").read_text(encoding="utf-8"))
     schema = json.loads((PKG / "config" / "extension-points.schema.json").read_text(encoding="utf-8"))
-    assert schema_check.validate(reg, schema) == []
+    assert schema_check.validate(reg, schema) == []  # the shared shape (tests/unit/test_vendored.py)
     ids = [p["id"] for p in reg["points"]]
     assert len(ids) == len(set(ids))
     for p in reg["points"]:
