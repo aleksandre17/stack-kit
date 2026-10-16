@@ -387,6 +387,19 @@ Without --apply it lists what would change. It is the only reader of the legacy 
 
 Exit codes: 0, 1.
 
+### `migrations`
+
+the migrations' ledger: a recorded one is never edited or removed; each is structure only.
+
+```
+stack-kit migrations check
+stack-kit migrations lock
+```
+
+`lock` records every migration the drivers' declarations find (sha256, line endings normalised) in ops/stack-kit/migrations.lock.json; validate then refuses a recorded migration that changed or is gone.
+
+Exit codes: 0, 1.
+
 ### `mod`
 
 a command a module's driver declares, or a rung of its delivery ladder.

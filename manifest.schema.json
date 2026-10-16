@@ -57,6 +57,17 @@
           "items": { "type": "string" },
           "description": "Module ids for stack compose-gen and stack-deploy auto-steps (default: all modules)"
         },
+        "migrate": {
+          "type": "object",
+          "description": "The migration step a release runs before the apps it serves: `service` (a one-shot infra service, e.g. flyway, under the `migrate` profile), `files` (the repository directory shipped to it), `modules` (the modules whose release runs it; default all)",
+          "required": ["service"],
+          "properties": {
+            "service": { "type": "string", "minLength": 1 },
+            "files": { "type": "string", "minLength": 1 },
+            "modules": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
         "services": {
           "type": "object",
           "description": "Services the environment's stack runs that no module builds (an object store, a cache): each an image with its settings and its `tier`, started by the same health flow",

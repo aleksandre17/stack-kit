@@ -244,6 +244,9 @@ def validate_manifest(
     from lib.migrations_gate import check as migrations_carry_data
 
     errs.extend(f"migrations: {f}" for f in migrations_carry_data(ctx.root, ctx.manifest))
+    from lib.migrations_gate import ledger_problems
+
+    errs.extend(f"migrations: {f}" for f in ledger_problems(ctx.root, ctx.manifest))
     # Configuration carries its sensitivity; a committed secret is refused (ADR-001 decision 5).
     from lib.config_keys import check as config_keys
 

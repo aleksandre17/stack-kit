@@ -76,8 +76,34 @@ def _start(ctx: Delivery, svc: list[Service], release: str, revision: str) -> li
     if not ctx.commands["compose"]:
         return []
     running.build_missing(ctx, svc, release)
+    migrate(ctx, svc)
     running.up(ctx, [s.id for s in svc])
     return [] if ctx.plan else running.wait_healthy(ctx, svc)
+
+
+def migrate(ctx: Delivery, svc: list[Service]) -> bool:
+    """The declared migration step (`stack.migrate`: a one-shot infra service, e.g. flyway), before the
+    apps it serves start: its files shipped into the infra place, then `run --rm` -- the database's
+    healthcheck gates it (depends_on), and its own ledger refuses an edited migration. A failure stops
+    the release before any app runs against a half-migrated schema."""
+    step = (ctx.manifest.get("stack") or {}).get("migrate") or {}
+    if not step or not ctx.commands["compose"]:
+        return False
+    serves = step.get("modules")
+    if serves and not any(s.module in serves for s in svc):
+        return False
+    from lib.delivery import infra
+
+    if step.get("files"):
+        src = ctx.root / str(step["files"])
+        if not src.is_dir():
+            raise DeliveryError(f"stack.migrate.files: {step['files']} is not there")
+        ctx.transport.put_tree(src, posixpath.join(ctx.places.of("infra"), "migrations"))
+    r = ctx.run(infra.compose(ctx, "--profile", "migrate", "run", "--rm", str(step["service"])), check=False)
+    if r.code != 0:
+        raise DeliveryError(f"the migration step ({step['service']}) failed (exit {r.code}); no app was started", 6)
+    ctx.out(f"[release] migrations applied ({step['service']})")
+    return True
 
 
 def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:

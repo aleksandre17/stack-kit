@@ -98,6 +98,24 @@ def _config(a: Args) -> int:
     return 1 if found else 0
 
 
+def _migrations(a: Args) -> int:
+    from lib import migrations_gate
+    from lib.project_context import ProjectContext
+
+    ctx = ProjectContext.discover()
+    if a.positional[:1] == ["lock"]:
+        added = migrations_gate.lock(ctx.root, ctx.manifest)
+        for rel in added:
+            print(f"  recorded {rel}")
+        print(f"  [migrations] {len(added)} new migration(s) recorded in {migrations_gate.LEDGER}")
+        return 0
+    found = migrations_gate.ledger_problems(ctx.root, ctx.manifest) + migrations_gate.check(ctx.root, ctx.manifest)
+    for line in found:
+        print(f"  {line}")
+    print("  [migrations] " + (f"{len(found)} finding(s)" if found else "structure only, and every recorded one unchanged"))
+    return 1 if found else 0
+
+
 VERBS = [
     Verb("init", "bootstrap a host, or draft its manifest from the tree", ["init", "init --plan", "init --approve <who>"],
          _init, passthrough=True, examples=["init --plan"],
@@ -116,6 +134,10 @@ VERBS = [
          details="The same policy every release runs before it writes an env file: required (or required only in an "
                  "environment), no placeholder, a minimum length, a format (positive-int, url, https-url without "
                  "localhost), values an environment forbids (a wildcard CORS origin in prod), keys another requires."),
+    Verb("migrations", "the migrations' ledger: a recorded one is never edited or removed; each is structure only",
+         ["migrations check", "migrations lock"], _migrations, exits=(0, 1),
+         details="`lock` records every migration the drivers' declarations find (sha256, line endings normalised) in "
+                 "ops/stack-kit/migrations.lock.json; validate then refuses a recorded migration that changed or is gone."),
     Verb("vscode-gen", "generate .vscode launch and tasks from the manifest", ["vscode-gen [--force]"],
          _py("lib/vscode_gen.py"), passthrough=True, group="generate"),
     Verb("config-gen", "generate module config from the manifest", ["config-gen [--all|--check|--dry-run] [module]"],

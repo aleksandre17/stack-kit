@@ -342,3 +342,47 @@ def test_a_generated_secret_is_made_on_the_server_once_and_never_read_back(proje
     assert svc["environment"]["DB_PASSWORD_FILE"] == "/run/stack-kit/generated/DB_PASSWORD"
     assert f"{ROOT}/shop/staging/edge/edge/runtime/generated:/run/stack-kit/generated:ro" in svc["volumes"]
     assert b"DB_PASSWORD" not in t.read(f"{ROOT}/shop/staging/stack/env/edge.env")
+
+
+def test_the_migration_step_runs_before_the_apps_and_a_failure_starts_none(project, tmp_path):
+    (project / "db" / "migrations").mkdir(parents=True)
+    (project / "db" / "migrations" / "V1__init.sql").write_text("create table t (id int);", encoding="utf-8")
+    m = manifest_of(project)
+    m["stack"] = {"infra": {"services": ["postgres", "flyway"]}, "migrate": {"service": "flyway", "files": "db/migrations"}}
+    (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
+    from lib import extend
+
+    for svc in ("postgres", "flyway"):
+        extend.make(project, m, "infra-service", svc)
+    extend.make(project, m, "init-ops-compose-infra-docker-composebaseyml")
+    commit(project, "with migrations")
+    t = server(tmp_path)
+    archive = packaged(project)
+    release.release(ctx_for(project, t), "edge", archive)
+    runs = [" ".join(e[1]) for e in t.log if e[0] == "exec"]
+    migrated = next(i for i, r in enumerate(runs) if "--profile migrate run --rm flyway" in r)
+    started = next(i for i, r in enumerate(runs) if " up -d edge" in r)
+    assert migrated < started and "shop-staging-infra" in runs[migrated]
+    assert t.read(f"{ROOT}/shop/staging/infra/migrations/V1__init.sql")
+    commit(project, "v2")
+    t.responses = lambda argv, cwd, env: Result(1, "", "checksum mismatch") if "flyway" in argv else Result(0, "running healthy")
+    t.log.clear()
+    with pytest.raises(DeliveryError, match="no app was started") as e:
+        release.release(ctx_for(project, t), "edge", packaged(project))
+    assert e.value.code == 6 and not [x for x in t.log if x[0] == "exec" and " up -d " in " ".join(x[1])]
+
+
+def test_a_recorded_migration_that_changed_or_is_gone_is_refused(tmp_path):
+    from lib import migrations_gate
+
+    root = tmp_path / "m"
+    mig = root / "apps" / "api" / "src" / "main" / "resources" / "db" / "migration"
+    mig.mkdir(parents=True)
+    (mig / "V1__a.sql").write_text("create table a (id int);", encoding="utf-8")
+    manifest = {"modules": {"api": {"type": "java-boot", "path": "apps/api"}}}
+    assert migrations_gate.lock(root, manifest) == ["apps/api/src/main/resources/db/migration/V1__a.sql"]
+    assert migrations_gate.ledger_problems(root, manifest) == []
+    (mig / "V1__a.sql").write_text("create table a (id bigint);", encoding="utf-8")
+    assert "was edited" in migrations_gate.ledger_problems(root, manifest)[0]
+    (mig / "V1__a.sql").unlink()
+    assert "is gone" in migrations_gate.ledger_problems(root, manifest)[0]

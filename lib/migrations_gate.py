@@ -69,3 +69,67 @@ def check(root: Path, manifest: dict[str, Any]) -> list[str]:
                                     f"modules.{mid}.migrations.allowData with its reason")
                     break
     return findings
+
+
+# ── the applied-checksum ledger: an edited or removed migration is refused ─────
+
+LEDGER = "ops/stack-kit/migrations.lock.json"
+
+
+def migration_files(root: Path, manifest: dict[str, Any]) -> list[Path]:
+    """Every migration file the drivers' declarations find, data or not."""
+    found: set[Path] = set()
+    for _mid, cfg in (manifest.get("modules") or {}).items():
+        if not isinstance(cfg, dict):
+            continue
+        declared = driver_capability(str(cfg.get("type") or ""), "migrations")
+        if not isinstance(declared, dict):
+            continue
+        exclude = [str(e).split("/")[-1] for e in declared.get("exclude") or []]
+        for base, globs in _bases(root, cfg, declared):
+            if base.is_dir():
+                for g in globs:
+                    found.update(p for p in base.glob(g) if p.is_file() and not any(fnmatch.fnmatch(p.name, e) for e in exclude))
+    return sorted(found)
+
+
+def _digest(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def ledger_problems(root: Path, manifest: dict[str, Any]) -> list[str]:
+    """A recorded migration that changed or is gone (a migration once run is never edited: a new one
+    corrects it). A new, unrecorded one is not a problem until `stack-kit migrations lock` records it."""
+    import json
+
+    path = root / LEDGER
+    if not path.is_file():
+        return []
+    recorded = json.loads(path.read_text(encoding="utf-8")).get("files") or {}
+    out = []
+    for rel, digest in sorted(recorded.items()):
+        f = root / rel
+        if not f.is_file():
+            out.append(f"{rel}: a recorded migration is gone -- a migration once applied is never removed")
+        elif _digest(f) != digest:
+            out.append(f"{rel}: a recorded migration was edited -- it is never edited once applied; add a new one")
+    return out
+
+
+def lock(root: Path, manifest: dict[str, Any]) -> list[str]:
+    """Record every migration not yet in the ledger (the ones already recorded are never rewritten)."""
+    import json
+
+    path = root / LEDGER
+    data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"schema": 1, "files": {}}
+    added = []
+    for f in migration_files(root, manifest):
+        rel = f.relative_to(root).as_posix()
+        if rel not in data["files"]:
+            data["files"][rel] = _digest(f)
+            added.append(rel)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+    return added
