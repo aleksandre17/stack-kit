@@ -33,6 +33,10 @@ REGISTRY = KIT / "config" / "extension-points.json"
 LOCK = "ops/stack-kit/extensions.lock.json"
 PENDING = re.compile(r"<<pending:\s*([^>]*)>>")
 _FIELD = re.compile(r"\{([A-Za-z0-9_.]+)\|([^}]*)\}")
+#: Where a tier's files go, rendered from the host (`<tier:T>` its module's path, `<secrets:T>` that
+#: module's secrets folder, `<up:T>` the way back from it to the root): the first module whose role
+#: lives in tier T, else the layout profile's `tiers.T` (`{project}` filled), else `apps/T`.
+_TIER = re.compile(r"<(tier|secrets|up):([a-z0-9][a-z0-9-]*)>")
 #: The base profile: what init lays down, required by every profile.
 INIT = "init"
 #: A point `<id>` + this suffix is made with `<id>`, under the same name.
@@ -59,13 +63,49 @@ def points() -> dict[str, dict[str, Any]]:
     return {p["id"]: p for p in json.loads(REGISTRY.read_text(encoding="utf-8"))["points"]}
 
 
+def _tier_module(manifest: dict[str, Any], tier: str) -> tuple[str, str] | None:
+    """(path, secrets folder) of the first module whose role lives in `tier`."""
+    from lib import catalogs
+
+    for mid, cfg in (manifest.get("modules") or {}).items():
+        if not isinstance(cfg, dict) or not cfg.get("path"):
+            continue
+        entry = catalogs.entry("roles", str(cfg.get("role") or ""), manifest) or {}
+        if entry.get("tier") == tier:
+            return str(cfg["path"]).replace("\\", "/").strip("/"), str(cfg.get("secretsModule") or mid)
+    return None
+
+
+def _profile_tier(manifest: dict[str, Any], tier: str) -> str:
+    profile = str((manifest.get("layout") or {}).get("profile") or "")
+    f = KIT / "config" / "layout-profiles" / f"{profile}.json"
+    if not profile or not f.is_file():
+        return ""
+    tpl = str((json.loads(f.read_text(encoding="utf-8")).get("tiers") or {}).get(tier) or "")
+    return tpl.replace("{project}", str(manifest.get("project") or "app")).strip("/")
+
+
+def placed(text: str, manifest: dict[str, Any]) -> str:
+    """`text` with each tier token rendered from the host's modules, its layout profile, its tiers."""
+    def one(m: re.Match[str]) -> str:
+        kind, tier = m.group(1), m.group(2)
+        mod = _tier_module(manifest, tier)
+        path = mod[0] if mod else (_profile_tier(manifest, tier) or f"apps/{tier}")
+        if kind == "tier":
+            return path
+        if kind == "secrets":
+            return mod[1] if mod else tier
+        return "/".join([".."] * len([p for p in path.split("/") if p])) or "."
+    return _TIER.sub(one, text)
+
+
 def _host_path(point: dict[str, Any], manifest: dict[str, Any], name: str) -> tuple[str, list[str] | None]:
     def field(m: re.Match[str]) -> str:
         cur: Any = manifest
         for part in m.group(1).split("."):
             cur = cur.get(part) if isinstance(cur, dict) else None
         return str(cur) if isinstance(cur, str) and cur else m.group(2)
-    path = _FIELD.sub(field, point["host_path"]).replace("<name>", name)
+    path = placed(_FIELD.sub(field, point["host_path"]), manifest).replace("<name>", name)
     if "#/" in path:
         f, ptr = path.split("#/", 1)
         return f, [p.replace("~1", "/").replace("~0", "~") for p in ptr.split("/")]
@@ -79,14 +119,28 @@ def place(point: dict[str, Any], manifest: dict[str, Any], name: str = "") -> Pl
     return Place(point, name, Path(f), ptr)
 
 
-def template_text(point: dict[str, Any], name: str) -> str:
+def template_text(point: dict[str, Any], name: str, manifest: dict[str, Any] | None = None) -> str:
     rel = point["template"].replace("<name>", name)
     path = KIT / rel
     if not path.is_file():
         raise ExtendError(f"{point['id']}: no template {rel} -- the kit offers "
                           + ", ".join(sorted(p.stem for p in path.parent.glob("*" + path.suffix))) if path.parent.is_dir()
                           else f"{point['id']}: no template {rel}")
-    return path.read_text(encoding="utf-8").replace("<name>", name)
+    text = path.read_text(encoding="utf-8").replace("<name>", name)
+    return text if manifest is None else rendered_for(text, manifest)
+
+
+def rendered_for(text: str, manifest: dict[str, Any]) -> str:
+    """A template's text placed for this host: its tier tokens and, where it has them, its manifest fields."""
+    if not _TIER.search(text):
+        return text
+
+    def field(m: re.Match[str]) -> str:
+        cur: Any = manifest
+        for part in m.group(1).split("."):
+            cur = cur.get(part) if isinstance(cur, dict) else None
+        return str(cur) if isinstance(cur, str) and cur else m.group(2)
+    return placed(_FIELD.sub(field, text), manifest)
 
 
 def _get(doc: Any, ptr: list[str], name: str) -> Any:
@@ -148,7 +202,7 @@ def make(root: Path, manifest: dict[str, Any], point_id: str, name: str = "", *,
     if existing(root, p) is not None:
         said.append(f"{point_id}{' ' + name if name else ''}: already there ({p.rel}{'#/' + '/'.join(p.pointer) if p.pointer else ''}) -- not overwritten")
     else:
-        text = template_text(point, name)
+        text = template_text(point, name, manifest)
         if p.pointer is None:
             said.append(f"{'plan: ' if plan else ''}create {p.rel} from {point['template'].replace('<name>', name)}")
             if not plan:
@@ -218,6 +272,7 @@ def upgrade(root: Path, *, plan: bool = False) -> list[str]:
         return ["nothing was made from a template here (no extensions lock)"]
     data = json.loads(f.read_text(encoding="utf-8"))
     pts = points()
+    manifest = _load(root, Path(MANIFEST_FILENAME))
     said = []
     for rel, entry in sorted(data["files"].items()):
         point = pts.get(entry["point"])
@@ -229,7 +284,7 @@ def upgrade(root: Path, *, plan: bool = False) -> list[str]:
         if not source.is_file():
             said.append(f"{rel}: the kit no longer has its template {entry['template']} -- left alone")
             continue
-        new = source.read_text(encoding="utf-8").replace("<name>", entry.get("name", ""))
+        new = rendered_for(source.read_text(encoding="utf-8").replace("<name>", entry.get("name", "")), manifest)
         if new == entry["base"]:
             continue
         host = target.read_text(encoding="utf-8")
@@ -310,12 +365,23 @@ def _companions_of(rel: str) -> bool:
     return any(rel.endswith("/" + f) for f in files)
 
 
+def copy_placed(kit_rel: str, root: str | Path, rel: str) -> None:
+    """A kit file laid into the host, its tier tokens placed for it (init's minimal compose catalog)."""
+    root = Path(root)
+    target = root / rel
+    if target.exists():
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    text = rendered_for((KIT / kit_rel).read_text(encoding="utf-8"), _load(root, Path(MANIFEST_FILENAME)))
+    target.write_text(text, encoding="utf-8", newline="\n")
+
+
 def init(root: Path, *, plan: bool = False) -> list[str]:
     """What init lays down: every point required by `init`, then each infra service the manifest selects."""
     said = []
     for point in points().values():
         if point.get("required_by") == INIT:
-            said += make(root, {}, point["id"], plan=plan)
+            said += make(root, _load(root, Path(MANIFEST_FILENAME)), point["id"], plan=plan)
     manifest = _load(root, Path(MANIFEST_FILENAME))
     for svc in ((manifest.get("stack") or {}).get("infra") or {}).get("services") or []:
         p = place(points()["infra-service"], manifest, svc)

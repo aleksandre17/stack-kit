@@ -18,7 +18,7 @@
     "vols_prod": "volumes:\n  {api_storage_vol}:\n  {api_uploads_vol}:\n"
   },
   "targets": {
-    "apps/backend/docker-compose.dev.yml": {
+    "<tier:backend>/docker-compose.dev.yml": {
       "comment": "# Dev API + worker — backend module compose up --build\n",
       "services": [
         "api_dev",
@@ -32,14 +32,14 @@
         "api_dockerfile_dev": "src/Dockerfile.dev",
         "worker_context": ".",
         "worker_dockerfile_dev": "worker/Dockerfile.dev",
-        "secrets_backend": "../../ops/config/backend",
+        "secrets_backend": "<up:backend>/{secrets|ops/config}/<secrets:backend>",
         "health_interval": "15s",
         "health_retries": "5",
         "health_start": "60s"
       },
       "networks": "net_bridge"
     },
-    "apps/backend/docker-compose.prod.yml": {
+    "<tier:backend>/docker-compose.prod.yml": {
       "comment": "# Prod API + worker — backend module compose -Prod | be deploy\n",
       "services": [
         "api_prod",
@@ -53,14 +53,14 @@
         "api_dockerfile_prod": "Dockerfile",
         "worker_build_context": ".",
         "worker_dockerfile_prod": "worker/Dockerfile",
-        "secrets_backend": "../../ops/config/backend",
+        "secrets_backend": "<up:backend>/{secrets|ops/config}/<secrets:backend>",
         "api_logs": "./logs"
       },
       "networks": "net_bridge",
       "volumes": "vols_prod"
     },
-    "apps/frontend/docker-compose.yml": {
-      "comment": "# Base — dev (override) + prod (overlay). Env: ops/config/frontend\n",
+    "<tier:frontend>/docker-compose.yml": {
+      "comment": "# Base — dev (override) + prod (overlay). Env: {secrets|ops/config}/<secrets:frontend>\n",
       "services": [
         "app_base"
       ],
@@ -68,7 +68,7 @@
         "app_context": "."
       }
     },
-    "apps/frontend/docker-compose.override.yml": {
+    "<tier:frontend>/docker-compose.override.yml": {
       "comment": "# Dev — auto-merged on compose up\n",
       "services": [
         "app_dev_overlay"
@@ -77,7 +77,7 @@
         "app_dev_mount": "."
       }
     },
-    "apps/frontend/docker-compose.prod.yml": {
+    "<tier:frontend>/docker-compose.prod.yml": {
       "comment": "# Prod overlay — frontend module compose -Prod\n",
       "services": [
         "app_prod_overlay"
@@ -98,7 +98,7 @@
       "comment": "# Full stack prod — full stack -Prod up -d --build\nname: {compose_project_name}\n\n",
       "manifestStack": "prod",
       "fmt": {
-        "api_logs": "../../apps/backend/logs"
+        "api_logs": "../../<tier:backend>/logs"
       },
       "networks": "net_internal",
       "volumes": "vols_prod"

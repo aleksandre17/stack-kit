@@ -1,5 +1,5 @@
 # nginx for the UI module: rendered to nginx.conf by `stack-kit nginx-gen`
-# (__NGINX_FRAME_ANCESTORS__ <- NGINX_FRAME_ANCESTORS in ops/config/frontend/nginx.env).
+# (__NGINX_FRAME_ANCESTORS__ <- NGINX_FRAME_ANCESTORS in {secrets|ops/config}/<secrets:frontend>/nginx.env).
 server {
     listen 80;
     root /usr/share/nginx/html;

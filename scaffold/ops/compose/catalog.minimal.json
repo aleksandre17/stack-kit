@@ -7,13 +7,13 @@
     "net_bridge": "networks:\n  {network_key}:\n    driver: bridge\n"
   },
   "targets": {
-    "apps/backend/docker-compose.dev.yml": {
+    "<tier:backend>/docker-compose.dev.yml": {
       "comment": "# Minimal API dev — extend for your stack\n",
       "services": ["api_dev"],
       "fmt": {
         "api_context": ".",
         "api_dockerfile_dev": "src/Dockerfile.dev",
-        "secrets_backend": "../../ops/config/backend"
+        "secrets_backend": "<up:backend>/{secrets|ops/config}/<secrets:backend>"
       },
       "networks": "net_bridge"
     }

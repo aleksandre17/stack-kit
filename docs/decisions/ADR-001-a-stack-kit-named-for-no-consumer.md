@@ -920,3 +920,14 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    noisy built-in); importing agent-kit's judge (a dependency between kits that share only shapes).
    The contract's own field names are used (`gates[].forbids`), not the `rules[].pattern` the request
    named, since that is the document the host already holds.
+11. **Templates are placed for the host.** The init points that named `apps/backend`, `apps/frontend`
+   and `ops/config/backend|frontend`, and the compose catalogs' paths, carry placement tokens
+   (`lib/extend.py`): `<tier:T>` the path of the host's first module whose role lives in tier T,
+   `<secrets:T>` that module's secrets folder, `<up:T>` the way back from it to the root -- else the
+   layout profile's `tiers.T` (the monorepo profile: `platform/apps/{project}/T`), else `apps/T`, so
+   a default host is laid down byte for byte as before. They are rendered in a point's host path and
+   in a template's text (with its `{field|default}` manifest fields), at init from the manifest as it
+   stands (a host's own, or the one init just wrote), on `extend --upgrade` too, and in init's minimal
+   compose catalog. *Not changed:* the scaffold manifest's sample modules keep `apps/<tier>` -- it is
+   the convention-defaults source, and a host with modules of its own never takes it.
+   *Rejected:* a template per layout (the same files twice).

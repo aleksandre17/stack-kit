@@ -162,8 +162,11 @@ Write-Step "Extension points required by init (scaffold, manifest, launchers, in
 if ($MinimalCatalog) {
     $catDst = Join-Path $ProjectRoot "ops\compose\catalog.json"
     if (-not (Test-Path $catDst)) {
-        New-Item -ItemType Directory -Path (Split-Path $catDst -Parent) -Force | Out-Null
-        Copy-Item (Join-Path $ScaffoldRoot "ops\compose\catalog.minimal.json") $catDst -Force
+        # placed for this host: its modules' paths, else its layout profile's, else apps/<tier>
+        $pyCat = Get-StackKitPythonArgs
+        if (-not $pyCat) { Write-Host "  [ERROR] Python 3 is required" -ForegroundColor Red; exit 9009 }
+        Invoke-StackKitPythonExe $pyCat "-B" "-c" "import sys; sys.path.insert(0, sys.argv[1]); from lib import extend; extend.copy_placed(sys.argv[2], sys.argv[3], sys.argv[4])" $PackageRoot "scaffold/ops/compose/catalog.minimal.json" $ProjectRoot "ops/compose/catalog.json"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         Write-Host "  [OK]   ops/compose/catalog.json (minimal)" -ForegroundColor Green
     }
 }

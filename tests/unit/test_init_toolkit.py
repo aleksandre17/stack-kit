@@ -16,7 +16,7 @@ def test_catalog_templates_in_scaffold(pkg_root: Path) -> None:
     assert (compose / "catalog.full.json").is_file()
     full = (compose / "catalog.full.json").read_text(encoding="utf-8")
     assert "ops/compose/stack/docker-compose.yml" in full
-    assert "apps/backend/docker-compose.dev.yml" in full
+    assert "<tier:backend>/docker-compose.dev.yml" in full  # placed for the host (lib/extend.py placement)
     assert "app_stack_dev" in full or "api_dev" in full
 
 

@@ -244,7 +244,7 @@
     {
       "id": "init-apps-backend-logs-gitignore",
       "purpose": "laid down by init: apps/backend/logs/.gitignore",
-      "host_path": "apps/backend/logs/.gitignore",
+      "host_path": "<tier:backend>/logs/.gitignore",
       "template": "scaffold/apps/backend/logs/.gitignore",
       "schema": null,
       "cardinality": "one",
@@ -254,7 +254,7 @@
     {
       "id": "init-apps-frontend-logs-gitignore",
       "purpose": "laid down by init: apps/frontend/logs/.gitignore",
-      "host_path": "apps/frontend/logs/.gitignore",
+      "host_path": "<tier:frontend>/logs/.gitignore",
       "template": "scaffold/apps/frontend/logs/.gitignore",
       "schema": null,
       "cardinality": "one",
@@ -264,7 +264,7 @@
     {
       "id": "init-apps-frontend-nginxconftemplate",
       "purpose": "laid down by init: apps/frontend/nginx.conf.template",
-      "host_path": "apps/frontend/nginx.conf.template",
+      "host_path": "<tier:frontend>/nginx.conf.template",
       "template": "scaffold/apps/frontend/nginx.conf.template",
       "schema": null,
       "cardinality": "one",
@@ -384,7 +384,7 @@
     {
       "id": "init-ops-config-backend-envexample",
       "purpose": "laid down by init: ops/config/backend/.env.example",
-      "host_path": "ops/config/backend/.env.example",
+      "host_path": "{secrets|ops/config}/<secrets:backend>/.env.example",
       "template": "scaffold/ops/config/backend/.env.example",
       "schema": null,
       "cardinality": "one",
@@ -394,7 +394,7 @@
     {
       "id": "init-ops-config-frontend-envexample",
       "purpose": "laid down by init: ops/config/frontend/.env.example",
-      "host_path": "ops/config/frontend/.env.example",
+      "host_path": "{secrets|ops/config}/<secrets:frontend>/.env.example",
       "template": "scaffold/ops/config/frontend/.env.example",
       "schema": null,
       "cardinality": "one",
@@ -404,7 +404,7 @@
     {
       "id": "init-ops-config-frontend-embedenvexample",
       "purpose": "laid down by init: ops/config/frontend/embed.env.example",
-      "host_path": "ops/config/frontend/embed.env.example",
+      "host_path": "{secrets|ops/config}/<secrets:frontend>/embed.env.example",
       "template": "scaffold/ops/config/frontend/embed.env.example",
       "schema": null,
       "cardinality": "one",
@@ -414,7 +414,7 @@
     {
       "id": "init-ops-config-frontend-nginxenvexample",
       "purpose": "laid down by init: ops/config/frontend/nginx.env.example",
-      "host_path": "ops/config/frontend/nginx.env.example",
+      "host_path": "{secrets|ops/config}/<secrets:frontend>/nginx.env.example",
       "template": "scaffold/ops/config/frontend/nginx.env.example",
       "schema": null,
       "cardinality": "one",
