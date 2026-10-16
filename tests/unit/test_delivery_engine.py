@@ -430,3 +430,18 @@ def test_an_oidc_provider_is_ready_only_when_discovery_names_it_and_the_jwks_has
         assert "names issuer" in targets.check_oidc(issuer)[0]
     finally:
         srv.shutdown()
+
+
+def test_the_safe_prune_touches_only_cache_and_dangling_images_and_schedules_once(project, tmp_path):
+    t = server(tmp_path)
+    ctx = ctx_for(project, t)
+    manage.prune(ctx)
+    manage.schedule_prune(ctx)
+    lines = [" ".join(e[1]) for e in t.log if e[0] == "exec"]
+    assert any("eng builder prune -f --filter until=168h" in x for x in lines)
+    assert any("eng image prune -f" in x for x in lines)
+    assert not [x for x in lines if " -a" in x.split("prune", 1)[-1] or "--volumes" in x or "--all" in x]
+    cron = next(x for x in lines if "crontab" in x)
+    assert "grep -vF '# stack-kit:safe-prune'" in cron and "| crontab -" in cron, "replaced, never duplicated"
+    with pytest.raises(DeliveryError, match="not a cron schedule"):
+        manage.schedule_prune(ctx, "every sunday")

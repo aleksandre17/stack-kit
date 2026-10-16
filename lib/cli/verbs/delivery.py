@@ -175,6 +175,10 @@ def _ops(a: Args) -> int:
                 print(f"  [ops] FAILED {f}")
             return 6 if failures else 0
         return remote.run(a, f"restart-check {' '.join(rest) or 'all'}", check)
+    if sub == "prune":
+        if a.has("--schedule"):
+            return remote.run(a, "schedule the safe prune", lambda ctx: manage.schedule_prune(ctx, a.value("--at") or manage.CRON_DEFAULT))
+        return remote.run(a, "safe prune", manage.prune)
     if sub == "rebuild":
         return remote.run(a, f"rebuild {' '.join(rest) or 'all'}", lambda ctx: manage.rebuild(ctx, rest))
     if sub == "rm":
@@ -346,8 +350,11 @@ VERBS = [
     Verb("ops", "operate a deployed environment, per service, module or tier (or all)",
          ["ops status|logs|start|stop|restart|rebuild [module|service|tier ...] --env <id>",
           "ops restart-check [module|service|tier ...] --env <id>   (restart is idempotent: healthy, same image, no drift)",
-          "ops rm <module|service|tier ...> --env <id> [--yes]", "ops nuke --env <id> [--yes]"],
-         _ops, options=[*TARGET_OPTS, Option("--follow", "logs: keep following"), Option("--tail", "logs: lines (default 200)", "n")],
+          "ops rm <module|service|tier ...> --env <id> [--yes]", "ops nuke --env <id> [--yes]",
+          "ops prune [--schedule [--at '<cron>']] --env <id>   (builder cache and dangling images only)"],
+         _ops, options=[*TARGET_OPTS, Option("--follow", "logs: keep following"), Option("--tail", "logs: lines (default 200)", "n"),
+                        Option("--schedule", "prune: install it in the target user's crontab, once per host"),
+                        Option("--at", "prune --schedule: the cron schedule (default weekly)", "cron")],
          group="delivery", exits=(0, 1, 2, 3, 6), examples=["ops status --env prod", "ops logs api --env dev --follow"],
          details="rm and nuke ask first and act only inside the project's own environment directory, which must carry "
                  "this project's ownership marker; never at the target's root."),

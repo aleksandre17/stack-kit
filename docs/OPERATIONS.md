@@ -124,6 +124,7 @@ stack-kit ops status|logs|start|stop|restart|rebuild [module|service|tier ...] -
 stack-kit ops restart-check [module|service|tier ...] --env <id>   (restart is idempotent: healthy, same image, no drift)
 stack-kit ops rm <module|service|tier ...> --env <id> [--yes]
 stack-kit ops nuke --env <id> [--yes]
+stack-kit ops prune [--schedule [--at '<cron>']] --env <id>   (builder cache and dangling images only)
 ```
 
 | option | |
@@ -132,6 +133,8 @@ stack-kit ops nuke --env <id> [--yes]
 | `--yes` | answer the confirmation (CI); without a terminal a confirmation is otherwise refused |
 | `--follow` | logs: keep following |
 | `--tail <n>` | logs: lines (default 200) |
+| `--schedule` | prune: install it in the target user's crontab, once per host |
+| `--at <cron>` | prune --schedule: the cron schedule (default weekly) |
 | `--target <name>` | the declared deploy target (default: the environment's) |
 | `--env <id>` | the environment (catalogs.environments; --dev / --prod are short for it) |
 

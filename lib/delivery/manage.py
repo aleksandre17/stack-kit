@@ -73,6 +73,41 @@ def restart_check(ctx: Delivery, wanted: list[str]) -> list[str]:
     return failures
 
 
+#: The safe prune: the builder cache older than a week and dangling images -- what no container and no
+#: tag can need. Never `-a` (another project's tagged image) and never `--volumes` (anyone's data).
+PRUNE_MARK = "# stack-kit:safe-prune"
+CRON_DEFAULT = "17 3 * * 0"
+
+
+def _prune_lines(ctx: Delivery) -> list[str]:
+    import shlex
+
+    engine = " ".join(shlex.quote(a) for a in ctx.engine())
+    return [f"{engine} builder prune -f --filter until=168h", f"{engine} image prune -f"]
+
+
+def prune(ctx: Delivery) -> int:
+    for line in _prune_lines(ctx):
+        ctx.run(["sh", "-c", line])
+    ctx.out("[ops] pruned: the builder cache older than a week and dangling images (never tagged images, never volumes)")
+    return 0
+
+
+def schedule_prune(ctx: Delivery, when: str = CRON_DEFAULT) -> int:
+    """The safe prune in the target user's crontab, once per host: the marked line is replaced, never
+    duplicated (every project of the host installs the same one)."""
+    import re as _re
+    import shlex
+
+    if not _re.fullmatch(r"[0-9*/,-]+( [0-9*/,-]+){4}", when):
+        raise DeliveryError(f"--at '{when}' is not a cron schedule (five fields)", 2)
+    job = f"{when} {' >/dev/null 2>&1; '.join(_prune_lines(ctx))} >/dev/null 2>&1 {PRUNE_MARK}"
+    script = f"(crontab -l 2>/dev/null | grep -vF {shlex.quote(PRUNE_MARK)}; echo {shlex.quote(job)}) | crontab -"
+    ctx.run(["sh", "-c", script])
+    ctx.out(f"[ops] scheduled ({when}): {job}")
+    return 0
+
+
 def _owned(ctx: Delivery) -> None:
     if not preflight.owned(ctx):
         raise DeliveryError(f"refused: {ctx.places.project_dir} carries no ownership marker of {ctx.project!r} -- "
