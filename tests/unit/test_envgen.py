@@ -116,3 +116,22 @@ def test_extend_env_refuses_a_file_git_would_track_and_a_secret_with_a_per_envir
     (project / "ops/config/keys.json").write_text(json.dumps(cat), encoding="utf-8")
     verdict = config_keys.check(project, manifest_of(project))
     assert any("per-environment value -- a committed secret" in f for f in verdict.failures)
+
+
+def test_a_key_family_is_described_never_assigned():
+    family = {"version": 1, "keys": [{"key": "Logging:LogLevel:*", "sensitivity": "PUBLIC", "owner": "app",
+                                      "allowedSource": "env file"}]}
+    text = envgen.example(family, "keys.json", "edge", ["dev"])
+    assert "Logging__LogLevel___=" not in text and "Logging__LogLevel__<Name>=... per member" in text
+    made, _ = envgen.env_file(family, "keys.json", "edge", "dev", ["dev"])
+    assert "Logging__LogLevel" not in made
+
+
+def test_a_secret_declared_unneeded_in_an_environment_is_absent_there_not_pending():
+    rows = {"version": 1, "keys": [{"key": "Smtp:Password", "sensitivity": "SECRET", "owner": "app",
+                                    "allowedSource": "secret store", "rotation": "yearly",
+                                    "policy": {"required": ["prod"]}}]}
+    dev, counts = envgen.env_file(rows, "keys.json", "edge", "dev", ["dev", "prod"])
+    assert "Smtp__Password" not in dev and counts == {"absent": 1}
+    prod, counts = envgen.env_file(rows, "keys.json", "edge", "prod", ["dev", "prod"])
+    assert envgen.PENDING.search(prod) and counts == {"pending": 1}

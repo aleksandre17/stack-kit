@@ -66,6 +66,11 @@ def example(catalogue: dict[str, Any], catalogue_rel: str, folder: str, environm
     """The folder's committed .env.example: every key, described; a secret's value always empty."""
     lines = [header(catalogue_rel).rstrip("\n")]
     for row in rows_for(catalogue, folder):
+        if "*" in str(row["key"]):
+            # A family of keys (`A:B:*`) names no one variable: it is described, never assigned.
+            member = _name({**row, "key": str(row["key"]).replace("*", "MEMBER")}).replace("MEMBER", "<Name>")
+            lines.append(f"# {row['key']} -- {row.get('sensitivity') or '?'}; a family: set {member}=... per member")
+            continue
         req = _required_in(row, environments)
         traits = [str(row.get("sensitivity") or "?"), f"required in {', '.join(req)}" if req else "optional"]
         if row.get("dataSource"):
@@ -95,6 +100,9 @@ def value_for(row: dict[str, Any], environment: str, environments: list[str]) ->
         return str(v), "set"
     if generate_bytes(row):
         return secrets.token_urlsafe(generate_bytes(row)), "generated"
+    declared = (row.get("policy") or {}).get("required") if isinstance(row.get("policy"), dict) else None
+    if row.get("sensitivity") == "SECRET" and declared is not None and environment not in _required_in(row, environments):
+        return None, "absent"  # a secret the key declares unneeded here is left unset, never asked for
     if row.get("sensitivity") == "SECRET":
         return f"<<pending: {row['key']} is a SECRET -- its value from the secret store>>", "pending"
     if "default" in row:
@@ -111,6 +119,8 @@ def env_file(catalogue: dict[str, Any], catalogue_rel: str, folder: str, environ
              f"ignored -- fill each pending value, never commit this file"]
     counts: dict[str, int] = {}
     for row in rows_for(catalogue, folder):
+        if "*" in str(row["key"]):
+            continue  # a family names no one variable
         value, kind = value_for(row, environment, environments)
         counts[kind] = counts.get(kind, 0) + 1
         if value is not None:
