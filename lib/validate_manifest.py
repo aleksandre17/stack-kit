@@ -272,6 +272,11 @@ def validate_manifest(
     errs.extend(f"config: {f}" for f in runtime_config_problems(ctx.root, ctx.manifest))
     warnings.extend(f"config: {k}" for k in keys.known)
     warnings.extend(f"config: {s}" for s in _shared_data_sources(ctx))
+    from lib import projections
+
+    stale, unrendered = projections.drift(ctx.root, ctx.manifest)
+    errs.extend(f"render: {s}" for s in stale)
+    warnings.extend(f"render: {s}" for s in unrendered)
     # Deploy targets are declared configuration (amendment 9): refused shapes and secrets; notices.
     from lib import targets as deploy_targets
 

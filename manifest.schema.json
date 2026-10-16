@@ -20,6 +20,15 @@
       },
       "additionalProperties": false
     },
+    "projections": {
+      "type": "object",
+      "description": "Where `render` writes the generated projections (lib/projections.py): `containers` ({module}, {service}) and `stack` ({environment})",
+      "properties": {
+        "containers": { "type": "string", "minLength": 1 },
+        "stack": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "extend": {
       "type": "object",
       "description": "The host's extension profile: `profile` names the profile whose points must be answered (config/extension-points.json `required_by`); a pending answer there is an error, elsewhere a notice",

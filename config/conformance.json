@@ -417,6 +417,17 @@
     },
     {
       "standard": "harvested (round 8)",
+      "clause": "what a deploy runs is visible in the host",
+      "mechanism": "`render`: each module's effective recipe and each environment's stack compose as generated projections (header naming the sources); validate reports a stale one, a release refuses it",
+      "evidence": [
+        "tests/unit/test_projections.py::test_a_release_ships_what_was_rendered_and_refuses_a_stale_projection",
+        "tests/unit/test_projections.py::test_validate_reports_a_projection_its_sources_no_longer_render"
+      ],
+      "status": "partial",
+      "why": "the release id and the packaged artifact's name are symbolic in the projection; a static service's server config is not projected"
+    },
+    {
+      "standard": "harvested (round 8)",
       "clause": "secure compose overlay",
       "mechanism": "not built",
       "evidence": [],

@@ -867,3 +867,18 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    sentinel, never shared. *Rejected:* comparing whole values (two spellings of one database would
    pass, and a whole value is a credential); resolving hosts to addresses (a network read in
    validate, and DNS differs by vantage point).
+7. **What a deploy runs is visible in the host** (owner request: the effective Dockerfile lived in the
+   driver, the per-environment compose only on the server). One new verb, `render` (`--plan`,
+   `--check`), writes generated projections -- each deployable module's effective recipe (its own
+   `container.dockerfile`, or its driver's template, a host driver's included, rendered for it) to
+   `projections.containers` (default `ops/containers/{module}/Dockerfile`), and each environment's
+   stack compose as deploy writes it on its target to `projections.stack` (default
+   `ops/compose/stack/{environment}/compose.yml`) -- each under one header line naming its sources.
+   Two values exist only once a commit is packaged and are symbolic: the release id (`{release}`)
+   and the artifact's file name (the driver's `container.artifact` glob); a credential is the one
+   the module declares. `validate` reports a projection its sources no longer render (an error) or
+   one not rendered (a notice); a release refuses a stale one (exit 5), comparing the archive's
+   recipe and the very service documents it is about to write. *Rejected:* extending `compose-gen`
+   (it generates the LOCAL development stack; one verb per output keeps each honest); committing
+   projections with the concrete release id (stale on every commit); rendering the compose as YAML
+   (compose reads the JSON deploy writes; a second serialiser would make two byte forms).

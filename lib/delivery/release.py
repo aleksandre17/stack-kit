@@ -17,7 +17,7 @@ import posixpath
 import time
 from pathlib import Path
 
-from lib import package
+from lib import identity, package
 from lib.delivery import preflight, running, stack
 from lib.delivery.context import Delivery, DeliveryError
 from lib.delivery.model import Service, keep_of, module_services
@@ -137,6 +137,12 @@ def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
     floating = images_floating(ctx, svc, trees)
     if floating:
         raise DeliveryError("refused: " + "; ".join(floating), 5)
+    from lib import projections
+
+    stale = projections.release_problems(ctx, svc, rid, trees) if archive is not None else []
+    if stale:
+        raise DeliveryError(f"refused: a committed projection is stale (`{identity.KIT_NAME} render`, then commit):\n  "
+                            + "\n  ".join(stale), 5)
     ctx.out(f"[release] {module_id} {rid} ({meta.get('revision')}) -> {ctx.target_name} {ctx.environment}: "
             f"{ctx.places.environment_dir}")
     policy = config_policy_problems(ctx, svc)

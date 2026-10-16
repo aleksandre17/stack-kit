@@ -116,6 +116,23 @@ def _migrations(a: Args) -> int:
     return 1 if found else 0
 
 
+def _render(a: Args) -> int:
+    """The generated projections: each module's effective container recipe, each environment's stack compose."""
+    from lib import projections
+    from lib.project_context import ProjectContext
+
+    ctx = ProjectContext.discover()
+    if a.has("--check"):
+        errors, notices = projections.drift(ctx.root, ctx.manifest)
+        for line in [*errors, *notices]:
+            print(f"  {line}")
+        print(f"  [render] {len(errors)} stale projection(s)" if errors else "  [render] every rendered projection is current")
+        return 1 if errors else 0
+    for line in projections.write(ctx.root, ctx.manifest, plan=a.has("--plan")):
+        print(f"  {line}")
+    return 0
+
+
 def _scan(a: Args) -> int:
     from lib import secret_scan
     from lib.project_context import ProjectContext
@@ -155,6 +172,14 @@ VERBS = [
          ["migrations check", "migrations lock"], _migrations, exits=(0, 1),
          details="`lock` records every migration the drivers' declarations find (sha256, line endings normalised) in "
                  "ops/stack-kit/migrations.lock.json; validate then refuses a recorded migration that changed or is gone."),
+    Verb("render", "write what a deploy runs into the host as generated projections: each module's container recipe, each environment's stack compose",
+         ["render [--plan]", "render --check"], _render,
+         options=[Option("--plan", "say what would be written"), Option("--check", "report a projection its sources no longer render")],
+         exits=(0, 1),
+         details="Each file carries a header naming its sources -- edit those, not it. The release id and the packaged "
+                 "artifact's name are written symbolically ({release}, the driver's artifact glob). validate reports a stale "
+                 "projection; a release refuses one (exit 5). Paths: manifest `projections.containers` "
+                 "(default ops/containers/{module}/Dockerfile) and `projections.stack` (default ops/compose/stack/{environment}/compose.yml)."),
     Verb("scan", "the secret boundary: credential-shaped values in the tracked tree (and, --history, every commit)",
          ["scan secrets [--history]"], _scan, options=[Option("--history", "every line any commit added, too")], exits=(0, 1),
          details="JWTs, passwords in URLs, connection-string passwords, private keys, committed env files, binaries in the "

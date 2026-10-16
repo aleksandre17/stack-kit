@@ -447,6 +447,24 @@ stack-kit mod api build
 stack-kit mod api deliver release --env prod --plan
 ```
 
+### `render`
+
+write what a deploy runs into the host as generated projections: each module's container recipe, each environment's stack compose.
+
+```
+stack-kit render [--plan]
+stack-kit render --check
+```
+
+| option | |
+|---|---|
+| `--plan` | say what would be written |
+| `--check` | report a projection its sources no longer render |
+
+Each file carries a header naming its sources -- edit those, not it. The release id and the packaged artifact's name are written symbolically ({release}, the driver's artifact glob). validate reports a stale projection; a release refuses one (exit 5). Paths: manifest `projections.containers` (default ops/containers/{module}/Dockerfile) and `projections.stack` (default ops/compose/stack/{environment}/compose.yml).
+
+Exit codes: 0, 1.
+
 ### `scan`
 
 the secret boundary: credential-shaped values in the tracked tree (and, --history, every commit).

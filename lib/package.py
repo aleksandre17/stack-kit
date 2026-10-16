@@ -137,9 +137,10 @@ def _artifact(tree: dict[str, Any], spec: dict[str, Any], where: str) -> str:
     return hits[0]
 
 
-def recipe(root: Path, manifest: dict, service: Any, tree: dict[str, Any]) -> dict[str, bytes]:
+def recipe(root: Path, manifest: dict, service: Any, tree: dict[str, Any], *, artifact: str | None = None) -> dict[str, bytes]:
     """The files a service's release adds to its artifacts: its container recipe (the module's own
-    Dockerfile, else the driver's template rendered for this module), or its static server config."""
+    Dockerfile, else the driver's template rendered for this module), or its static server config.
+    `artifact`: the artifact's name when no tree is packaged yet (a projection: its declared glob)."""
     from lib import templating
     from lib.delivery.model import driver_home
 
@@ -155,7 +156,7 @@ def recipe(root: Path, manifest: dict, service: Any, tree: dict[str, Any]) -> di
         template = driver_home(service.driver) / str(spec["template"])
         if not template.is_file():
             raise PackageError(f"{where}: driver template {spec['template']} is not there")
-        extra = {"artifact": _artifact(tree, spec, where), "port": str(spec.get("port") or ""),
+        extra = {"artifact": artifact if artifact is not None else _artifact(tree, spec, where), "port": str(spec.get("port") or ""),
                  "entry": templating.render(str(spec.get("entry") or ""), cfg),
                  "healthcheck": _probe(spec, where)}
         return {"Dockerfile": templating.render(template.read_text(encoding="utf-8"), cfg, extra).encode("utf-8")}
