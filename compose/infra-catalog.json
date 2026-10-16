@@ -1,28 +1,155 @@
 {
-  "description": "Infra module catalog — fragment path + SSH tunnel port env keys. Consumer may add ops/compose/infra/infra-catalog.json to extend.",
+  "description": "Infra module catalog -- fragment path, SSH tunnel port env keys, what it needs, and how it is backed up and restore-checked (`backup`: dump, restore, query, drop -- run inside its container, its secrets read there). A consumer may add ops/compose/infra/infra-catalog.json to extend.",
   "modules": {
     "postgres": {
       "fragment": "services/postgres.yml",
       "description": "PostgreSQL (relational)",
-      "tunnel": [{ "env": "POSTGRES_PORT", "default": "5432" }]
+      "tunnel": [
+        {
+          "env": "POSTGRES_PORT",
+          "default": "5432"
+        }
+      ],
+      "backup": {
+        "container": "postgres",
+        "extension": "dump",
+        "dump": "pg_dump -Fc -U \"$POSTGRES_USER\" \"$POSTGRES_DB\"",
+        "restore": "createdb -U \"$POSTGRES_USER\" \"$CHECK_DB\" && pg_restore -U \"$POSTGRES_USER\" -d \"$CHECK_DB\" --no-owner \"$RESTORE_FILE\"",
+        "query": "psql -U \"$POSTGRES_USER\" -d \"$CHECK_DB\" -tAc \"$ANCHOR\"",
+        "drop": "dropdb -U \"$POSTGRES_USER\" --if-exists \"$CHECK_DB\""
+      }
     },
     "redis": {
       "fragment": "services/redis.yml",
-      "description": "Redis (cache / streams)",
-      "tunnel": [{ "env": "REDIS_PORT", "default": "6379" }]
+      "description": "Redis (cache / streams; REDIS_PASSWORD turns auth on)",
+      "tunnel": [
+        {
+          "env": "REDIS_PORT",
+          "default": "6379"
+        }
+      ]
     },
     "qdrant": {
       "fragment": "services/qdrant.yml",
       "description": "Qdrant (vectors)",
       "tunnel": [
-        { "env": "QDRANT_HTTP_PORT", "default": "6333" },
-        { "env": "QDRANT_GRPC_PORT", "default": "6334" }
+        {
+          "env": "QDRANT_HTTP_PORT",
+          "default": "6333"
+        },
+        {
+          "env": "QDRANT_GRPC_PORT",
+          "default": "6334"
+        }
       ]
     },
     "rabbitmq": {
       "fragment": "services/rabbitmq.yml",
       "description": "RabbitMQ (async events, P5)",
-      "tunnel": [{ "env": "RABBITMQ_PORT", "default": "5672" }]
+      "tunnel": [
+        {
+          "env": "RABBITMQ_PORT",
+          "default": "5672"
+        }
+      ]
+    },
+    "sqlserver": {
+      "fragment": "services/sqlserver.yml",
+      "description": "SQL Server",
+      "tunnel": [
+        {
+          "env": "SQLSERVER_PORT",
+          "default": "1433"
+        }
+      ],
+      "backup": {
+        "container": "sqlserver",
+        "extension": "bak",
+        "inContainerDir": "/var/opt/mssql/backup",
+        "dump": "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -b -Q \"BACKUP DATABASE [$DB_NAME] TO DISK='$DUMP_FILE' WITH COPY_ONLY, CHECKSUM, INIT\"",
+        "restore": "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -b -Q \"RESTORE VERIFYONLY FROM DISK='$RESTORE_FILE' WITH CHECKSUM\"",
+        "query": "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -h -1 -W -b -d \"$DB_NAME\" -Q \"SET NOCOUNT ON; $ANCHOR\"",
+        "drop": "true"
+      }
+    },
+    "minio": {
+      "fragment": "services/minio.yml",
+      "description": "MinIO (S3-compatible objects)",
+      "tunnel": [
+        {
+          "env": "MINIO_PORT",
+          "default": "9000"
+        },
+        {
+          "env": "MINIO_CONSOLE_PORT",
+          "default": "9001"
+        }
+      ]
+    },
+    "otel-collector": {
+      "fragment": "services/otel-collector.yml",
+      "description": "OpenTelemetry collector",
+      "tunnel": [
+        {
+          "env": "OTLP_GRPC_PORT",
+          "default": "4317"
+        },
+        {
+          "env": "OTLP_HTTP_PORT",
+          "default": "4318"
+        }
+      ]
+    },
+    "prometheus": {
+      "fragment": "services/prometheus.yml",
+      "description": "Prometheus (retention declared)",
+      "tunnel": [
+        {
+          "env": "PROMETHEUS_PORT",
+          "default": "9090"
+        }
+      ]
+    },
+    "grafana": {
+      "fragment": "services/grafana.yml",
+      "description": "Grafana (provisioned datasources)",
+      "tunnel": [
+        {
+          "env": "GRAFANA_PORT",
+          "default": "3000"
+        }
+      ]
+    },
+    "tempo": {
+      "fragment": "services/tempo.yml",
+      "description": "Tempo (traces)",
+      "tunnel": [
+        {
+          "env": "TEMPO_PORT",
+          "default": "3200"
+        }
+      ]
+    },
+    "keycloak": {
+      "fragment": "services/keycloak.yml",
+      "description": "Keycloak on the stack's Postgres",
+      "needs": [
+        "postgres"
+      ],
+      "tunnel": [
+        {
+          "env": "KEYCLOAK_PORT",
+          "default": "8080"
+        }
+      ]
+    },
+    "flyway": {
+      "fragment": "services/flyway.yml",
+      "description": "Flyway one-shot migrations (profile migrate)",
+      "needs": [
+        "postgres"
+      ],
+      "tunnel": []
     }
   }
 }

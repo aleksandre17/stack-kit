@@ -40,6 +40,7 @@ def sync(ctx: Delivery) -> list[str]:
     values = envfile.merged(envfile.run_files(ctx.secrets_root, "infra", ctx.environment,
                                               catalogs.ids("environments", ctx.manifest)))
     values.setdefault("STACK_KIT_NETWORK", naming.remote_network(ctx.project, ctx.environment))
+    values.setdefault("INFRA_PREFIX", naming.remote_compose_project(ctx.project, ctx.environment))
     data = "".join(f"{k}={v}\n" for k, v in sorted(values.items())).encode("utf-8")
     if write_if_changed(ctx, posixpath.join(base, ".env.runtime"), data, "600"):
         written.append(".env.runtime")

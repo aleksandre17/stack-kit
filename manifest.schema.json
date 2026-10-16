@@ -79,6 +79,19 @@
               "type": "array",
               "items": { "type": "string" },
               "description": "Full override: explicit -f list relative to infraComposeDir"
+            },
+            "backup": {
+              "type": "object",
+              "description": "Per store: what a backup keeps and what a restore must still hold (`backup`, `backup verify`): database, keep (dumps kept, default 7), anchors [{query, equals | atLeast}] checked in a throwaway restore",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "database": { "type": "string", "minLength": 1 },
+                  "keep": { "type": "integer", "minimum": 1 },
+                  "anchors": { "type": "array", "items": { "type": "object", "required": ["query"] } }
+                },
+                "additionalProperties": false
+              }
             }
           }
         }

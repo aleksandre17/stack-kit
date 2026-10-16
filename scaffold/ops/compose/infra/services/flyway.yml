@@ -1,0 +1,19 @@
+# Flyway: the one-shot migration step (`compose run --rm flyway`, profile migrate) -- a declared template (stack.infra.services: ["flyway"]); values from ops/config/infra/.env.<env>.
+services:
+  flyway:
+    image: flyway/flyway:10.20.0
+    container_name: ${INFRA_PREFIX:-app}-flyway
+    profiles: ["migrate"]
+    command: ["migrate"]
+    environment:
+      FLYWAY_URL: ${FLYWAY_URL:?set FLYWAY_URL in ops/config/infra}
+      FLYWAY_USER: ${FLYWAY_USER:?set FLYWAY_USER in ops/config/infra}
+      FLYWAY_PASSWORD: ${FLYWAY_PASSWORD:?set FLYWAY_PASSWORD in ops/config/infra}
+      FLYWAY_VALIDATE_ON_MIGRATE: "true"   # the applied-checksum ledger: an edited, applied migration is refused
+      FLYWAY_CLEAN_DISABLED: "true"
+    volumes:
+      - ${FLYWAY_SQL_DIR:-./migrations}:/flyway/sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [infra-net]

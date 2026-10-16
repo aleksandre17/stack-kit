@@ -19,6 +19,33 @@ exact remote paths and commands -- before it acts; `--plan` stops there and writ
 
 ## Deploy and operate
 
+### `backup`
+
+a store's dump in the layout's backups place, and a restore that is checked, not assumed.
+
+```
+stack-kit backup <store> --env <id> [--plan]
+stack-kit backup verify <store> [--file <name>] --env <id>
+stack-kit backup list <store> --env <id>
+```
+
+| option | |
+|---|---|
+| `--plan` | print the plan -- remote paths and commands -- and stop; nothing is written |
+| `--yes` | answer the confirmation (CI); without a terminal a confirmation is otherwise refused |
+| `--file <name>` | verify: the dump to check (default the newest) |
+| `--target <name>` | the declared deploy target (default: the environment's) |
+| `--env <id>` | the environment (catalogs.environments; --dev / --prod are short for it) |
+
+How a store dumps, restores, is queried and dropped is its catalog entry (run inside its container, its credentials read there); what a restore must still hold is the host's (stack.infra.backup.<store>.anchors). verify restores into a throwaway database, compares each anchor and drops the database, pass or fail.
+
+Exit codes: 0, 1, 2, 6.
+
+```
+stack-kit backup postgres --env prod
+stack-kit backup verify postgres --env prod
+```
+
 ### `deploy`
 
 build -> package -> ship -> up -> health, for a module or all, to one environment.

@@ -1,0 +1,25 @@
+# SQL Server -- a declared template (stack.infra.services: ["sqlserver"]); values from ops/config/infra/.env.<env>.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest   # pin a CU (2022-CUnn-ubuntu-22.04) in the host's copy
+    container_name: ${INFRA_PREFIX:-app}-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in ops/config/infra}
+      MSSQL_PID: ${MSSQL_PID:-Developer}
+    ports:
+      - "127.0.0.1:${SQLSERVER_PORT:-1433}:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - sqlserver_backup:/var/opt/mssql/backup     # where BACKUP writes and a restore check reads
+    networks: [infra-net]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+volumes:
+  sqlserver_data:
+  sqlserver_backup:

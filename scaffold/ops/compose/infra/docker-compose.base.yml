@@ -1,11 +1,11 @@
 # Infra base — network + shared volumes. Service modules: services/*.yml
 # Manifest: stack.infra.services selects which fragments stack-kit infra merges.
 
-name: ${INFRA_COMPOSE_PROJECT:-app-infra}
+name: ${INFRA_COMPOSE_PROJECT:-app-infra}   # on a target the CLI's -p {project}-{env}-infra
 
 networks:
   infra-net:
-    name: ${DOCKER_NETWORK:-app-net}
+    name: ${STACK_KIT_NETWORK:-app-net}   # on a target: the environment's network, {project}-{env}
 
 volumes:
   postgres_data:

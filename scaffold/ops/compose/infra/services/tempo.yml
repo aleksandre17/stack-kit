@@ -1,0 +1,15 @@
+# Tempo (traces) -- a declared template (stack.infra.services: ["tempo"]); values from ops/config/infra/.env.<env>.
+services:
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: ${INFRA_PREFIX:-app}-tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "127.0.0.1:${TEMPO_PORT:-3200}:3200"
+    networks: [infra-net]
+    restart: unless-stopped
+volumes:
+  tempo_data:

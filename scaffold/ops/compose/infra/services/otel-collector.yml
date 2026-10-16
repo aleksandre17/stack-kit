@@ -1,0 +1,13 @@
+# OpenTelemetry collector -- a declared template (stack.infra.services: ["otel-collector"]); values from ops/config/infra/.env.<env>.
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    container_name: ${INFRA_PREFIX:-app}-otel-collector
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel/collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:${OTLP_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${OTLP_HTTP_PORT:-4318}:4318"
+    networks: [infra-net]
+    restart: unless-stopped
