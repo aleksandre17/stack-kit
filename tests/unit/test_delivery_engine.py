@@ -308,3 +308,17 @@ def test_every_stack_service_rotates_its_logs(project, tmp_path):
     release.release(ctx_for(project, t), "edge", packaged(project))
     svc = json.loads(t.read(f"{ROOT}/shop/staging/stack/compose.yml"))["services"]["edge"]
     assert svc["logging"] == {"driver": "json-file", "options": {"max-size": "10m", "max-file": "5"}}
+
+
+def test_a_release_is_refused_by_the_env_value_policy_naming_the_key(project, tmp_path):
+    (project / "ops" / "config" / "keys.json").write_text(json.dumps({"version": 1, "keys": [
+        {"key": "SIGNING_KEY", "sensitivity": "SECRET", "owner": "ops", "allowedSource": "env", "rotation": "90d",
+         "policy": {"required": ["staging"], "minLength": 32, "modules": ["edge"]}}]}), encoding="utf-8")
+    m = manifest_of(project)
+    m["config"] = {"keys": "ops/config/keys.json"}
+    (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
+    commit(project, "with a policy\n")
+    t = server(tmp_path)
+    with pytest.raises(DeliveryError, match="SIGNING_KEY is required in staging") as e:
+        release.release(ctx_for(project, t), "edge", packaged(project))
+    assert e.value.code == 4 and t.changes() == [], "nothing is written before the policy holds"

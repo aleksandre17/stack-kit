@@ -105,6 +105,9 @@ def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
         raise DeliveryError("refused: " + "; ".join(floating), 5)
     ctx.out(f"[release] {module_id} {rid} ({meta.get('revision')}) -> {ctx.target_name} {ctx.environment}: "
             f"{ctx.places.environment_dir}")
+    policy = config_policy_problems(ctx, svc)
+    if policy:
+        raise DeliveryError("refused by the env-value policy (config.keys):\n  " + "\n  ".join(policy), 4)
     for line in preflight.all_checks(ctx, [s.id for s in svc]):
         ctx.out(f"[preflight] {line}")
     for kind in ("stack", "infra", "backups"):
@@ -139,6 +142,21 @@ def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
             ctx.out(f"[release] {s.id}: pruned {', '.join(gone)} (keep {keep_of(s, ctx.target)})")
     ctx.out(f"[release] {module_id} {rid} is current in {ctx.environment}")
     return 0
+
+
+def config_policy_problems(ctx: Delivery, svc: list[Service]) -> list[str]:
+    """Each service's env values for this environment against the catalogue's policy; names, never values."""
+    from lib import catalogs, config_policy, envfile
+
+    catalogue = config_policy.catalogue_of(ctx.root, ctx.manifest)
+    if not catalogue:
+        return []
+    out: list[str] = []
+    for folder in dict.fromkeys(s.secrets_folder for s in svc if s.secrets_folder):
+        values = envfile.merged(envfile.run_files(ctx.secrets_root, folder, ctx.environment,
+                                                  catalogs.ids("environments", ctx.manifest)))
+        out += config_policy.problems(catalogue, values, folder=folder, environment=ctx.environment)
+    return out
 
 
 def images_floating(ctx: Delivery, svc: list[Service], trees: dict[str, dict[str, bytes]]) -> list[str]:

@@ -75,6 +75,29 @@ def _hybrid(a: Args) -> int:
                                    {"STACK_KIT_MODULE_ID": module})
 
 
+def _config(a: Args) -> int:
+    """The env-value policy of the configuration catalogue against this machine's env files."""
+    from lib import catalogs, config_policy, envfile
+    from lib.project_context import ProjectContext
+
+    ctx = ProjectContext.discover()
+    catalogue = config_policy.catalogue_of(ctx.root, ctx.manifest)
+    if not catalogue:
+        print("  [config] no configuration catalogue is declared (manifest `config.keys`)")
+        return 0
+    envs = [a.value("--env")] if a.value("--env") else catalogs.ids("environments", ctx.manifest)
+    folders = a.positional[1:] or ctx.list_secrets_module_folders()
+    found = []
+    for env in envs:
+        for folder in folders:
+            values = envfile.merged(envfile.run_files(ctx.secrets_root, folder, env, catalogs.ids("environments", ctx.manifest)))
+            found += config_policy.problems(catalogue, values, folder=folder, environment=env)
+    for line in found:
+        print(f"  {line}")
+    print(f"  [config] {len(found)} finding(s) over {', '.join(envs)}" if found else f"  [config] the policy holds ({', '.join(envs)})")
+    return 1 if found else 0
+
+
 VERBS = [
     Verb("init", "bootstrap a host, or draft its manifest from the tree", ["init", "init --plan", "init --approve <who>"],
          _init, passthrough=True, examples=["init --plan"],
@@ -87,6 +110,12 @@ VERBS = [
          details="Without --apply it lists what would change. It is the only reader of the legacy homes "
                  "(deploy.env, .env.deploy, DEPLOY_*/COMPOSE_* keys): it moves their values into the manifest and "
                  "the targets file, and removes them."),
+    Verb("config", "the configuration catalogue's env-value policy against this machine's env files (names, never values)",
+         ["config check [module ...] [--env <id>]"], _config, exits=(0, 1),
+         examples=["config check --env prod"],
+         details="The same policy every release runs before it writes an env file: required (or required only in an "
+                 "environment), no placeholder, a minimum length, a format (positive-int, url, https-url without "
+                 "localhost), values an environment forbids (a wildcard CORS origin in prod), keys another requires."),
     Verb("vscode-gen", "generate .vscode launch and tasks from the manifest", ["vscode-gen [--force]"],
          _py("lib/vscode_gen.py"), passthrough=True, group="generate"),
     Verb("config-gen", "generate module config from the manifest", ["config-gen [--all|--check|--dry-run] [module]"],

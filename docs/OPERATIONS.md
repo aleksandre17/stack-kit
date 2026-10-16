@@ -250,6 +250,22 @@ stack-kit build
 stack-kit test api
 ```
 
+### `config`
+
+the configuration catalogue's env-value policy against this machine's env files (names, never values).
+
+```
+stack-kit config check [module ...] [--env <id>]
+```
+
+The same policy every release runs before it writes an env file: required (or required only in an environment), no placeholder, a minimum length, a format (positive-int, url, https-url without localhost), values an environment forbids (a wildcard CORS origin in prod), keys another requires.
+
+Exit codes: 0, 1.
+
+```
+stack-kit config check --env prod
+```
+
 ### `help`
 
 the verbs, or one verb's help, or the generated operator documentation.
