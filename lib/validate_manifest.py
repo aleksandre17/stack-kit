@@ -223,6 +223,22 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
     return errs, warnings
 
 
+def _consumes_problems(ctx: ProjectContext) -> list[str]:
+    from lib import catalogs, naming
+    from lib import targets as deploy_targets
+    from lib.delivery import consumes, model
+
+    if not consumes.declared(ctx.manifest):
+        return []
+    try:
+        data = deploy_targets.load(ctx.root, ctx.manifest)
+        services = {s.id: s for s in model.all_services(ctx.manifest)}
+        envs = catalogs.ids("environments", ctx.manifest)
+    except ValueError as e:  # a broken declaration other checks name
+        return [f"not checked: {e}"]
+    return consumes.problems(ctx.manifest, data, envs, services, naming.project_slug(ctx.manifest, ctx.root))
+
+
 def validate_manifest(
     root: Path | None = None, *, pkg_root: Path | None = None
 ) -> tuple[list[str], list[str]]:
@@ -291,6 +307,8 @@ def validate_manifest(
 
     errs.extend(f"deploy: {p}" for p in deploy_targets.problems(ctx.root, ctx.manifest))
     warnings.extend(f"deploy: {n}" for n in deploy_targets.notices(ctx.root, ctx.manifest))
+    # What the project uses from a platform it does not own (amendment 17): reachable, named, no credential.
+    errs.extend(f"consumes: {p}" for p in _consumes_problems(ctx))
     # Every host extension through a declared point (amendment 15): pending answers and undeclared files.
     from lib import extend
 

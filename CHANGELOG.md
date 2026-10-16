@@ -1,5 +1,29 @@
 # Changelog — stack-kit
 
+## 2.3.0 — 2026-10-16
+
+What a project uses from a shared platform it does not own is a declaration (ADR-001 amendment 17).
+A host with no `consumes` renders and deploys byte for byte as before.
+
+### Added
+
+- `consumes` in the manifest: `networks.<name>` {`services`, `owner`} (platform networks services
+  join), `endpoints.<name>` {`env`, `services`, `owner`} (an address given as a variable), `routes[]`
+  {`environment`, `host`, `path`, `service`, `port`, `network`, `tls`: `required`} (what the
+  platform's edge is asked to serve). A target's `consumes` names each network on that host and each
+  endpoint's address per environment.
+- The stack compose joins each consumed network as external and sets each endpoint's variable; no
+  deploy, regenerate or `nuke` creates or removes a consumed network.
+- The deploy preflight reads that each consumed network exists on the target; a missing one is
+  `NOT RUN` (exit 4, the plan included) naming the owner and the create command they would run --
+  never run by this project.
+- `render` writes each environment's routes to `projections.routes` (default
+  `ops/compose/stack/<env>/edge-routes.json`), its `generated` field naming the sources, for the
+  platform's owner to apply; validate reports drift, a release refuses a stale one.
+- validate: a consumption that names an undeployed service or undeclared environment, a route the
+  edge could not reach, a target without a consumed name or address, a consumed name in the
+  project's own namespace, an address carrying a credential (never printed).
+
 ## 2.2.0 — 2026-10-16
 
 The owed list after amendment 15, closed where it can be, and what a real host found (ADR-001

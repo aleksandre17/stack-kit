@@ -940,3 +940,68 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
 - The image scanner's digest, and the OSV-Scanner image's, are the host's to pin; no scanner runs in the suite.
 - A static service's server config is not projected by `render`; the release id and artifact name are symbolic in projections.
 - The kit's schemas are draft-07, not JSON Schema 2020-12; commit messages are not machine-checked.
+
+## Amendment 17 — what a project consumes from a platform it does not own (2026-10-16, owner-delegated)
+
+*Measured:* on a real shared host another project runs the platform -- an edge container that
+publishes 443, terminates TLS and routes by host name, and a telemetry collector -- both on an
+external network of that project's. A project deployed beside it either owned infra it should not
+(a second edge, a second collector) or asked for its routes by editing the platform's files. The kit
+names neither product: what is consumed is a declaration, and the platform's owner provides it.
+
+1. **`consumes` is declared in two halves, each fact in its one home.** The manifest says what the
+   project uses, by names of its own: `consumes.networks.<name>` {`services`, `owner`?} (the
+   services that join it), `consumes.endpoints.<name>` {`env`, `services`, `owner`?} (an address
+   given to those services as the variable `env`), and `consumes.routes[]` {`environment`, `host`?,
+   `path`? (a prefix, default `/`), `service`, `port`? (default the service's declared `port`),
+   `network`? (only when the service joins several), `tls`: `required`}. The target says what the
+   platform IS on that host: `targets.<t>.consumes.networks.<name>` (the network's name there) and
+   `targets.<t>.consumes.endpoints.<name>.<environment>` (the address per environment). A route
+   names a host, a path prefix or both. *Rejected:* a per-service `consumes` field in the service
+   vocabulary (the platform dependency scattered across modules and drivers, gathered again by the
+   preflight and the projection); the whole declaration in the target (which services join and
+   which routes are asked is the project's, the same on every host); one address for every
+   environment as a second form (one form: per environment, as the request has it).
+2. **Compose joins, never owns.** `lib/delivery/consumes.py` gives each service its `Uses` -- the
+   networks by their names on the target, the endpoint variables -- and `stack.service_document`
+   adds them; the network is external in the compose document as every network of the stack already
+   is. What changes is ownership: `stack.networks_of` (what a deploy creates before `up` and `nuke`
+   removes) excludes a consumed network, so no regenerate, release, rollback or nuke creates or
+   removes it. An endpoint's variable is the target's alone: validate refuses a service that also
+   sets it in its `environment`. A host with no `consumes` renders byte for byte as before.
+   *Rejected:* a separate compose override file per platform (a second compose home the release
+   would also have to compare).
+3. **The preflight reads, and a missing network is NOT RUN.** `preflight.all_checks` runs
+   `consumes.check` after the ports: for each consumed network the deployed services join, the
+   engine's `network inspect` (read only). Present, it is reported; missing, the run stops before any
+   release is shipped (exit 4) with `NOT RUN:`, the network, the services that join it, the target,
+   and the owner's action -- the declared `owner` (else "the platform's owner") and the engine's own
+   create command rendered from the target's invocation. A plan (`--plan`, the dry run every remote
+   verb starts with) reads the server, so it says the same. *Rejected:* creating a missing network
+   (another project's resource, and an empty network the platform would then collide with);
+   a warning and a deploy anyway (compose fails at `up` on a missing external network, after the
+   release is shipped).
+4. **The routes are a projection the platform's owner applies.** `render` writes each environment
+   that declares routes to `projections.routes` (default
+   `ops/compose/stack/{environment}/edge-routes.json`): `schema`, `project`, `environment`,
+   `target`, and each route with its `upstream` {`service`, `container` (the kit's name for it),
+   `port`, `network` (its name on the host)}; its header is the `generated` field naming its sources,
+   since a comment line would make the JSON unreadable to the platform's tooling. `validate` reports
+   it stale or not rendered (projection drift), and a release refuses a stale one (exit 5). This
+   project never writes into the platform's files. *Rejected:* writing the edge's configuration from
+   this kit (the platform's product and its file format are the platform's; the kit would name a
+   product, and a second project's file would have two writers); a `tls` value other than
+   `required` (the platform's edge terminates TLS for every project; a plaintext route a project
+   could ask for silently is a downgrade -- a later need is a new value, decided then).
+5. **Validate names what the declarations cannot answer**: a consumed service that is not deployed;
+   a route's undeclared environment, missing host and path, duplicate, missing port, or a service
+   that joins no platform network (the edge could not reach it); a target that an environment
+   deploys to without the network's name or the environment's address; a target name for nothing
+   the manifest consumes; a consumed network name inside this project's own namespace (it would
+   exclude the project's own network from creation); an address that carries a credential
+   (`scheme://user:secret@`) -- named, never printed.
+
+*Unproven:* against a real docker host and a real edge -- the suite proves the compose, the
+preflight (present, missing, planned), nuke and regenerate, the projection and its drift with the
+recorded transport (`tests/unit/test_consumes.py`). The platform's own application of the routes
+document is the platform's.

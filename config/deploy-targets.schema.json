@@ -320,6 +320,32 @@
               },
               "additionalProperties": false
             }
+          },
+          "consumes": {
+            "type": "object",
+            "description": "What the shared platform on this host is, for what the manifest consumes (`consumes`, ADR-001 amendment 17): never created, changed or removed by this project",
+            "properties": {
+              "networks": {
+                "type": "object",
+                "description": "Each consumed network's name on this host",
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+                }
+              },
+              "endpoints": {
+                "type": "object",
+                "description": "Each consumed endpoint's address per environment (no credential: a value that carries one is refused)",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": false

@@ -28,7 +28,7 @@ generated from the CLI's registry. Boundaries: [ARCHITECTURE.md](../ARCHITECTURE
 |---|---|
 | `cli/` | `stack_kit.py` (the entry point), `stack-kit.ps1` and `stack-kit.sh` (launchers that only find Python) |
 | `lib/cli/` | the operator CLI: `main.py`, `registry.py` (verbs, options, exit codes, the generated docs), `verbs/` (one module per verb), `remote.py` (plan, confirm, act), `tools.py` (driver commands by runtime, the run record) |
-| `lib/delivery/` | the engine: `context.py`, `transport.py` (ssh, a local directory, a recording fake, a plan), `model.py` (a service from its declarations), `stack.py` (the environment's compose file), `running.py`, `release.py`, `preflight.py`, `tree.py` (init, verify), `drift.py`, `dev.py` + `sync.py` (remote dev), `manage.py`, `infra.py`, `legacy_layout.py`, `fake_server.py` |
+| `lib/delivery/` | the engine: `context.py`, `transport.py` (ssh, a local directory, a recording fake, a plan), `model.py` (a service from its declarations), `stack.py` (the environment's compose file), `running.py`, `release.py`, `preflight.py`, `consumes.py` (what a shared platform provides), `tree.py` (init, verify), `drift.py`, `dev.py` + `sync.py` (remote dev), `manage.py`, `infra.py`, `legacy_layout.py`, `fake_server.py` |
 | `lib/targets/` | `declaration.py` (load, select, validate), `layout.py` (the one renderer of remote paths), `remote.py` (ssh, engine and compose invocations) |
 | `lib/resolution/` | `context.py` (what the manifest says, flat), `resolver.py` (env files and values, the selected target), `infra.py` (the local infra stack) |
 | `lib/` | `naming.py`, `templating.py`, `package.py`, `catalogs.py`, `modules.py` (the driver registry), `project_root.py`, `project_context.py`, `legacy.py` + `migrate_legacy.py` (the former homes), generators (`ci_gen.py`, `vscode_gen.py`, `config_gen.py`), `validate_manifest.py`, shell shims over `resolve_cli.py` (`project.*`, `env.*`, `drivers.ps1`, `modules.ps1`) |
@@ -50,6 +50,7 @@ generated from the CLI's registry. Boundaries: [ARCHITECTURE.md](../ARCHITECTURE
 | `stack.services` | services no module builds (an object store, a cache): `image`, `tier`, the service vocabulary |
 | `stack` | the local stack: `composeDir`, `infraComposeDir`, `primaryApiModule`, `composeModules`, `infra.services` |
 | `deploy.targets` | the tracked targets file (below) |
+| `consumes` | what the project uses from a shared platform it does not own ([lib/delivery/consumes.py](../lib/delivery/consumes.py)): `networks` {name: {`services`, `owner`}} joined as external, never created or removed, read by the preflight (a missing one is NOT RUN with its owner's action); `endpoints` {name: {`env`, `services`, `owner`}} given as that variable; `routes` [{`environment`, `host`, `path`, `service`, `port`, `network`, `tls`: `required`}] rendered by `render` to `projections.routes` (default `ops/compose/stack/<env>/edge-routes.json`) for the platform's owner to apply |
 | `catalogs` | the host's entries over `config/catalogs/` (`roles`, `tiers`, `environments`, `lifecycle`, `targetRuntimes`); a new id goes `after` the one it names |
 | `drivers.registry` | the project's own drivers, beside their registry |
 | `runtimes` | the host's script runtimes over `config/runtimes.json` |
@@ -72,7 +73,8 @@ platform shares; this project's own is `{root}/{project}`), `ssh` {`identity`: `
 `file:<ignored path>`, `knownHosts`, `hostKeys` `pinned` | `accept-new`, `config`, `options`},
 `compose` / `engine` (this host's invocations over the runtime's), `layout`, `ports`
 {environment: {service: [host ports]}}, `health` {environment: {service: url}}, `keep`,
-`healthWait`, `minFreeMb`, `legacyLayout` {`environment`, `units`, `places`}, `pending`, `runner`;
+`healthWait`, `minFreeMb`, `legacyLayout` {`environment`, `units`, `places`}, `pending`, `runner`,
+`consumes` {`networks` {name: its name on this host}, `endpoints` {name: {environment: address}}};
 top-level `defaults` {environment: target}.
 
 ## Layout

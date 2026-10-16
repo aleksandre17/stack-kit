@@ -48,14 +48,17 @@ def _ports(service: Service, target: dict[str, Any], environment: str, workspace
 
 def service_document(service: Service, *, project: str, environment: str, target: dict[str, Any],
                      places: Places, state: State, revision: str = "", credentials: list[str] | None = None,
-                     env_file: bool = True, generated: list[str] | None = None) -> dict[str, Any]:
-    """The compose definition of one service in its current state."""
+                     env_file: bool = True, generated: list[str] | None = None,
+                     consumed: Any = None) -> dict[str, Any]:
+    """The compose definition of one service in its current state; `consumed` (consumes.Uses) what it
+    takes from a platform it does not own: networks by their names there, and endpoint values."""
     spec = service.spec
     unit = places.unit(service) if service.module or service.kind != "image" else None
     doc: dict[str, Any] = {"container_name": naming.remote_container(project, environment, service.id),
                            "restart": "unless-stopped",
                            "networks": ["default", *(naming.remote_named_network(project, environment, n)
-                                                     for n in spec.get("networks") or [])],
+                                                     for n in spec.get("networks") or []),
+                                        *(consumed.networks if consumed else [])],
                            "labels": {"stack-kit.project": project, "stack-kit.environment": environment,
                                       "stack-kit.service": service.id, "stack-kit.tier": service.tier}}
     volumes: list[str] = []
@@ -96,7 +99,8 @@ def service_document(service: Service, *, project: str, environment: str, target
         doc["ports"] = ports
     if spec.get("healthcheck") and not state.workspace:
         doc["healthcheck"] = spec["healthcheck"]
-    environment_vars = {**(spec.get("environment") or {}), **((service.dev.get("environment") or {}) if state.workspace else {})}
+    environment_vars = {**(spec.get("environment") or {}), **((service.dev.get("environment") or {}) if state.workspace else {}),
+                        **(consumed.environment if consumed else {})}
     d = defaults()
     for item in service.runtime_config:
         if environment in (item.get("environments") or [environment]):
@@ -129,12 +133,16 @@ def service_document(service: Service, *, project: str, environment: str, target
     return doc
 
 
-def networks_of(services: dict[str, dict[str, Any]], project: str, environment: str) -> list[str]:
-    """Every network the stack joins -- all external, all namespaced, all created before `up`."""
-    found = {naming.remote_network(project, environment)}
-    for doc in services.values():
-        found |= {n for n in doc.get("networks") or [] if n != "default"}
-    return sorted(found)
+def joined(services: dict[str, dict[str, Any]]) -> set[str]:
+    """Every named network a service of the stack joins: this project's own and the platform's."""
+    return {n for doc in services.values() for n in doc.get("networks") or [] if n != "default"}
+
+
+def networks_of(services: dict[str, dict[str, Any]], project: str, environment: str,
+                consumed: list[str] | tuple[str, ...] = ()) -> list[str]:
+    """Every network this project owns in the stack -- namespaced, created before `up`, removed by
+    `nuke`. A `consumed` one is the platform's: joined, never created or removed here."""
+    return sorted(({naming.remote_network(project, environment)} | joined(services)) - set(consumed))
 
 
 def named_volumes_of(services: dict[str, dict[str, Any]]) -> list[str]:
@@ -149,7 +157,7 @@ def named_volumes_of(services: dict[str, dict[str, Any]]) -> list[str]:
 
 def compose_document(*, project: str, environment: str, services: dict[str, dict[str, Any]]) -> dict[str, Any]:
     nets = {"default": {"name": naming.remote_network(project, environment), "external": True}}
-    for n in networks_of(services, project, environment):
+    for n in sorted(joined(services)):  # all external: compose creates and removes none of them
         if n != naming.remote_network(project, environment):
             nets[n] = {"name": n, "external": True}
     doc: dict[str, Any] = {"name": naming.remote_compose_project(project, environment),

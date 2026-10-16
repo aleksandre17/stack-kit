@@ -29,10 +29,11 @@
     },
     "projections": {
       "type": "object",
-      "description": "Where `render` writes the generated projections (lib/projections.py): `containers` ({module}, {service}) and `stack` ({environment})",
+      "description": "Where `render` writes the generated projections (lib/projections.py): `containers` ({module}, {service}), `stack` and `routes` ({environment})",
       "properties": {
         "containers": { "type": "string", "minLength": 1 },
-        "stack": { "type": "string", "minLength": 1 }
+        "stack": { "type": "string", "minLength": 1 },
+        "routes": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
@@ -689,6 +690,58 @@
       "description": "Where deploys go: `targets` names the tracked, non-secret targets file (schema config/deploy-targets.schema.json); a gitignored `<name>.local.json` beside it is merged over it per machine (ADR-001 amendment 9)",
       "properties": {
         "targets": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "consumes": {
+      "type": "object",
+      "description": "What this project uses from a shared platform it does not own (ADR-001 amendment 17, lib/delivery/consumes.py): never created, changed or removed by this project. Each target names what it is there (targets.<t>.consumes)",
+      "properties": {
+        "networks": {
+          "type": "object",
+          "description": "A platform network the listed services join, by a name of this project's; its name on a host is the target's (`consumes.networks.<name>`). Joined as external, never created or removed; a deploy's preflight reads that it exists",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["services"],
+            "properties": {
+              "services": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+              "owner": { "type": "string", "minLength": 1, "description": "Who provides it, named in a missing network's NOT RUN" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "endpoints": {
+          "type": "object",
+          "description": "A platform address given to the listed services as the variable `env`; its value per environment is the target's (`consumes.endpoints.<name>.<environment>`)",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["env", "services"],
+            "properties": {
+              "env": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
+              "services": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+              "owner": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "routes": {
+          "type": "array",
+          "description": "What this project asks the platform's edge to serve: a `host`, a `path` prefix (default /), or both, in one `environment`, to a `service` on its `port` (default the service's) over the platform `network` it joins (needed only when it joins several); `tls` is required. Rendered for the platform's owner to apply (`projections.routes`)",
+          "items": {
+            "type": "object",
+            "required": ["environment", "service", "tls"],
+            "properties": {
+              "environment": { "type": "string", "minLength": 1 },
+              "host": { "type": "string", "pattern": "^(\\*\\.)?[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$" },
+              "path": { "type": "string", "pattern": "^/[^\\s]*$" },
+              "service": { "type": "string", "minLength": 1 },
+              "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+              "network": { "type": "string", "minLength": 1 },
+              "tls": { "enum": ["required"] }
+            },
+            "additionalProperties": false
+          }
+        }
       },
       "additionalProperties": false
     },

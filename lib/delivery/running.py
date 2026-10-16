@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from lib import envfile, naming
-from lib.delivery import stack
+from lib.delivery import consumes, stack
 from lib.delivery.context import Delivery, DeliveryError
 from lib.delivery.model import Service, all_services, defaults, wait_of
 
@@ -167,10 +167,12 @@ def regenerate(ctx: Delivery, override: dict[str, stack.State] | None = None, re
         docs[s.id] = stack.service_document(s, project=ctx.project, environment=ctx.environment, target=ctx.target,
                                             places=ctx.places, state=state, revision=revision or (state.release or ""),
                                             credentials=creds, env_file=bool(s.secrets_folder),
-                                            generated=sorted(generated(ctx, s)) if s.module else [])
+                                            generated=sorted(generated(ctx, s)) if s.module else [],
+                                            consumed=consumes.uses(ctx.manifest, ctx.target, ctx.environment, s.id))
     doc = stack.compose_document(project=ctx.project, environment=ctx.environment, services=docs)
     changed = write_if_changed(ctx, ctx.places.of("stackCompose"), stack.render(doc))
-    for net in stack.networks_of(docs, ctx.project, ctx.environment):
+    platform = list(consumes.networks(ctx.manifest, ctx.target).values())
+    for net in stack.networks_of(docs, ctx.project, ctx.environment, platform):
         if ctx.transport.exec(ctx.engine("network", "inspect", net), readonly=True).code != 0:
             ctx.run(ctx.engine("network", "create", net))
     return changed

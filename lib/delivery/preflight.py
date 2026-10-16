@@ -8,6 +8,8 @@
     ports     every host port this environment publishes is free, or already this compose
               project's: another project's container, or a process outside the engine, refuses it.
               One listing answers however many ports other projects use.
+    consumes  each platform network the deployed services consume exists there (a read); a missing
+              one is NOT RUN with its owner's action -- never created (lib/delivery/consumes.py)
     disk      the free space under the project's directory (reported; a declared floor refuses)
 """
 from __future__ import annotations
@@ -17,6 +19,7 @@ import re
 from typing import Any
 
 from lib import naming
+from lib.delivery import consumes
 from lib.delivery.context import Delivery, DeliveryError
 
 _PUBLISHED = re.compile(r":(\d+)->")
@@ -131,5 +134,6 @@ def all_checks(ctx: Delivery, services: list[str] | None = None) -> list[str]:
     if ctx.commands["compose"]:
         said += runtime(ctx)
         said += ports(ctx, services)
+        said += consumes.check(ctx, services)
     said.append(disk(ctx))
     return said
