@@ -931,3 +931,11 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    compose catalog. *Not changed:* the scaffold manifest's sample modules keep `apps/<tier>` -- it is
    the convention-defaults source, and a host with modules of its own never takes it.
    *Rejected:* a template per layout (the same files twice).
+
+**Owed after amendment 16 (one line each, the truth at 2.2.0):**
+- Every delivery, restore and replay is proven against the recorded transport only: unproven against a real docker host, SQL Server or Postgres.
+- Windows/IIS delivery (`iis` pending): a host that publishes to IIS by hand keeps its own publish.
+- No separate live-parity CI job.
+- The image scanner's digest, and the OSV-Scanner image's, are the host's to pin; no scanner runs in the suite.
+- A static service's server config is not projected by `render`; the release id and artifact name are symbolic in projections.
+- The kit's schemas are draft-07, not JSON Schema 2020-12; commit messages are not machine-checked.

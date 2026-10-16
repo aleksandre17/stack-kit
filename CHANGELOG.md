@@ -1,5 +1,56 @@
 # Changelog — stack-kit
 
+## 2.2.0 — 2026-10-16
+
+The owed list after amendment 15, closed where it can be, and what a real host found (ADR-001
+amendment 16). Each change is a declaration; the migration below names what a host does once.
+
+### Added
+
+- `render` (`--plan`, `--check`): generated projections of what a deploy runs -- each module's
+  effective container recipe (`ops/containers/<module>/Dockerfile`), each environment's stack compose
+  (`ops/compose/stack/<env>/compose.yml`), each secrets folder's `.env.example` from the catalogue;
+  validate reports a stale one, a release refuses one (exit 5).
+- `extend env <folder> --env <id>`: an ignored env file made from `config.keys` (non-secret values,
+  SECRET pending -- `config` reports it, a deploy refuses it -- generated keys fresh and never printed,
+  `none` data sources the unroutable sentinel). Catalogue keys gain `dataSource`, `environments`,
+  `generate: "random:<bytes>"`.
+- Isolation by data source: two environments that name one server and database through a
+  `dataSource` key are refused by a deploy and reported by validate, unless `config.sharedDataSources`
+  or a target's `sharedDataSources` declares it with a reason.
+- `backup verify` restores SQL Server with `RESTORE ... WITH MOVE` into a uniquely named throwaway
+  database (no more VERIFYONLY), anchors queried there, dropped in a finally; `backup replay` applies
+  the whole migration chain to an empty throwaway database (`stack.migrate.replay`). Both plan first.
+- java-boot `audit`: OSV-Scanner over the Gradle lockfiles (the binary, else its image through the
+  local engine); `modules.<id>.audit` overrides (pin a digest there).
+- `modules.<id>.package.exclude`: files kept out of every archive and image; release.json records them.
+- `security.secretPatterns`: the secret scan's rules as agent-kit edit-gate documents, calibrated
+  before use; the built-in set only when none is declared.
+- Placement tokens in init and extension templates (`<tier:T>`, `<secrets:T>`, `<up:T>`): a tier's
+  files go where the host's module lives (else the layout profile's `tiers`, else `apps/<tier>`).
+- `config/vendored.json`: agent-kit's `extension-points.schema.json`, byte for byte, its origin and
+  sha256 tested; the registry validates against it.
+
+### Changed
+
+- A driver's VS Code launch is data (`vscode.launch`, `values`, `label`, `optional`); the generic
+  generator names no debugger or tool, and the Full-stack compound takes one launch per role in boot
+  order. `compose.opsModules` (java-boot) carries the local ops.modules rows.
+- `BatchMode=yes` is first in every target's ssh options; a target declaring otherwise is refused.
+- The extension-point registry is in the shared shape (`schema_version`, `required_by` one profile --
+  `init` the base -- companions by the `<id>-entry` rule).
+- sqlcmd reads its password from `SQLCMDPASSWORD`, never an argument.
+
+### Migration
+
+1. A host driver whose `vscode.launch` is a string (a former launch kind) declares the launch as data.
+2. A host whose dev and prod name the same database marks the key `dataSource: true` and gives each
+   environment its own store, or declares `environments: {dev: "none"}`, or declares the sharing in
+   `config.sharedDataSources` with its reason -- a deploy refuses it otherwise.
+3. A host with `config.keys` runs `stack-kit render` once and commits the projections: its
+   hand-written `.env.example` files are now projections of the catalogue (validate reports drift).
+4. A java-boot module locks its dependencies (Gradle `dependencyLocking`) for its audit to run.
+
 ## 2.1.0 — 2026-10-16
 
 What the earlier platforms proved, carried as mechanisms (ADR-001 amendment 14), and one extension
