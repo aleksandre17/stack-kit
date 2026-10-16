@@ -148,12 +148,16 @@ def test_a_per_machine_override_is_merged_over_the_tracked_file(resolver):
     assert r.server_base() == "/srv/apps"
 
 
-def test_a_pending_target_refuses_every_deploy_with_its_reason(resolver):
+def test_a_pending_target_refuses_every_deploy_with_its_reason_and_nothing_else(resolver):
+    # A deploy key asked of it answers empty (a local step reading settings never fails on it); the
+    # acts a deploy needs it for refuse, naming why.
     r = resolver(_doc(prod={"runtime": "iis", "pending": "IIS delivery is not built"}))
+    assert r.deploy_env_value("DEPLOY_SERVER") == "" and r.env_value("api", "DEPLOY_PATH") == ""
+    assert r.ssh_args() == [] and r.compose_project("prod") == "golden-consumer-prod"
     with pytest.raises(ValueError, match="pending: IIS delivery is not built"):
-        r.deploy_env_value("DEPLOY_SERVER")
-    with pytest.raises(ValueError, match="pending"):
         r.remote_path("api", "runtime", "c")
+    with pytest.raises(ValueError, match="pending: IIS delivery is not built"):
+        r.remote_preflight([])
 
 
 def test_ssh_is_strict_against_the_pinned_file_and_trusts_first_use_only_when_declared(resolver, monkeypatch):

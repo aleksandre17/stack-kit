@@ -174,7 +174,10 @@ def _answer(r, verb: str, args: list[str]) -> list[str] | None:
     if verb == "target-keep" and not args:
         from lib import targets
 
-        chosen = r.target()
+        try:
+            chosen = r.target()
+        except targets.TargetError:
+            chosen = None
         return [str(targets.keep(chosen[1]) if chosen else 5)]
     if verb == "remote-preflight":
         return [r.remote_preflight(args)]

@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -200,3 +201,50 @@ def test_package_builds_once_and_leaves_one_archive_per_commit(tmp_path):
     archives = list((root / ".stack-kit" / "artifacts").glob("api-*.tgz"))
     assert len(archives) == 1 and archives[0].with_suffix(".tgz.sha256").is_file()
     assert [r["kind"] for r in _records(root) if r["module"] == "api"] == ["package"]
+
+
+PENDING_TARGETS = {"schema": 1, "defaults": {"dev": "linux", "prod": "linux"}, "targets": {
+    "iis": {"runtime": "iis", "pending": "Windows/IIS delivery is not built"},
+    "linux": {"runtime": "docker-compose", "pending": "the platform's host is not known yet"}}}
+
+
+def test_a_host_whose_every_target_is_pending_builds_tests_and_runs_but_never_deploys(tmp_path):
+    # A local step never resolves a deploy target (ADR-001 amendment 9): a pending one refuses the
+    # deploy, naming why, and nothing else. (It once failed `build` through a toolkit reading
+    # DEPLOY_SERVER at load.)
+    def dotnet_module(root: Path, mid: str) -> dict:
+        d = root / "fx" / mid
+        d.mkdir(parents=True)
+        major = _dotnet_major()
+        if major is not None:
+            (d / "Lib.csproj").write_text(CLASSLIB.format(v=major), encoding="utf-8")
+            (d / "Lib.cs").write_text("namespace Lib; public static class A { public const int V = 1; }\n", encoding="utf-8")
+        return {"type": "dotnet-aspnet", "role": "api", "path": f"fx/{mid}", "secretsModule": mid,
+                "dotnet": {"configuration": "Debug", "test": ""}}
+
+    modules = {"web": lambda r, m: _spa(r, m, OK)}
+    if _dotnet_major() is not None:
+        modules["api"] = dotnet_module
+    root = _host(tmp_path, modules)
+    (root / "ops" / "deploy").mkdir(parents=True, exist_ok=True)
+    (root / "ops" / "deploy" / "targets.json").write_text(json.dumps(PENDING_TARGETS), encoding="utf-8")
+    mf = root / identity.MANIFEST_FILENAME
+    manifest = json.loads(mf.read_text(encoding="utf-8"))
+    manifest["deploy"] = {"targets": "ops/deploy/targets.json"}
+    mf.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    for step in ("build", "test"):
+        ran = _cli(root, step)
+        assert ran.returncode == 0, ran.stdout + ran.stderr
+        assert f"{step} OK ({len(modules)} module(s))" in ran.stdout and "pending" not in ran.stdout + ran.stderr
+    ran = _cli(root, "mod", "web", "run")
+    assert ran.returncode == 0 and "started" in ran.stdout, ran.stdout + ran.stderr
+
+    # Every remote deploy passes the preflight first; it is refused, naming the reason.
+    env = {k: v for k, v in os.environ.items() if not k.startswith(identity.ENV_PREFIX + "_")}
+    env.update({identity.env_name("PROJECT_ROOT"): str(root), "PYTHONPATH": str(PKG)})
+    gate = subprocess.run([sys.executable, "-B", str(PKG / "lib" / "resolve_cli.py"), "remote-preflight"],
+                          cwd=root, env=env, capture_output=True, text=True)
+    assert gate.returncode != 0 and "pending: the platform's host is not known yet" in gate.stderr, gate.stderr
+    verify = _cli(root, "targets", "--verify")
+    assert verify.returncode == 2 and "pending: the platform's host is not known yet" in verify.stdout

@@ -290,14 +290,32 @@ class Resolver:
                 data, identity.env("TARGET"), identity.env("ENVIRONMENT"))
         return self._target  # type: ignore[return-value]
 
+    def targets_declared(self) -> bool:
+        """Whether the host declares deploy targets at all -- asked without selecting or reaching one."""
+        from lib import targets
+
+        return targets.declared_file(self.manifest) is not None
+
     def _target_answer(self, key: str, folder: str = "") -> str | None:
-        """A deploy.env key, answered by the selected target; None when no target is declared."""
-        chosen = self.target()
-        if chosen is None or key not in TARGET_KEYS:
+        """A deploy.env key, answered by the selected target; None when no target is declared.
+
+        A declared target that is pending, unreachable or not selectable answers "" -- it never
+        raises here. Many local steps read these keys only incidentally (a toolkit loading its
+        settings for a build), and a local step never needs a deploy target; the refusal stands
+        where a deploy does need one: `remote-path`, the remote preflight, `targets --verify`."""
+        if key not in TARGET_KEYS or not self.targets_declared():
             return None
         from lib import targets
 
-        name, t = chosen
+        try:
+            return self._target_value(key, folder)
+        except targets.TargetError:
+            return ""
+
+    def _target_value(self, key: str, folder: str) -> str:
+        from lib import targets
+
+        name, t = self.target()
         if key == "DEPLOY_SERVER":
             return targets.server(name, t)
         if key == "DEPLOY_SERVER_BASE":
@@ -363,11 +381,17 @@ class Resolver:
         """The openssh options every ssh, scp and rsync of a deploy takes: the target's (port, strict
         host keys against its pinned file, its identity reference, options); without a target, the
         deprecated DEPLOY_SSH_CONFIG_FILE / DEPLOY_SSH_IDENTITY_FILE / DEPLOY_SSH_OPTIONS."""
-        chosen = self.target()
-        if chosen is not None:
+        if self.targets_declared():
+            # No options for a target nothing can reach (pending, unselected): the deploy that needs
+            # it is refused at its preflight, naming why; a local step loading ssh helpers is not.
             from lib import targets
 
-            return targets.ssh_args(self.root, *chosen)
+            try:
+                name, t = self.target()
+                targets.reachable(name, t)
+            except targets.TargetError:
+                return []
+            return targets.ssh_args(self.root, name, t)  # a reachable target's own error is said
         out: list[str] = []
         for key, flag in (("DEPLOY_SSH_CONFIG_FILE", "-F"), ("DEPLOY_SSH_IDENTITY_FILE", "-i")):
             value = self.deploy_env_value(key)
@@ -380,8 +404,9 @@ class Resolver:
 
     def compose_project(self, environment: str = "") -> str:
         """The compose project a deploy runs under: `{project}-{environment}` on a declared target;
-        "" without one (the deprecated path keeps compose's own default)."""
-        if self.target() is None:
+        "" without one (the deprecated path keeps compose's own default). It names the project's
+        environment, not a server, so it is answered without selecting or reaching a target."""
+        if not self.targets_declared():
             return ""
         from lib import targets
 
@@ -479,7 +504,7 @@ class Resolver:
         """The target's root. Without a declared target (deprecated): DEPLOY_SERVER_BASE, else the
         `/home/<user>` of DEPLOY_SERVER -- an inference kept only until a host declares its targets,
         and gone at 2.0.0 (`migrate --apply` writes the root it finds, and invents none)."""
-        if self.target() is not None:
+        if self.targets_declared():
             return self.deploy_env_value("DEPLOY_SERVER_BASE")
         base = self.deploy_env_value("DEPLOY_SERVER_BASE") or self._any_folder("DEPLOY_SERVER_BASE")
         if base:
@@ -492,7 +517,7 @@ class Resolver:
         return slugify(self.env_value("infra", "INFRA_SLUG") or Path(self.ctx["monorepoRoot"]).name)
 
     def infra_deploy_path(self) -> str:
-        if self.target() is not None:
+        if self.targets_declared():
             return self.env_value("infra", "DEPLOY_PATH")
         from lib.deploy_paths import resolve_infra_deploy_path
 
@@ -504,7 +529,7 @@ class Resolver:
     def deploy_base(self, folder: str) -> str:
         """A folder's remote base: the target's module directory; without a target (deprecated), its
         DEPLOY_PATH, else {server base}/{project slug}/{folder}."""
-        if self.target() is not None:
+        if self.targets_declared():
             return self.env_value(folder, "DEPLOY_PATH")
         explicit = self.env_value(folder, "DEPLOY_PATH").rstrip("/")
         if explicit:
