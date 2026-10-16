@@ -72,7 +72,7 @@ def prune(ctx: Delivery, service: Service) -> list[str]:
 
 def _start(ctx: Delivery, svc: list[Service], release: str, revision: str) -> list[str]:
     """Stack, images, up, health -- the failures."""
-    running.regenerate(ctx, revision=revision)
+    running.regenerate(ctx)  # the revision label is the release id: what verify can derive again
     if not ctx.commands["compose"]:
         return []
     running.build_missing(ctx, svc, release)
