@@ -1,12 +1,10 @@
-# Resolves boot JAR path and runs java -jar (Windows-safe: avoids Gradle includeBuild file-lock).
-$PackageRoot = if ($env:STACK_KIT_KIT_ROOT) { $env:STACK_KIT_KIT_ROOT } else {
-    Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-}
-. (Join-Path $PackageRoot "lib\module-manifest.ps1")
+# java-boot - the boot JAR: resolves it and runs java -jar (Windows-safe: avoids the Gradle
+# includeBuild file-lock). Dot-sourced by this driver's launch step (ps1/hybrid.ps1), with the
+# runner's lib in scope; the fields read are this driver's own (modules.<id>.hybrid.*, datastores.*).
 
 function Get-StackKitHybridBootJar {
     param([string]$Root, [string]$ModuleId, [string]$ModPath)
-    $explicit = Get-ModuleBootJar $ModuleId
+    $explicit = Get-ModuleField $ModuleId 'hybrid.bootJar'
     if ($explicit) {
         return Join-Path $Root ($explicit -replace '/', '\')
     }
@@ -23,7 +21,7 @@ function Test-StackKitPreferHybridJar {
     param([string]$ModuleId)
     if ($env:STACK_KIT_HYBRID_GRADLE -eq '1') { return $false }
     if ($env:STACK_KIT_HYBRID_JAR -eq '1') { return $true }
-    $pref = Get-ModulePreferHybridJar $ModuleId
+    $pref = Get-ModuleField $ModuleId 'hybrid.preferJar'
     if ($pref -eq 'true') { return $true }
     if ($pref -eq 'false') { return $false }
     return $IsWindows
@@ -34,12 +32,12 @@ function Invoke-StackKitHybridJarBoot {
     $jar = Get-StackKitHybridBootJar -Root $Root -ModuleId $ModuleId -ModPath $ModPath
     if (-not $jar -or -not (Test-Path $jar)) { return }
 
-    $profiles = Get-ModuleHybridProfiles $ModuleId
+    $profiles = Get-ModuleField $ModuleId 'hybrid.springProfiles'
     if ($profiles) { $env:SPRING_PROFILES_ACTIVE = $profiles }
 
     # Modules that do NOT own Flyway (datastores.postgres.flyway != true) must not run
     # DB migrations on startup — exclude DataSource + Flyway auto-configuration entirely.
-    if (-not (Test-ModuleOwnsFlyway $ModuleId)) {
+    if ((Get-ModuleField $ModuleId 'datastores.postgres.flyway') -ne 'true') {
         $env:SPRING_FLYWAY_ENABLED = 'false'
         $env:SPRING_AUTOCONFIGURE_EXCLUDE = (
             'org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,' +

@@ -14,6 +14,11 @@
     resolve_cli.py infra-tunnel-forwards     (local<TAB>remote<TAB>service<TAB>env per line)
     resolve_cli.py slugify <text>
     resolve_cli.py alias <alias>            (also: resolve_cli.py <alias>, the former form)
+    resolve_cli.py driver-types              (id<TAB>roles<TAB>label per line)
+    resolve_cli.py driver-command <module|alias> <command>
+    resolve_cli.py stack-steps [dev|prod] [flag...]   (module<TAB>command<TAB>args... per line)
+    resolve_cli.py stack-health              (module<TAB>url<TAB>expect per line; expect '-' = status only)
+    resolve_cli.py stack-endpoints | compose-names | compose-service <module>
 
 `context` first carries every former-prefixed variable to its current name and then answers; for
 bash it prints shell to `eval` (the variables to export and unset, and the context as one
@@ -134,7 +139,9 @@ PATH_VERBS = {"env-files"}
 VERBS = {"context", "notice", "slugify", "alias", "env-files", "env-value", "run-env", "deploy-env-value",
          "project-slug", "compose-slug", "docker-network", "server-base", "infra-slug",
          "infra-deploy-path", "deploy-base", "infra-tunnel-forwards", "infra-compose-files",
-         "infra-compose-args", "infra-sync-paths", "infra-services"}
+         "infra-compose-args", "infra-sync-paths", "infra-services",
+         "driver-types", "driver-command", "stack-steps", "stack-health", "stack-endpoints",
+         "compose-names", "compose-service"}
 
 
 def _answer(r, verb: str, args: list[str]) -> list[str] | None:
@@ -159,6 +166,50 @@ def _answer(r, verb: str, args: list[str]) -> list[str] | None:
               "infra-slug": r.infra_slug, "infra-deploy-path": r.infra_deploy_path}
     if verb in simple and not args:
         return [simple[verb]()]
+    return _modules_answer(verb, args)
+
+
+def _modules_answer(verb: str, args: list[str]) -> list[str] | None:
+    """What the drivers and modules answer: the verbs `driver_api.py` and `modules_cli.py` held,
+    folded here so one command line speaks for the resolver (ADR-001 amendment 7)."""
+    from lib.modules import driver_commands, driver_registry, resolve_cli_alias
+    from lib.project_context import ProjectContext
+
+    if verb == "driver-types" and not args:
+        return [f"{tid}\t{','.join(ent.get('roles', ['any']))}\t{ent.get('label', '')}"
+                for tid, ent in sorted(driver_registry().items())]
+    ctx = ProjectContext.discover()
+    if verb == "driver-command" and len(args) == 2:
+        module_id = resolve_cli_alias(args[0], ctx.manifest) or args[0]
+        typ = str((ctx.manifest.get("modules") or {}).get(module_id, {}).get("type") or "")
+        if not typ:
+            raise ValueError(f"module '{args[0]}' is not declared, or declares no type")
+        commands = driver_commands(typ)
+        if args[1] not in commands:
+            raise ValueError(f"driver '{typ}' has no command '{args[1]}' (available: {', '.join(sorted(commands))})")
+        return [str(commands[args[1]])]
+    if verb == "stack-steps":
+        from lib.stack_deploy import stack_deploy_lines
+
+        environment = args[0] if args and args[0] in ("dev", "prod") else "prod"
+        flags = args[1:] if args and args[0] in ("dev", "prod") else args
+        return stack_deploy_lines(ctx.manifest, environment, flags)
+    if verb == "stack-health" and not args:
+        from lib.ci_health import stack_health_targets
+
+        return [f"{t.module_id}\t{t.url}\t{t.expect or '-'}" for t in stack_health_targets(ctx)]
+    if verb == "stack-endpoints" and not args:
+        from lib.stack_endpoints import stack_endpoint_lines
+
+        return list(stack_endpoint_lines(ctx))
+    if verb in ("compose-names", "compose-service"):
+        from lib.compose_identity import compose_service_names, load_deploy_env, resolve_module_service_name
+
+        deploy = load_deploy_env(ctx.secrets_root)
+        if verb == "compose-names" and not args:
+            return [json.dumps(compose_service_names(ctx.manifest, deploy, ctx.root.name))]
+        if verb == "compose-service" and len(args) == 1:
+            return [resolve_module_service_name(args[0], ctx.manifest, deploy, ctx.root.name)]
     return None
 
 

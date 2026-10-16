@@ -18,7 +18,7 @@ import pytest
 
 from conftest import PKG, WORKING_ROOT
 from lib import identity
-from lib.modules import _read_registry
+from lib.modules import _read_registry, driver_commands
 
 KIT = _read_registry(PKG / "drivers" / "registry.json")
 PWSH = shutil.which("pwsh") or shutil.which("powershell")
@@ -96,7 +96,7 @@ def test_every_built_rung_of_a_kit_driver_plans_to_a_script_it_declares(host, ty
         ran = _cli(host, "mod", module, "deliver", rung, "--plan")
         assert ran.returncode == 0, (rung, ran.stdout + ran.stderr)
         if "command" in how:
-            script = KIT[typ]["commands"][how["command"]]
+            script = driver_commands(typ)[how["command"]]
             assert Path(script).name in ran.stdout, (rung, ran.stdout)
         else:
             assert f"{how['via']} boot {module}" in ran.stdout
@@ -138,12 +138,20 @@ def test_a_declared_operand_is_rewritten_and_said(host):
 def test_every_rung_names_a_command_its_driver_declares_or_is_pending():
     for typ, entry in KIT.items():
         for rung, how in entry.get("delivery", {}).items():
-            assert ("pending" in how) or ("via" in how) or how.get("command") in entry["commands"], (typ, rung)
+            assert ("pending" in how) or ("via" in how) or how.get("command") in driver_commands(typ), (typ, rung)
 
 
 def test_the_hybrid_rung_runs_the_drivers_declared_launch_step_with_its_run_environment(host):
     # The runner names no driver: the step is the one the registry declares, and the module's
     # .env.dev wins over its .env.prod, an empty dev value leaving the prod one (envfile.HOST_RUN).
     ran = _cli(host, "mod", "echo", "deliver", "hybrid")
+    assert ran.returncode == 0, ran.stdout + ran.stderr
+    assert "hybrid module=echo a=dev b=prod" in ran.stdout
+
+
+def test_a_driver_that_declares_a_launch_step_is_given_the_kits_host_run_as_run(host):
+    # No driver ships a `run` script of its own any more (ADR-001 amendment 7): `run` is the kit's
+    # one host runner, dispatched as the driver's command, reading the module from the dispatch.
+    ran = _cli(host, "mod", "echo", "run")
     assert ran.returncode == 0, ran.stdout + ran.stderr
     assert "hybrid module=echo a=dev b=prod" in ran.stdout

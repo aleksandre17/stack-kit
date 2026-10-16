@@ -61,6 +61,23 @@ CONVENTION_DEFAULTS = (
 )
 
 
+#: The CI scripts the kit itself runs, by field. A host's further scripts are `ci.scripts`, by its
+#: own names -- the kit checks each exists and names none of them.
+CI_SCRIPT_FIELDS = ("integration", "prepareEnv", "waitHealth", "waitStackHealth")
+
+
+def declared_ci_scripts(manifest: dict[str, Any]) -> list[tuple[str, str]]:
+    """(field, path) for every CI script the manifest declares explicitly, kit-run and host-named."""
+    ci = manifest.get("ci") or {}
+    if not isinstance(ci, dict):
+        return []
+    out = [(f"ci.{key}", str(ci[key])) for key in CI_SCRIPT_FIELDS if ci.get(key)]
+    scripts = ci.get("scripts") or {}
+    if isinstance(scripts, dict):
+        out += [(f"ci.scripts.{name}", str(rel)) for name, rel in scripts.items() if rel]
+    return out
+
+
 def default_field(dotted: str) -> str:
     return flatten_defaults().get(dotted, "")
 

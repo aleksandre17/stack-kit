@@ -10,6 +10,9 @@ MODULE_ROLES = frozenset({"ui", "api", "worker", "gateway", "data", "other"})
 
 
 KIT_DRIVERS = Path(__file__).resolve().parent.parent / "drivers"
+#: The host run is the KIT's: one runner for every driver that declares its launch step
+#: (`hybrid.script`), given to it as its `run` command (ADR-001 amendment 7).
+HOST_RUN = Path(__file__).resolve().parent.parent / "toolkit" / "hybrid" / "Invoke-HybridRun.ps1"
 
 
 class DriverCollision(ValueError):
@@ -79,6 +82,19 @@ def driver_registry() -> dict[str, Any]:
 def driver_home(driver_id: str) -> Path:
     """The directory a driver's command scripts are resolved under."""
     return _composed_for(_current_root())[1].get(str(driver_id), KIT_DRIVERS / str(driver_id))
+
+
+def driver_commands(driver_id: str) -> dict[str, Path]:
+    """command -> script, for one driver: what it declares under `commands`, and `run` -- the kit's
+    host run -- when it declares a launch step and no `run` of its own. The one home of the rule."""
+    entry = driver_registry().get(str(driver_id))
+    if not isinstance(entry, dict):
+        return {}
+    home = driver_home(driver_id)
+    out = {str(name): home / str(rel) for name, rel in (entry.get("commands") or {}).items()}
+    if (entry.get("hybrid") or {}).get("script") and "run" not in out:
+        out["run"] = HOST_RUN
+    return out
 
 
 def driver_capability(driver_id: str, key: str, default: Any = None) -> Any:

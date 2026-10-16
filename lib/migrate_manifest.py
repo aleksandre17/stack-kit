@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.identity import MANIFEST_FILENAME, find_manifest
+from lib.manifest_defaults import CI_SCRIPT_FIELDS
 from lib.modules import driver_accepts_global_credentials, driver_default_role
 from lib.project_context import ProjectContext, find_project_root, load_manifest
 
@@ -18,6 +19,42 @@ def _infer_role(cfg: dict[str, Any]) -> str:
     if role:
         return role
     return driver_default_role(str(cfg.get("type", ""))) or "other"
+
+
+#: Module fields one former consumer's tools read and the kit never did: carried into the module's
+#: `extensions`, under the same name, so nothing the host wrote is lost (ADR-001 amendment 7).
+MODULE_EXTENSION_FIELDS = ("catalog", "derivation")
+#: `ci` fields that are the kit's own; any other string under `ci` is a host script, by its name.
+CI_KIT_FIELDS = frozenset(CI_SCRIPT_FIELDS) | {"scripts", "healthModules"}
+
+
+def carry_host_shapes(manifest: dict[str, Any], *, apply: bool = False) -> list[str]:
+    """A host's own names the schema once spelled are carried to the agnostic homes: a former
+    `ci.<name>` script path to `ci.scripts.<name>`, a module's `catalog`/`derivation` to its
+    `extensions`. A key already in its new home is never overwritten -- that is a conflict, named."""
+    changes: list[str] = []
+    ci = manifest.get("ci")
+    if isinstance(ci, dict):
+        for key in [k for k in ci if k not in CI_KIT_FIELDS and isinstance(ci[k], str)]:
+            scripts = ci.get("scripts") if isinstance(ci.get("scripts"), dict) else {}
+            if key in scripts:
+                changes.append(f"ci.{key}: CONFLICT -- ci.scripts.{key} already set; resolve by hand")
+                continue
+            changes.append(f"ci.{key} -> ci.scripts.{key}")
+            if apply:
+                ci["scripts"] = {**scripts, key: ci.pop(key)}
+    for mid, cfg in (manifest.get("modules") or {}).items():
+        if not isinstance(cfg, dict):
+            continue
+        for key in [k for k in MODULE_EXTENSION_FIELDS if k in cfg]:
+            ext = cfg.get("extensions") if isinstance(cfg.get("extensions"), dict) else {}
+            if key in ext:
+                changes.append(f"modules.{mid}.{key}: CONFLICT -- extensions.{key} already set; resolve by hand")
+                continue
+            changes.append(f"modules.{mid}.{key} -> modules.{mid}.extensions.{key}")
+            if apply:
+                cfg["extensions"] = {**ext, key: cfg.pop(key)}
+    return changes
 
 
 def migrate_manifest(manifest: dict[str, Any], *, apply: bool = False) -> list[str]:
@@ -88,6 +125,7 @@ def main() -> int:
     if moved_to is not None and apply:
         mf = moved_to
     changes += migrate_manifest(manifest, apply=apply)
+    changes += carry_host_shapes(manifest, apply=apply)
     words = host_words(root, skip={mf, root / MANIFEST_FILENAME})
     for line in words:
         print(f"  restate (yours to edit): {line}")

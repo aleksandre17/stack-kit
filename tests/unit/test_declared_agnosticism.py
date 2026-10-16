@@ -38,6 +38,11 @@ GENERATORS = [
     "toolkit/hybrid/Invoke-HybridRun.ps1",
     "cli/stack-kit.ps1",
     "cli/stack-kit.sh",
+    "lib/resolve_cli.py",
+    "lib/stack_deploy.py",
+    "lib/drivers.ps1",
+    "toolkit/deploy/stack-remote.sh",
+    "toolkit/powershell/Deploy-Path.ps1",
 ]
 
 

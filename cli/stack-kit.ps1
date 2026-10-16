@@ -49,11 +49,12 @@ function Show-Help {
 
     init | validate | migrate | vscode-gen | config-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout | hybrid | dev
 
-    mod <moduleId> deploy|manage|compose|check|modules|run  ...
+    mod <moduleId> <command> ...   A command its driver declares (listed per module below)
+    mod <moduleId> deliver <rung> [--env dev|prod] [--plan]   A rung of its driver's delivery ladder
 
-    dev up <alias|moduleId|all> [--mode hybrid|local|docker] [--no-infra] [--no-tunnel]
+    dev up <alias|moduleId|all> [--mode hybrid|local|docker|remote] [--no-infra] [--no-tunnel]
 
-    hybrid boot <alias|moduleId>   Local app run (host + ops/config .env.dev)
+    hybrid boot <alias|moduleId>   Host run: the module's .env.dev over its .env.prod
 
     <alias> run                    Same as hybrid boot; aliases from stack-kit.json cli.aliases
 
@@ -67,7 +68,7 @@ function Show-Help {
 
     $pyArgs = Get-StackKitPythonArgs
     if ($pyArgs) {
-        Invoke-StackKitPythonExe $pyArgs (Join-Path $PackageRoot "lib\driver_api.py") "list-types" 2>$null
+        Invoke-StackKitPythonExe $pyArgs (Join-Path $PackageRoot "lib\resolve_cli.py") "driver-types" 2>$null
     }
 
     Write-Host ""

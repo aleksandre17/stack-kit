@@ -10,6 +10,7 @@ from typing import Any
 from lib.compose_identity import primary_api_module_id, primary_worker_module_id
 from lib.identity import MANIFEST_FILENAME, with_current_fields
 from lib.credentials import all_module_credential_files, module_credentials
+from lib.manifest_defaults import declared_ci_scripts
 from lib.project_context import ProjectContext, load_manifest
 
 
@@ -113,12 +114,9 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
                     "features.worker + manifest role=worker module — pick one worker model (Architecture B)"
                 )
 
-    ci = ctx.manifest.get("ci") or {}
-    if isinstance(ci, dict):
-        for key in ("integration", "prepareEnv", "waitHealth", "waitStackHealth"):
-            rel = ci.get(key)
-            if rel and not (root / str(rel)).is_file():
-                warnings.append(f"ci.{key}: file missing ({rel})")
+    for dotted, rel in declared_ci_scripts(ctx.manifest):
+        if not (root / rel).is_file():
+            warnings.append(f"{dotted}: file missing ({rel})")
 
     for mid, cfg in (ctx.manifest.get("modules") or {}).items():
         if not isinstance(cfg, dict):
@@ -183,6 +181,10 @@ def validate_manifest(
 
     errs = _validate_required(ctx.manifest)
     errs.extend(_validate_jsonschema(with_current_fields(ctx.manifest), schema))
+    # A host on a shape the kit no longer spells is told the door that carries it (amendment 7).
+    from lib.migrate_manifest import carry_host_shapes
+
+    errs.extend(f"{c} -- run `migrate --apply`" for c in carry_host_shapes(ctx.manifest))
     proj_errs, warnings = _validate_project(ctx, registry)
     errs.extend(proj_errs)
     # The declared tree, held as a floor (ADR-001 decision 3).

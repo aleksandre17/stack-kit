@@ -5,9 +5,10 @@
 
 deploy_path_load_config() {
   local deploy_base_module
-  deploy_base_module="$(stack_kit_read_manifest_field stack.deployBaseSecretsModule backend)"
+  # The folder a module without its own DEPLOY_PATH inherits from: declared, else the primary API's.
+  deploy_base_module="$(_stack_kit_ctx deployBaseSecretsFolder || true)"
   DEPLOY_PATH_BASE="${DEPLOY_PATH_BASE:-$(stack_kit_env_value "$OPS_SECRETS_MODULE" DEPLOY_PATH "")}"
-  if [[ -z "$DEPLOY_PATH_BASE" && -n "${OPS_SECRETS_MODULE:-}" && "$OPS_SECRETS_MODULE" != "$deploy_base_module" ]]; then
+  if [[ -z "$DEPLOY_PATH_BASE" && -n "$deploy_base_module" && -n "${OPS_SECRETS_MODULE:-}" && "$OPS_SECRETS_MODULE" != "$deploy_base_module" ]]; then
     DEPLOY_PATH_BASE="$(stack_kit_env_value "$deploy_base_module" DEPLOY_PATH "")"
   fi
   if [[ -z "$DEPLOY_PATH_BASE" && -n "${OPS_SECRETS_MODULE:-}" ]]; then
@@ -101,7 +102,7 @@ backend_find_deployed_path() {
 deploy_path_summary() {
   deploy_path_load_config
   if [[ -z "$DEPLOY_PATH_BASE" ]]; then
-    echo "${SERVER_BASE}/${PROJECT}/backend/runtime/<container>/ (set DEPLOY_PATH in ops/config)"
+    echo "$(stack_kit_default_remote_deploy_base "${OPS_SECRETS_MODULE:-}" 2>/dev/null || echo "${SERVER_BASE}/${PROJECT}")/runtime/<container>/ (set DEPLOY_PATH in ops/config)"
     return 0
   fi
   if [[ "$DEPLOY_LAYOUT" == "structured" ]]; then

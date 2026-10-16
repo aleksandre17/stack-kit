@@ -21,7 +21,7 @@ if ! command -v python3 &>/dev/null; then
 fi
 
 mapfile -t lines < <(
-  cd "$PKG" && PYTHONPATH="$PKG" "$PY" lib/modules_cli.py stack-health
+  cd "$PKG" && PYTHONPATH="$PKG" "$PY" lib/resolve_cli.py stack-health
 )
 
 if [[ ${#lines[@]} -eq 0 ]]; then

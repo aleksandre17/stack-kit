@@ -2,7 +2,7 @@
 # run environment was imported. A built boot JAR when preferred and present, else Gradle bootRun.
 # In scope from the caller: $ModuleId, $modPath, $root, $PackageRoot.
 
-. (Join-Path $PackageRoot "toolkit\hybrid\Invoke-HybridJarBoot.ps1")
+. (Join-Path $PSScriptRoot "_jar-boot.ps1")
 if (Test-StackKitPreferHybridJar -ModuleId $ModuleId) {
     $jar = Get-StackKitHybridBootJar -Root $root -ModuleId $ModuleId -ModPath $modPath
     if ($jar -and (Test-Path $jar)) {
@@ -12,10 +12,10 @@ if (Test-StackKitPreferHybridJar -ModuleId $ModuleId) {
     }
 }
 
-$profiles = Get-ModuleHybridProfiles $ModuleId
+$profiles = Get-ModuleField $ModuleId 'hybrid.springProfiles'
 if ($profiles) { $env:SPRING_PROFILES_ACTIVE = $profiles }
 
-$wrapperRel = Get-ModuleGradleWrapper $ModuleId
+$wrapperRel = Get-ModuleField $ModuleId 'hybrid.gradleWrapper'
 if (-not $wrapperRel) {
     $modRelPath = Get-ManifestField "modules.$ModuleId.path"
     if (Test-Path (Join-Path $modPath "gradlew.bat")) {
@@ -31,7 +31,7 @@ if (-not $wrapperRel) {
 $wrapper = Join-Path $root ($wrapperRel -replace '/', '\')
 if (-not (Test-Path $wrapper)) { throw "Gradle wrapper not found: $wrapper" }
 
-$gradleProject = Get-ModuleGradleProject $ModuleId
+$gradleProject = Get-ModuleField $ModuleId 'hybrid.gradleProject'
 $bootTask = if ($gradleProject) { ":${gradleProject}:bootRun" } else { "bootRun" }
 
 & $wrapper $bootTask -x test

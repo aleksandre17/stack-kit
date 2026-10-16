@@ -7,17 +7,19 @@
 # the ENVIRONMENT says (env files, deploy values, slugs) is asked of the resolver each time, in
 # lib/env.sh. A test holds this: no manifest field is spelled here.
 
+# Every kit script speaks UTF-8 (PYTHONUTF8), for this child only: a Python writing to a pipe on
+# Windows otherwise encodes in the ANSI code page, and an em dash arrives as a replacement character.
 stack_kit_python() {
   if command -v python3 &>/dev/null; then
     if python3 -c "import sys" &>/dev/null 2>&1; then
-      python3 "$@"
+      PYTHONUTF8=1 python3 "$@"
       return $?
     fi
   fi
   if command -v py &>/dev/null; then
-    py -3 "$@"
+    PYTHONUTF8=1 py -3 "$@"
   elif command -v python &>/dev/null; then
-    python "$@"
+    PYTHONUTF8=1 python "$@"
   else
     echo "  ERROR: python not found (need python3, py, or python)" >&2
     return 127

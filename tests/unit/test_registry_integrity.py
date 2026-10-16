@@ -24,3 +24,12 @@ def test_a_hybrid_rung_has_a_declared_launch_step(pkg_root: Path):
         assert script or not via_hybrid, f"{driver_id} delivers through hybrid but declares no hybrid.script"
         if script:
             assert (pkg_root / "drivers" / driver_id / script).is_file(), f"{driver_id}.hybrid -> missing {script}"
+
+
+def test_the_host_run_has_one_home(pkg_root: Path):
+    # A kit driver with a launch step is given the kit's runner as `run` (lib/modules.py
+    # driver_commands); a `run` script of its own beside it would be a second home (ADR-001 am. 7).
+    reg = json.loads((pkg_root / "drivers" / "registry.json").read_text(encoding="utf-8"))
+    for driver_id, entry in reg.items():
+        if (entry.get("hybrid") or {}).get("script"):
+            assert "run" not in entry.get("commands", {}), f"{driver_id} declares its own run beside its launch step"

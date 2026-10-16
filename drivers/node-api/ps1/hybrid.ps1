@@ -3,7 +3,7 @@
 # through pnpm so workspace dependencies resolve; npm when pnpm is not on PATH.
 # In scope from the caller: $ModuleId, $modPath, $root, $PackageRoot.
 
-$npmScript = Get-ModuleNpmScript $ModuleId
+$npmScript = Get-ModuleField $ModuleId 'debug.npmScript', 'hybrid.npmScript'
 if (-not $npmScript) { $npmScript = "dev" }
 
 if (Get-Command pnpm -ErrorAction SilentlyContinue) {

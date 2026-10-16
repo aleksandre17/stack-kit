@@ -10,7 +10,7 @@ Stack-agnostic **single-page app** module driver: **Vite (React)**, **Angular CL
 | `dev bootstrap\|sync\|watch\|restart` | Windows → Linux **source** sync (rsync), no `dist` build |
 | `run` | Local `npm run <script>` + secrets `.env.dev` (manifest `debug.npmScript` / `hybrid`) |
 
-**`deploy watch` vs `dev watch`:** [docs/FE-WATCH.md](../../../docs/FE-WATCH.md)
+**`deploy watch` vs `dev watch`:** [docs/GOLDEN-PATHS.md#frontend](../../docs/GOLDEN-PATHS.md#frontend)
 
 | `compose`, `manage`, `check` | Module lifecycle |
 

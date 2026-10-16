@@ -66,6 +66,6 @@ Frontend stays `node-vite`; catalog / compose may need catalog entries for the n
 ## Resolution
 
 - One resolver: `lib/resolution.py` reads `drivers/registry.json`; `lib/drivers.ps1` and `lib/drivers.sh` look its answers up
-- List types: `python3 kits/stack-kit/lib/driver_api.py list-types`
+- List types: `python3 kits/stack-kit/lib/resolve_cli.py driver-types`
 
 See [docs/REFERENCE.md, Drivers](../docs/REFERENCE.md#drivers).

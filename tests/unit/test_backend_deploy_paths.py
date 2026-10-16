@@ -5,7 +5,6 @@ import pytest
 
 from lib.deploy_paths import (
     backend_deploy_path_candidates,
-    deploy_path_summary,
     resolve_backend_deploy_path,
     resolve_deploy_path_base,
 )
@@ -103,17 +102,24 @@ class TestDeployPathBaseInherit:
         assert path == f"{self.BACKEND_BASE}/runtime/sample-app-search"
 
 
-class TestDeployPathSummary:
-    def test_structured(self):
-        assert (
-            deploy_path_summary(base=BASE, layout="structured")
-            == f"{BASE}/runtime/<container>/"
-        )
+class TestDeployBaseSecretsFolder:
+    """The folder a module without its own DEPLOY_PATH inherits from is the project's word, never the
+    kit's: declared, else the primary API module's secrets folder, else none (ADR-001 amendment 7)."""
 
-    def test_missing_base_hint(self):
-        s = deploy_path_summary(
-            base=None,
-            server_base="/home/administrator",
-            project="app",
-        )
-        assert "backend/runtime/<container>/" in s
+    MODULES = {"svc": {"role": "api", "secretsModule": "svc-secrets"}, "ui": {"role": "ui"}}
+
+    def test_declared(self):
+        from lib.resolution import deploy_base_secrets_folder
+
+        manifest = {"stack": {"deployBaseSecretsModule": "shared"}, "modules": self.MODULES}
+        assert deploy_base_secrets_folder(manifest) == "shared"
+
+    def test_the_primary_api_modules_folder(self):
+        from lib.resolution import deploy_base_secrets_folder
+
+        assert deploy_base_secrets_folder({"modules": self.MODULES}) == "svc-secrets"
+
+    def test_none_without_an_api(self):
+        from lib.resolution import deploy_base_secrets_folder
+
+        assert deploy_base_secrets_folder({"modules": {"ui": {"role": "ui"}}}) == ""

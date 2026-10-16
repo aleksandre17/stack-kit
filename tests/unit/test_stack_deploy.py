@@ -45,7 +45,7 @@ def test_default_steps_include_all_compose_modules() -> None:
     steps = default_stack_deploy_steps(m)
     ids = [s["module"] for s in steps]
     assert ids == ["backend", "retrieval", "ingestion", "frontend"]
-    assert steps[0]["args"] == ["all"]
+    assert steps[0]["args"] == ["all", "--{environment}"]
     assert "dist" in steps[-1]["args"]
     assert "{environment}" in steps[-1]["args"]
 

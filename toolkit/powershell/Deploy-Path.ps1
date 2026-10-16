@@ -3,8 +3,9 @@
 function Get-DeployPathBase {
     $base = Get-EnvValue "DEPLOY_PATH"
     if (-not $base) {
-        $deployBaseModule = Get-ManifestField "stack.deployBaseSecretsModule" "backend"
-        if ($OpsSecretsModule -and $OpsSecretsModule -ne $deployBaseModule) {
+        # The folder a module without its own DEPLOY_PATH inherits from: declared, else the primary API's.
+        $deployBaseModule = Get-KitContextValue "deployBaseSecretsFolder"
+        if ($deployBaseModule -and $OpsSecretsModule -and $OpsSecretsModule -ne $deployBaseModule) {
             $base = Get-SecretsEnvValue -Module $deployBaseModule -Key "DEPLOY_PATH"
         }
     }

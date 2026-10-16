@@ -2,10 +2,6 @@
 # Module drivers for bash -- a SHIM over the resolver's context (ADR-001 decision 2).
 # Requires lib/project.sh (sourced first by every caller).
 
-stack_kit_driver_api() {
-  stack_kit_python "$(stack_kit_kit_package_root)/lib/driver_api.py" "$@"
-}
-
 stack_kit_driver_registry() {
   echo "$(stack_kit_kit_package_root)/drivers/registry.json"
 }

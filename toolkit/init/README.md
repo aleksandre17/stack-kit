@@ -2,7 +2,7 @@
 
 ერთი ბრძანება — სრული ops bootstrap ახალი ან ნაწილობრივ მოწყობილი repo-სთვის.
 
-**პროექტის დოკუმენტაცია (სრული):** [STACK_KIT-INIT.md](../../../../docs/STACK_KIT-INIT.md) (repo `docs/`)
+**პროექტის დოკუმენტაცია (სრული):** [docs/INSTALL.md#first-run](../../docs/INSTALL.md#first-run)
 
 ## გაშვება
 

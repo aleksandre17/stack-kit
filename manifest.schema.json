@@ -348,23 +348,6 @@
             },
             "additionalProperties": false
           },
-          "catalog": {
-            "type": "object",
-            "description": "Chat catalog source configuration (yaml vs derived)",
-            "properties": {
-              "sourceEnv": { "type": "string" },
-              "defaultSource": { "type": "string" },
-              "cutoverSource": { "type": "string" },
-              "jdbcUrlEnv": { "type": "string" },
-              "jdbcUserEnv": { "type": "string" },
-              "jdbcPasswordEnv": { "type": "string" },
-              "presentationResources": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            },
-            "additionalProperties": false
-          },
           "node": {
             "type": "object",
             "description": "Node-stack build declarations (node-api / node-vite drivers)",
@@ -378,47 +361,12 @@
             },
             "additionalProperties": false
           },
-          "derivation": {
+          "extensions": {
             "type": "object",
-            "description": "Derivation pipeline configuration (Phase 8 P1 enrichment + clustering)",
-            "properties": {
-              "phase": { "type": "string" },
-              "planDoc": { "type": "string" },
-              "defaultCorpus": { "type": "string" },
-              "flywayRange": { "type": "string" },
-              "enrichment": {
-                "type": "object",
-                "properties": {
-                  "enabledEnv": { "type": "string" },
-                  "chatModelEnv": { "type": "string" },
-                  "modelVersionEnv": { "type": "string" },
-                  "defaultChatModel": { "type": "string" }
-                },
-                "additionalProperties": false
-              },
-              "aggregation": {
-                "type": "object",
-                "properties": {
-                  "enabledEnv": { "type": "string" }
-                },
-                "additionalProperties": false
-              },
-              "cutover": {
-                "type": "object",
-                "properties": {
-                  "orchestrator": { "type": "string" },
-                  "prep": { "type": "string" },
-                  "evalGate": { "type": "string" },
-                  "freezeBaseline": { "type": "string" },
-                  "frozenBaselinePath": { "type": "string" },
-                  "derivedSmoke": { "type": "string" }
-                },
-                "additionalProperties": false
-              }
-            },
-            "additionalProperties": false
+            "description": "This module's own configuration, by name, for the host's tools: the kit validates its shape as an object and reads nothing in it"
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "vscode": {
@@ -597,20 +545,11 @@
         "prepareEnv": { "type": "string" },
         "waitHealth": { "type": "string" },
         "waitStackHealth": { "type": "string" },
-        "ragSmoke": { "type": "string" },
-        "chatCatalogRagSmoke": { "type": "string" },
-        "chatDerivedCatalogSmoke": { "type": "string", "description": "P1 derived catalog smoke test" },
-        "chatRagE2eSmoke": { "type": "string" },
-        "verifyServicesProd": { "type": "string" },
-        "corpusQualityAudit": { "type": "string" },
-        "ragEvalSmoke": { "type": "string", "description": "RAG eval dry-run / smoke" },
-        "ragEvalHarness": { "type": "string", "description": "RAG eval full harness" },
-        "ragEvalGate": { "type": "string", "description": "RAG eval gate (pass/fail)" },
-        "ragEvalFreezeYamlBaseline": { "type": "string", "description": "Freeze YAML catalog baseline for eval" },
-        "ragDerivationCutoverPrep": { "type": "string", "description": "Phase 8 P1 derivation cutover prep" },
-        "ragP0CorpusQuality": { "type": "string", "description": "P0 Layer 1 corpus quality gate" },
-        "ragP1Cutover": { "type": "string", "description": "Phase 8 P1 full cutover orchestrator" },
-        "ragLocalePipeline": { "type": "string", "description": "Locale pair pipeline orchestrator" },
+        "scripts": {
+          "type": "object",
+          "description": "The host's further CI scripts, by its own names: each a path the kit checks exists (validate) and holds as a layout-floor row; the kit names none of them",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
         "healthModules": {
           "type": "array",
           "items": { "type": "string" }

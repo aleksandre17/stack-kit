@@ -38,8 +38,12 @@ def test_each_guide_declares_its_kind_and_what_it_owns():
 
 def test_every_relative_link_in_a_guide_reaches_a_file():
     broken = []
-    for name in [*GUIDES, "../README.md", "../ARCHITECTURE.md"]:
-        page = (DOCS / name).resolve()
+    # Every page the kit ships to be read in place (scaffold pages are read in the host they land in,
+    # and the changelog is a record of what pages were then).
+    pages = [*(DOCS / name for name in GUIDES), PKG / "README.md", PKG / "ARCHITECTURE.md",
+             *(p for d in ("drivers", "toolkit", "ci", "adapters", "compose", "contracts", "lib")
+               for p in (PKG / d).rglob("*.md"))]
+    for page in (p.resolve() for p in pages):
         for target in re.findall(r"\]\(([^)#\s]+)(?:#[^)]*)?\)", page.read_text(encoding="utf-8")):
             if re.match(r"^[a-z]+:", target):
                 continue

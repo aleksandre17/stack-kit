@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lib.modules import _modules, driver_deploy_args, module_ids, module_role
+from lib.modules import _modules, driver_deploy_args, driver_delivery, module_ids, module_role
 
 ROLE_DEPLOY_ORDER = ("api", "worker", "gateway", "data", "ui", "other")
 
@@ -66,6 +66,26 @@ def stack_deploy_steps(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     if isinstance(steps, list) and steps:
         return steps
     return default_stack_deploy_steps(manifest)
+
+
+def substitute_environment(args: list[Any], environment: str) -> list[str]:
+    """A step's argv with `{environment}` (and the older `{env}`) made the environment deployed."""
+    return [str(a).replace("{environment}", environment).replace("{env}", environment) for a in args]
+
+
+def stack_deploy_lines(manifest: dict[str, Any], environment: str, flags: list[str]) -> list[str]:
+    """`module<TAB>command<TAB>args...` per step, as a stack deploy runs them. A stack-deploy flag
+    reaches a step only when the module's driver declares its `release` rung `forwards` it: the
+    runner names no driver, so which flags a driver's deploy understands is the driver's to say."""
+    lines = []
+    for step in stack_deploy_steps(manifest):
+        module_id = str(step["module"])
+        typ = str((_modules(manifest).get(module_id) or {}).get("type") or "")
+        forwards = (driver_delivery(typ).get("release") or {}).get("forwards") or []
+        args = substitute_environment(step.get("args", []), environment)
+        args += [f for f in flags if f in forwards]
+        lines.append("\t".join([module_id, str(step["command"]), *args]))
+    return lines
 
 
 def validate_stack_deploy(manifest: dict[str, Any]) -> list[str]:

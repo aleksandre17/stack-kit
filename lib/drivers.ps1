@@ -18,6 +18,26 @@ function Get-ModuleManifestEntry {
     return ($json | ConvertFrom-Json)
 }
 
+function Get-ModuleField {
+    # A module's own field, by its path under the module (e.g. 'hybrid.npmScript'); the first of
+    # several paths that holds a value, else "". The DRIVER that reads a field names it -- the kit
+    # keeps no list of any driver's fields (ADR-001 amendment 7).
+    param([Parameter(Mandatory = $true)][string]$ModuleId, [Parameter(Mandatory = $true)][string[]]$Path)
+    $entry = Get-ModuleManifestEntry $ModuleId
+    foreach ($p in $Path) {
+        $v = $entry
+        foreach ($name in $p.Split('.')) {
+            if ($null -eq $v) { break }
+            $v = $v.$name
+        }
+        if ($null -ne $v -and "$v" -ne "") {
+            if ($v -is [bool]) { return $v.ToString().ToLowerInvariant() }
+            return "$v"
+        }
+    }
+    return ""
+}
+
 function Get-ModuleType {
     param([string]$ModuleId)
     if (-not (Get-KitContextValue "module:$($ModuleId):json")) {

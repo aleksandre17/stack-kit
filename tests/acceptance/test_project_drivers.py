@@ -68,7 +68,7 @@ def test_the_resolver_and_validate_find_the_project_driver(tmp_path):
     ctx = json.loads(ran.stdout)["context"]
     assert Path(ctx[f"driver:{OWN}:command:check"]) == root / "ops" / "drivers" / OWN / "sh" / "check.sh"
     assert ctx["module:own:type"] == OWN
-    ran = subprocess.run([sys.executable, "-B", str(PKG / "lib" / "driver_api.py"), "path", "own", "check"],
+    ran = subprocess.run([sys.executable, "-B", str(PKG / "lib" / "resolve_cli.py"), "driver-command", "own", "check"],
                          cwd=root, env=env, capture_output=True, text=True)
     assert ran.returncode == 0, ran.stderr
     assert Path(ran.stdout.strip()) == root / "ops" / "drivers" / OWN / "sh" / "check.sh"

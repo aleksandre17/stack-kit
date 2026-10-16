@@ -13,7 +13,6 @@
     "commands": {
       "deploy": "sh/deploy.sh",
       "dev": "sh/dev.sh",
-      "run": "ps1/run.ps1",
       "manage": "sh/manage.sh",
       "compose": "sh/compose.sh",
       "check": "sh/check.sh",
@@ -55,7 +54,12 @@
       "release": {
         "command": "deploy",
         "args": [
-          "all"
+          "all",
+          "--{environment}"
+        ],
+        "forwards": [
+          "--no-build",
+          "--skip-checks"
         ]
       }
     },
@@ -80,7 +84,6 @@
     "commands": {
       "deploy": "ps1/deploy.ps1",
       "dev": "ps1/dev.ps1",
-      "run": "ps1/run.ps1",
       "manage": "ps1/manage.ps1",
       "compose": "ps1/compose.ps1",
       "check": "ps1/check.ps1"
@@ -140,7 +143,6 @@
     "commands": {
       "deploy": "sh/deploy.sh",
       "dev": "sh/dev.sh",
-      "run": "ps1/run.ps1",
       "manage": "sh/manage.sh",
       "compose": "sh/compose.sh",
       "check": "sh/check.sh",
@@ -170,7 +172,13 @@
       },
       "release": {
         "command": "deploy",
-        "args": []
+        "args": [
+          "--{environment}"
+        ],
+        "forwards": [
+          "--no-build",
+          "--skip-checks"
+        ]
       }
     }
   },
@@ -183,7 +191,6 @@
     "runtime": "powershell",
     "commands": {
       "deploy": "ps1/deploy.ps1",
-      "run": "ps1/run.ps1",
       "check": "ps1/check.ps1"
     },
     "hybrid": {

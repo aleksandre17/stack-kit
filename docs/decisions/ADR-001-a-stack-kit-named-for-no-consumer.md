@@ -290,3 +290,63 @@ Proof: `tests/acceptance/test_delivery.py` runs a project driver's hybrid rung t
 and reads `.env.dev` over `.env.prod` from the process; `tests/unit/test_envfile.py`;
 `tests/acceptance/test_layout_floor.py`. The order was mutation-checked (reversing `HOST_RUN` fails
 both). Still owed: the four identical `run.ps1` delegates.
+
+## Amendment 7 — the owed list, closed (2026-10-16, owner-delegated)
+
+Everything the amendments above named as owed, except the container rung, which still has no docker
+host to be proven on.
+
+1. **The schema spells no consumer.** `ci` lost fourteen script fields one former consumer's tools
+   ran (`ragSmoke`, `ragEval*`, `chatCatalogRagSmoke`, …) and that no line of the kit ever read;
+   `modules.<id>` lost `catalog` and `derivation`, the same. A host's further CI scripts are
+   `ci.scripts` (name → path), and every one is checked to exist and held as a layout-floor row, like
+   the four the kit runs (`manifest_defaults.declared_ci_scripts`, the one list). A module's own
+   configuration for its own tools is `modules.<id>.extensions`, which the kit reads nothing of; the
+   module schema is now closed (`additionalProperties: false`), so a misspelt field is refused instead
+   of ignored. `migrate` carries the former keys to the new homes under the same names, and refuses
+   to overwrite a key already there; `validate` names that door. *Rejected:* keeping the fields as
+   deprecated (the kit would go on carrying one consumer's vocabulary); an open module object (a
+   misspelling passes); dropping the keys (a host's data, lost by the kit).
+2. **The host run has one home.** The four `run.ps1` delegates are gone. A driver that declares its
+   launch step (`hybrid.script`) is given `run` = `toolkit/hybrid/Invoke-HybridRun.ps1` by
+   `lib/modules.driver_commands`, the one place a driver's commands are resolved (the resolver's
+   context, the CLI dispatch and `dev up` all read it). The runner takes its module from the dispatch
+   (`STACK_KIT_MODULE_ID`) when not given one. A kit driver declaring its own `run` beside a launch
+   step fails `test_registry_integrity.py`; a project driver's own `run` is still its own.
+   *Rejected:* a `{via}` form for commands (a second grammar beside the delivery ladder's for one
+   fact); one shared script reached by a `../` path from each driver (four declarations of one thing).
+3. **The stack deploy names no driver.** `toolkit/deploy/stack-remote.sh` appended the environment
+   flag and its own options only to `java-boot`, and called a consumer's `tools/stack-kit.ps1`. The
+   environment is now the release rung's argument (`--{environment}`), and the options a rung passes
+   on are declared there (`forwards`); `node-api`, which accepts both and was given neither, now
+   deploys the environment asked for. The runner calls the kit's own CLI, under `pwsh` when present.
+4. **One command line for the resolver.** `lib/driver_api.py` and `lib/modules_cli.py` folded into
+   `lib/resolve_cli.py` (`driver-types`, `driver-command`, `stack-steps`, `stack-health`,
+   `stack-endpoints`, `compose-names`, `compose-service`); their duplicate manifest and registry
+   readers, and two verbs printing one plan (`stack-steps`, `stack-deploy-steps`), went with them.
+   Roles, types and aliases were already the context's.
+5. **The kit keeps no list of a driver's fields.** `lib/module-manifest.ps1` named `hybrid.*`,
+   `spring.*` and Flyway fields for every runtime, four of them read by nothing. A driver now reads
+   its own fields by name (`Get-ModuleField <id> <path>[, <path>]`, `lib/drivers.ps1`); the JAR boot
+   moved from `toolkit/hybrid/` into the driver that is its only user (`drivers/java-boot/ps1/_jar-boot.ps1`).
+6. **No literal folder.** The deploy-base secrets folder defaulted to `backend` in bash and PowerShell;
+   it is now `stack.deployBaseSecretsModule`, else the primary API module's folder, else none — one
+   rule in the resolver's context (`deployBaseSecretsFolder`). The Python `deploy_path_summary`, read
+   by no runtime and carrying `/home/administrator` and `backend` literals, was deleted.
+7. **UTF-8 at the Python boundary.** Both shims that start a kit script (`Invoke-StackKitPythonExe`,
+   `stack_kit_python`) set `PYTHONUTF8=1` for the child only; a script writing to a pipe on Windows
+   otherwise encoded in the ANSI code page and an em dash arrived as `�`.
+8. **Every in-place page's links resolve.** Driver, toolkit and CI READMEs linked a former consumer's
+   `docs/`; they point at the kit's guides, and `test_handwriting.py` now holds every `.md` under
+   `drivers/`, `toolkit/`, `ci/`, `adapters/`, `compose/`, `contracts/`, `lib/`. (The compose catalog
+   path the guides state, `ops/compose/catalog.json`, was already the code's.) The CLI help names
+   `--mode remote`, `deliver`, and that a module's commands are its driver's.
+
+Proof: `tests/unit/test_migrate_manifest.py`; `tests/unit/test_validate_manifest.py` (the former
+shape refused, with the door); `tests/acceptance/test_layout_floor.py` (`ci.scripts` rows);
+`tests/acceptance/test_driver_resolution.py` (`run` is the host runner; stack steps' environment and
+`forwards`); `tests/acceptance/test_delivery.py` (`mod <id> run` runs the runner through the real CLI);
+`tests/unit/test_backend_deploy_paths.py` (deploy-base folder); `test_declared_agnosticism.py` guards
+five more generic files. Each new test was mutation-checked. **Still owed:** the container rung; the
+remote Windows/IIS delivery path; `toolkit/deploy/` layout-migration and marker scripts that still
+name `java-boot`, `node-vite` or a `backend` folder (one consumer's server history, run by hand).

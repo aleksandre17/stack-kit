@@ -131,7 +131,7 @@ def _write_volatile_secrets(fixture_root: Path) -> None:
 
 @pytest.fixture(scope="session", autouse=True)
 def _fixture_project(request: pytest.FixtureRequest) -> None:
-    """Prepare the synthetic consumer + wire driver_api env for the session."""
+    """Prepare the synthetic consumer + wire the kit CLI env for the session."""
     if REPO == WORKING_ROOT:
         _link_kit_into_fixture(WORKING_ROOT, PKG)
         _write_volatile_secrets(WORKING_ROOT)
@@ -143,7 +143,7 @@ def kit_cli_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     """The environment a kit child process needs to behave like the in-process tests.
 
     Single source of truth for the three things a subprocess invocation of a kit
-    CLI (``lib/driver_api.py``, ``lib/validate_manifest.py``, …) depends on:
+    CLI (``lib/resolve_cli.py``, ``lib/validate_manifest.py``, …) depends on:
 
     * ``PYTHONPATH`` -> the kit root, so the child resolves ``from lib.x import``
       (the scripts import the kit's namespace package; without this the child
@@ -168,7 +168,7 @@ def kit_cli_env(extra: dict[str, str] | None = None) -> dict[str, str]:
 
 def run_kit_cli(
     *args: str,
-    script: str = "driver_api.py",
+    script: str = "resolve_cli.py",
     check: bool = True,
     env_extra: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:

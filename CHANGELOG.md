@@ -2,6 +2,29 @@
 
 ## 1.2.0-dev — unreleased
 
+### The owed list, closed (ADR-001 amendment 7)
+
+- **Breaking for a host on the former keys, carried by `migrate --apply`:** `ci.<name>` script paths
+  the schema spelled for one consumer (`ragSmoke`, `ragEval*`, `chat*Smoke`, `corpusQualityAudit`,
+  `verifyServicesProd`, …) → `ci.scripts.<name>`; `modules.<id>.catalog` / `.derivation` →
+  `modules.<id>.extensions.*`. The module object is closed: an undeclared field is refused.
+  `validate` names the door. Each `ci.scripts` path must exist and is a layout-floor row.
+- `run` is the kit's host runner for every driver that declares `hybrid.script`
+  (`lib/modules.driver_commands`); the four `drivers/*/ps1/run.ps1` delegates are deleted.
+- `stack-deploy` names no driver: the environment is the release rung's `--{environment}` and the
+  options a rung passes on are its `forwards` (`java-boot`, `node-api`: `--no-build`,
+  `--skip-checks`). `node-api` now deploys the environment asked for. The runner calls the kit's
+  CLI, not a host's `tools/stack-kit.ps1`.
+- `lib/driver_api.py` and `lib/modules_cli.py` folded into `lib/resolve_cli.py` (`driver-types`,
+  `driver-command`, `stack-steps`, `stack-health`, `stack-endpoints`, `compose-names`,
+  `compose-service`).
+- `lib/module-manifest.ps1` deleted; a driver reads its own fields with `Get-ModuleField`. The JAR
+  boot moved to `drivers/java-boot/ps1/_jar-boot.ps1`.
+- The deploy-base secrets folder defaults to the primary API module's, not `backend`.
+- Kit Python scripts speak UTF-8 on Windows pipes (`PYTHONUTF8=1`, child only).
+- Driver, toolkit and CI READMEs link the kit's guides; the link test holds them. CLI help names
+  `--mode remote` and `deliver`.
+
 ### The host run is declared too (ADR-001 amendment 6)
 
 - `toolkit/hybrid/Invoke-HybridRun.ps1` names no driver. The `java-boot`, `node-vite` and

@@ -96,3 +96,12 @@ def test_a_declared_host_file_that_is_missing_fails_naming_its_field(host, dotte
     manifest.setdefault(section, {})[name] = "ops/declared-but-absent.json"
     failures = evaluate(host, manifest).failures
     assert any(dotted in f and "ops/declared-but-absent.json" in f for f in failures), failures
+
+
+def test_a_host_named_ci_script_is_a_place_named_by_its_own_name(host):
+    # The kit names none of a host's further CI scripts (ADR-001 amendment 7): `ci.scripts` holds
+    # them by the host's names, and each is a row like the kit-run ones.
+    manifest = _manifest(host)
+    manifest.setdefault("ci", {})["scripts"] = {"smoke": "ops/ci/declared-but-absent.sh"}
+    failures = evaluate(host, manifest).failures
+    assert any("ci.scripts.smoke" in f and "ops/ci/declared-but-absent.sh" in f for f in failures), failures

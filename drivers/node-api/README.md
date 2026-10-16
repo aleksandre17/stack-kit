@@ -21,7 +21,7 @@ health-checked process/container, so its ops surface mirrors java-boot, not node
 | `<alias> modules` | List compose services for this module |
 
 Scripts: `sh/*.sh` (Git Bash on Windows, via the consumer's `stack-kit` entry script);
-`ps1/run.ps1` for local run.
+`ps1/hybrid.ps1` is the launch step of the kit's host run (`run`, `hybrid boot`).
 
 ## Build ordering
 
@@ -89,4 +89,4 @@ secretsModule.
   and by the VS Code watch task `vscode-gen` emits.
 - `vscode.launch: "node-terminal"` — the launch shape `vscode-gen` emits.
 
-Tests: `tests/test_registry_integrity.py`, `tests/test_driver_api.py`.
+Tests: `tests/unit/test_registry_integrity.py`, `tests/acceptance/test_driver_resolution.py`.

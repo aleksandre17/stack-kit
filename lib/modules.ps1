@@ -10,7 +10,7 @@ function Invoke-StackKitModulesApi {
         $script:KitPython = Get-StackKitPythonArgs
         if (-not $script:KitPython) { throw "Python not found (tried py -3, python3, python)" }
     }
-    $script = Join-Path (Get-OpsPackageRoot) "lib\modules_cli.py"
+    $script = Join-Path (Get-OpsPackageRoot) "lib\resolve_cli.py"
     Invoke-StackKitPythonExe $script:KitPython $script @ApiArgs
 }
 

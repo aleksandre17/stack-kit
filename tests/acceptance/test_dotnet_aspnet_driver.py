@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lib.modules import driver_registry
+from lib.modules import driver_commands, driver_registry
 from lib.project_context import ProjectContext
 from lib.validate_manifest import _validate_required
 from lib.vscode_gen import LAUNCH_BUILDERS, build_launch_json
@@ -34,7 +34,7 @@ class TestRegistryEntry:
         assert entry["runtime"] == "powershell"
         assert entry["deployKind"] == "artifact"
         assert entry["delivery"]["release"] == {"command": "deploy", "args": ["artifact"]}
-        assert {"run", "check", "deploy"} <= set(entry["commands"])
+        assert {"run", "check", "deploy"} <= set(driver_commands(DRIVER))
 
     def test_declared_scripts_exist(self) -> None:
         entry = driver_registry()[DRIVER]

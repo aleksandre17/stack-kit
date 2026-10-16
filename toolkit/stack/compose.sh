@@ -41,7 +41,7 @@ PY="$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)"
 if [[ -n "$PY" ]]; then
   while IFS= read -r line; do
     [[ -n "$line" ]] && echo "  $line"
-  done < <("$PY" "$PKG/lib/modules_cli.py" stack-endpoints)
+  done < <("$PY" "$PKG/lib/resolve_cli.py" stack-endpoints)
 fi
 echo ""
 

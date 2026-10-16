@@ -30,9 +30,14 @@ echo ""
 echo "  Stack remote deploy [$ENV_FLAG]"
 echo ""
 
+PWSH="$(command -v pwsh 2>/dev/null || command -v powershell.exe 2>/dev/null || true)"
+[[ -n "$PWSH" ]] || { echo "  ERROR: PowerShell (pwsh or powershell.exe) is required to run module steps" >&2; exit 1; }
+
 step=0
 
-mapfile -t LINES < <(stack_kit_python "$PKG/lib/driver_api.py" stack-steps $([[ "$ENV_FLAG" == "--dev" ]] && echo --dev))
+# Each step's argv is its driver's release rung, `{environment}` substituted; a flag below reaches
+# a step only when that rung `forwards` it (drivers/registry.json). No driver is named here.
+mapfile -t LINES < <(PYTHONPATH="$PKG" stack_kit_python "$PKG/lib/resolve_cli.py" stack-steps "$ENV_NAME" "${EXTRA[@]}")
 total="${#LINES[@]}"
 
 for line in "${LINES[@]}"; do
@@ -45,18 +50,11 @@ for line in "${LINES[@]}"; do
     # shellcheck disable=SC2206
     args=($args_rest)
   fi
-  mod_type="$(PYTHONPATH="${PKG}" stack_kit_python "$PKG/lib/driver_api.py" type "$module_id" 2>/dev/null || true)"
-  if [[ "$subcmd" == "deploy" ]]; then
-    if [[ "$mod_type" == "java-boot" ]]; then
-      args+=("$ENV_FLAG")
-      args+=("${EXTRA[@]}")
-    fi
-  fi
   echo "  $step/$total  module=$module_id  $subcmd ${args[*]}"
   echo ""
   # shellcheck disable=SC2086
-  powershell.exe -ExecutionPolicy Bypass -NoProfile -File \
-    "$ROOT/tools/stack-kit.ps1" mod "$module_id" "$subcmd" "${args[@]}"
+  "$PWSH" -ExecutionPolicy Bypass -NoProfile -File \
+    "$PKG/cli/stack-kit.ps1" mod "$module_id" "$subcmd" "${args[@]}"
   echo ""
 done
 

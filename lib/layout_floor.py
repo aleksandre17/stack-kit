@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from lib.manifest_defaults import read_nested
+from lib.manifest_defaults import declared_ci_scripts, read_nested
 
 
 @dataclass
@@ -57,9 +57,8 @@ def derived_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             rows.append(_row(str(cfg["path"]), "dir", "module-source", f"modules.{mid}.path"))
     if declared("compose.catalog"):
         rows.append(_row(declared("compose.catalog"), "file", "compose", "compose.catalog"))
-    for key in ("integration", "prepareEnv", "waitHealth", "waitStackHealth"):
-        if declared(f"ci.{key}"):
-            rows.append(_row(declared(f"ci.{key}"), "file", "ci", f"ci.{key}"))
+    for dotted, rel in declared_ci_scripts(manifest):
+        rows.append(_row(rel, "file", "ci", dotted))
     infra = (manifest.get("stack") or {}).get("infra") or {}
     if isinstance(infra, dict) and infra.get("services"):
         rel = declared("stack.infraComposeDir") or "ops/compose/infra"

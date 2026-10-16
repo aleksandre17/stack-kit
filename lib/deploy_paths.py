@@ -127,23 +127,6 @@ def resolve_deploy_path_base(
     return ""
 
 
-def deploy_path_summary(
-    *,
-    base: str | None,
-    layout: str = "structured",
-    server_base: str | None = None,
-    project: str | None = None,
-) -> str:
-    if not base:
-        sb = normalize_base(server_base) if server_base else "/home/administrator"
-        proj = project or "app"
-        return f"{sb}/{proj}/backend/runtime/<container>/ (set DEPLOY_PATH in ops/config)"
-    base = normalize_base(base)
-    if layout == "structured":
-        return f"{base}/runtime/<container>/"
-    return f"{base}/<container>/"
-
-
 def deploy_path_candidates(*, base: str, container_name: str) -> list[str]:
     base = normalize_base(base)
     if not base:

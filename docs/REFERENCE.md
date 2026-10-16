@@ -34,7 +34,7 @@ Not used, by design — reject in review:
 | Path | Holds |
 |---|---|
 | `cli/` | `stack-kit.ps1` (every verb), `stack-kit.sh` (bash verbs, delegates the rest); the former command names remain as shims (`lib/identity.json` `legacyKitName`) |
-| `lib/` | the resolver (`resolution.py`, `resolve_cli.py`, `envfile.py`, `identity.py` + `identity.json`), manifest/defaults (`project_context.py`, `manifest_defaults.py`, `modules.py`, `modules_cli.py`, `driver_api.py`), feature logic (`validate_manifest.py`, `migrate_manifest.py`, `migrate_identity.py`, `vscode_gen.py`, `config_gen.py`, `ci_prepare.py`, `ci_health.py`, `credentials.py`, `compose_identity.py`, `deploy_paths.py`, `stack_deploy.py`, `stack_endpoints.py`, `infra_tunnel.py`), shell shims (`project.*`, `env.*`, `drivers.*`, `modules.ps1`, `ssh.*`, `module-manifest.ps1`, `stack-kit-python.ps1`), `deploy-defaults.json` |
+| `lib/` | the resolver (`resolution.py`, `resolve_cli.py`, `envfile.py`, `identity.py` + `identity.json`), manifest/defaults (`project_context.py`, `manifest_defaults.py`, `modules.py`), feature logic (`validate_manifest.py`, `migrate_manifest.py`, `migrate_identity.py`, `vscode_gen.py`, `config_gen.py`, `ci_prepare.py`, `ci_health.py`, `credentials.py`, `compose_identity.py`, `deploy_paths.py`, `stack_deploy.py`, `stack_endpoints.py`, `infra_tunnel.py`), shell shims (`project.*`, `env.*`, `drivers.*`, `modules.ps1`, `ssh.*`, `stack-kit-python.ps1`), `deploy-defaults.json` |
 | `toolkit/` | shared operations: `bash/`, `powershell/` (SSH, compose, logs, static watch, remote dev), `deploy/` (upload, JAR prep, deploy watch, dev remote, stack-remote, layout migrate/cleanup), `dev/` (`dev up`), `hybrid/`, `infra/`, `init/`, `layout/` (simulators), `stack/`, `templates/` (`ops.config.*.example`) |
 | `drivers/` | one folder per stack type + `registry.json`; `_template/` to copy |
 | `compose/` | generator (`build.py`, `build.ps1`, `build.sh`, `manifest_compose.py`, `sync_ops_modules.py`) and catalogs: `compose-catalog.json` (templates per `type` + `role`), `stack-catalog.json` (per-role port env keys, defaults, health `urlPath`, `healthExpect`, `ciHealth`), `infra-catalog.json` (reference infra modules + tunnel port keys) |
@@ -60,7 +60,7 @@ Required: `version` (integer ≥ 2), `package`, `secrets`, `modules`.
 | `package` | kit path from the root (`kits/stack-kit`) |
 | `secrets` | config root (`ops/config`) |
 | `compose` | optional; `catalog` (required when `compose` is present), `syncModules` (java-boot `ops.modules`) |
-| `stack` | `composeDir`, `infraComposeDir`, `networkName`, `primaryApiModule` (default: first `api` module), `composeModules` (compose-gen + stack-deploy list; default all), `deployBaseSecretsModule` (shared `DEPLOY_PATH`/`DEPLOY_LAYOUT`; workers inherit it when their `.env.deploy` omits `DEPLOY_PATH`), `modules` (filter for `stack up` endpoint hints only), `composeNaming`, `infra.services` (`services/<id>.yml` merged with `docker-compose.base.yml`), `infra.composeFiles` (full `-f` override) |
+| `stack` | `composeDir`, `infraComposeDir`, `networkName`, `primaryApiModule` (default: first `api` module), `composeModules` (compose-gen + stack-deploy list; default all), `deployBaseSecretsModule` (shared `DEPLOY_PATH`/`DEPLOY_LAYOUT`; workers inherit it when their `.env.deploy` omits `DEPLOY_PATH`; default: the primary API module's secrets folder), `modules` (filter for `stack up` endpoint hints only), `composeNaming`, `infra.services` (`services/<id>.yml` merged with `docker-compose.base.yml`), `infra.composeFiles` (full `-f` override) |
 | `cli.aliases` | shortcut → module id |
 | `stackDeploy` | `modules` (override list), `steps` (explicit; only when the auto plan is insufficient) |
 | `modules.<id>` | see below |
@@ -71,7 +71,7 @@ Required: `version` (integer ≥ 2), `package`, `secrets`, `modules`.
 | `adapters` | `gcp.{credentialsFile,containerMount,envVar}`, `nginx.{template,output,envExample,env}`, `embed.envExample` |
 | `validate.stages` | the real-stack proof `validate --stages` runs: stages `{id, kind, run, cwd, env, timeout, expect}`, kind `setup`, `migrate`, `build`, `test`, `health`, `ingest`, `anchor`, `teardown`; fail-fast, teardown always runs; an `anchor` compares stripped stdout (`expect.equals` \| `matches` \| `atLeast`); a list without an anchor, or whose last working stage is not one, is refused (`lib/pipeline.py`) |
 | `layout` | the host tree as a declared layout held by `validate` as a floor (`lib/layout_floor.py`): `entries[]` `{path, kind, holds, writer, read_when, lifecycle, pending}` add rows to the places the manifest already declares; `closed` names directories where an undeclared child fails; a `pending` row is printed, not failed |
-| `ci` | `integration`, `prepareEnv`, `waitHealth`, `waitStackHealth`, `healthModules` (subset of health targets) and further host script paths (see the schema) |
+| `ci` | `integration`, `prepareEnv`, `waitHealth`, `waitStackHealth`, `healthModules` (subset of health targets), `scripts` (the host's further CI scripts by its own names; each must exist and is a layout-floor row) |
 
 `modules.<id>` — required `type`, `role`, `path`, `secretsModule`:
 
@@ -92,6 +92,7 @@ Required: `version` (integer ≥ 2), `package`, `secrets`, `modules`.
 | `dotnet` | `project`, `launchProfile`, `configuration` (default `Release`), `publishExpect` |
 | `migrations` | `paths` (migration dirs outside the module tree), `allowData[]` `{path, reason}` (reference-data files allowed); migrations are structure-only and `validate` names any that carries data (`lib/migrations_gate.py`, driver `migrations` patterns) |
 | `scripts` | deprecated |
+| `extensions` | the module's own configuration for the host's tools, by name; the kit reads none of it. Any other field is refused (`migrate` carries a former `catalog`/`derivation` here) |
 
 Convention defaults: a missing field takes its value from `scaffold/stack-kit.json`, for the declared
 list `manifest_defaults.CONVENTION_DEFAULTS` only (`package`, `secrets`, `compose.*`, `stack.composeDir`,
@@ -156,8 +157,10 @@ Module commands are the driver's `commands` in the registry (table in [Drivers](
 - A bash-runtime driver needs Git Bash on Windows; a PowerShell driver that throws exits 1 with the message.
 - Role shortcuts: `ui`, `api`, `worker`, `gateway` resolve to the module when exactly one module has that role and no alias of that name exists.
 
-Inspect (Python, from the kit with `PYTHONPATH` = kit root): `lib/driver_api.py list-types`;
-`lib/modules_cli.py compose-names` (JSON) | `stack-deploy-steps [dev|prod]` | `stack-health` (TSV module, url, expect) | `stack-endpoints` | `aliases` | `role <id>` | `by-role <role>`.
+Inspect (Python, from the kit with `PYTHONPATH` = kit root), one command line: `lib/resolve_cli.py`
+`driver-types` | `driver-command <module|alias> <command>` | `stack-steps [dev|prod] [flag...]` |
+`stack-health` (TSV module, url, expect) | `stack-endpoints` | `compose-names` (JSON) |
+`compose-service <module>` | `alias <alias>`; roles, types and aliases are in its `context`.
 
 ## Environment variables
 
@@ -181,16 +184,17 @@ Former-prefix variables (`lib/identity.json` `legacyEnvPrefix`) are adopted inwa
 
 | Type | Roles | Runtime | Commands | Watch tasks | Launch | Deploy kind / args |
 |---|---|---|---|---|---|---|
-| `java-boot` | api, worker | bash | deploy, dev, run, manage, compose, check, modules | `devWatch` | java | runtime / `all` |
+| `java-boot` | api, worker | bash | deploy, dev, run, manage, compose, check, modules | `devWatch` | java | runtime / `all --{environment}`, forwards `--no-build`, `--skip-checks` |
 | `node-vite` | ui | powershell | deploy, dev, run, manage, compose, check | `devWatch`, `deployWatch` | node-terminal | static / `dist -Environment {environment}` |
-| `node-api` | api | bash | deploy, dev, run, manage, compose, check, modules | `devWatch` | node-terminal | runtime |
+| `node-api` | api | bash | deploy, dev, run, manage, compose, check, modules | `devWatch` | node-terminal | runtime / `--{environment}`, forwards `--no-build`, `--skip-checks` |
 | `dotnet-aspnet` | api | powershell | deploy, run, check | — | dotnet | artifact / `artifact` (`deploy remote` refused: delivery not declared) |
 
 Per-driver detail: [java-boot](../drivers/java-boot/README.md), [node-vite](../drivers/node-vite/README.md), [node-api](../drivers/node-api/README.md), [dotnet-aspnet](../drivers/dotnet-aspnet/README.md), [drivers/README.md](../drivers/README.md).
 
 Entry fields: `label`, `roles` (first = default role), `runtime` (`bash` | `powershell`), `commands`
-(name → script), `tasks` (`devWatch`, `deployWatch` argv; `dev up --mode remote` and `vscode-gen` read them),
-`vscode.launch`, `deployKind`, `deployArgs`, `layoutSimulator`, `hybrid.script` (the launch step the hybrid
+(name → script; a driver that declares `hybrid.script` is given `run` = the kit's host runner,
+`toolkit/hybrid/Invoke-HybridRun.ps1`, and ships no run script of its own), `tasks` (`devWatch`, `deployWatch` argv; `dev up --mode remote` and `vscode-gen` read them),
+`vscode.launch`, `deployKind`, `delivery` (rung → `{command, args, forwards}` | `{via}` | `{pending}`; `forwards` names the `stack-deploy` flags a `release` step passes on), `layoutSimulator`, `hybrid.script` (the launch step the hybrid
 runner dot-sources; a `hybrid` rung requires it), `migrations` (`globs`, `exclude`, `data` patterns; java-boot Flyway SQL, dotnet-aspnet EF Core), `configGen`, `acceptsGlobalCredentials`. A driver that declares no watch task gets none — a declared absence.
 
 Adding a driver (Go, FastAPI, Next.js, a Node API …) — a new type, never a renamed folder:

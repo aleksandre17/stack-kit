@@ -24,7 +24,7 @@ bash kits/stack-kit/tests/run-kit-tests.sh
 | **`test_layout_v2.py`** | **Post-migration layout** — manifest paths, `apps/`/`kits/`/`ops/`, no legacy dirs, Spring/Vite/compose wiring |
 | `test_deploy_paths.py` | structured / flat / full paths (B1, D1, C1, …) |
 | `test_golden_path_matrix.py` | static vs compose/dev vs compose/prod separation |
-| `test_driver_api.py` | registry, cli-alias resolution, stack-deploy, no top-level `watch` |
+| `test_driver_resolution.py` | registry, cli-alias resolution, the host run as `run`, stack-deploy steps, no top-level `watch` |
 | `test_frontend_contracts.py` | Dockerfile EXPOSE 80, compose `HOST:80`, deploy/dev scripts |
 | `test_registry_integrity.py` | every registry command file exists |
 

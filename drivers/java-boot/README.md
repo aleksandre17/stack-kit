@@ -19,7 +19,7 @@ Scripts: `sh/*.sh` (run via Git Bash on Windows: `tools/stack-kit.ps1`).
 
 ## Layout — `structured` vs `flat`
 
-სრული ახსნა: [docs/BACKEND-DEPLOY-LAYOUTS.md](../../../../docs/BACKEND-DEPLOY-LAYOUTS.md)
+სრული ახსნა: [docs/GOLDEN-PATHS.md#server-layout](../../docs/GOLDEN-PATHS.md#server-layout)
 
 | ტერმინი | მნიშვნელობა |
 |--------|-------------|

@@ -34,6 +34,7 @@ from lib import envfile, identity
 from lib.credentials import module_credentials
 from lib.manifest_defaults import flatten_defaults
 from lib.modules import (
+    driver_commands,
     driver_default_role,
     driver_delivery,
     driver_home,
@@ -154,8 +155,23 @@ def context(start: Path | None = None) -> dict[str, str]:
     out.update({f"role:{r}": _lines(ids) for r, ids in roles.items()})
     out.update({f"type:{t}": _lines(ids) for t, ids in types.items()})
     out["secretsFolders"] = _lines(folders)
+    out["deployBaseSecretsFolder"] = deploy_base_secrets_folder(manifest)
     out.update({f"alias:{a}": mid for a, mid in infer_cli_aliases(manifest).items()})
     return out
+
+
+def deploy_base_secrets_folder(manifest: dict) -> str:
+    """The secrets folder whose DEPLOY_PATH a module without its own inherits:
+    `stack.deployBaseSecretsModule` when declared, else the primary API module's folder, else none.
+    No folder is spelled here -- a folder is the project's word (ADR-001 amendment 7)."""
+    from lib.compose_identity import primary_api_module_id
+
+    declared = (manifest.get("stack") or {}).get("deployBaseSecretsModule")
+    if declared:
+        return str(declared)
+    mods = manifest.get("modules") or {}
+    primary = primary_api_module_id(manifest, [str(m) for m in mods])
+    return str((mods.get(primary) or {}).get("secretsModule") or primary or "") if primary else ""
 
 
 def _drivers() -> dict[str, str]:
@@ -166,10 +182,10 @@ def _drivers() -> dict[str, str]:
     out["drivers"] = _lines(sorted(registry))
     for typ, entry in registry.items():
         home = driver_home(typ)
-        commands = entry.get("commands") or {}
+        commands = driver_commands(typ)
         out[f"driver:{typ}:commands"] = _lines(sorted(commands))
-        for name, rel in commands.items():
-            out[f"driver:{typ}:command:{name}"] = str(home / rel)
+        for name, path in commands.items():
+            out[f"driver:{typ}:command:{name}"] = str(path)
         out[f"driver:{typ}:defaultRole"] = driver_default_role(typ)
         for name, argv in (entry.get("tasks") or {}).items():
             if isinstance(argv, list):

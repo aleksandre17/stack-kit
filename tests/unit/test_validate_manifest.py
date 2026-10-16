@@ -66,3 +66,16 @@ def test_validate_fails_missing_role(tmp_path: Path, monkeypatch: pytest.MonkeyP
 def test_validate_cli_main(repo_root: Path) -> None:
     errs, warnings = validate_manifest(repo_root)
     assert not errs, errs
+
+
+def test_validate_refuses_a_former_consumer_shape_and_names_the_door(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # ADR-001 amendment 7: the kit spells no consumer's keys; a host still on one is told `migrate`.
+    monkeypatch.delenv("STACK_KIT_PROJECT_ROOT", raising=False)
+    root = _golden_tree(tmp_path)
+    mf = root / "stack-kit.json"
+    data = json.loads(mf.read_text(encoding="utf-8"))
+    data["modules"]["api"]["catalog"] = {"sourceEnv": "SRC"}
+    mf.write_text(json.dumps(data), encoding="utf-8")
+    errs, _ = validate_manifest(root)
+    assert any("modules.api.catalog -> modules.api.extensions.catalog" in e and "migrate --apply" in e
+               for e in errs), errs
