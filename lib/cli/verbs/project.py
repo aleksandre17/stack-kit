@@ -10,7 +10,7 @@ def _py(rel: str):
 
 
 def _init(a: Args) -> int:
-    if "--plan" in a.raw or "--approve" in a.raw:
+    if "--plan" in a.raw or "--approve" in a.raw:  # `init --plan` is `extend module`: the draft from the tree
         code = tools.python_script("lib/draft.py", a.raw)
         if code or "--plan" in a.raw:
             return code

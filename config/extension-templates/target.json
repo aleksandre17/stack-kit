@@ -1,0 +1,14 @@
+{
+  "runtime": "docker-compose",
+  "pending": "<<pending: host, user, root (the platform's shared directory) and the pinned host key>>",
+  "port": 22,
+  "ssh": {
+    "identity": "agent",
+    "knownHosts": "ops/deploy/known_hosts",
+    "hostKeys": "pinned",
+    "options": [
+      "BatchMode=yes",
+      "ConnectTimeout=10"
+    ]
+  }
+}

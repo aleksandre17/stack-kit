@@ -10,6 +10,12 @@
       "description": "Relative path from project root to stack-kit package"
     },
     "secrets": { "type": "string" },
+    "extend": {
+      "type": "object",
+      "description": "The host's extension profile: `profile` names the profile whose points must be answered (config/extension-points.json `required_by`); a pending answer there is an error, elsewhere a notice",
+      "properties": { "profile": { "type": "string", "minLength": 1 } },
+      "additionalProperties": false
+    },
     "project": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9._-]*$",

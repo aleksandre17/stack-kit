@@ -1,0 +1,609 @@
+{
+  "$comment": "The kit's extension points (config/extension-points.schema.json; the shape agent-kit shares). `extend --list` shows each with its status; `extend <point> [<name>] [--plan]` creates it from its template; `extend --upgrade` merges a changed template 3-way into the host's file; init is `extend` of every point required by `init`.",
+  "schema": 1,
+  "points": [
+    {
+      "id": "manifest",
+      "purpose": "the project's manifest",
+      "host_path": "stack-kit.json",
+      "template": "scaffold/stack-kit.json",
+      "schema": "manifest.schema.json",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "module",
+      "purpose": "a module of the project (no name: drafted from the tree by the drivers' evidence)",
+      "host_path": "stack-kit.json#/modules/<name>",
+      "template": "config/extension-templates/module.json",
+      "schema": "manifest.schema.json#/properties/modules",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "instance"
+    },
+    {
+      "id": "catalog-roles",
+      "purpose": "a role over the kit's (config/catalogs/roles.json)",
+      "host_path": "stack-kit.json#/catalogs/roles/-",
+      "template": "config/extension-templates/catalog-roles.json",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "catalog"
+    },
+    {
+      "id": "catalog-tiers",
+      "purpose": "a tier over the kit's",
+      "host_path": "stack-kit.json#/catalogs/tiers/-",
+      "template": "config/extension-templates/catalog-tiers.json",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "catalog"
+    },
+    {
+      "id": "catalog-environments",
+      "purpose": "an environment over the kit's (e.g. staging)",
+      "host_path": "stack-kit.json#/catalogs/environments/-",
+      "template": "config/extension-templates/catalog-environments.json",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "catalog"
+    },
+    {
+      "id": "catalog-lifecycle",
+      "purpose": "a lifecycle step over the kit's (e.g. typecheck)",
+      "host_path": "stack-kit.json#/catalogs/lifecycle/-",
+      "template": "config/extension-templates/catalog-lifecycle.json",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "catalog"
+    },
+    {
+      "id": "catalog-target-runtimes",
+      "purpose": "a target runtime over the kit's",
+      "host_path": "stack-kit.json#/catalogs/targetRuntimes/-",
+      "template": "config/extension-templates/catalog-targetRuntimes.json",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "catalog"
+    },
+    {
+      "id": "runtime",
+      "purpose": "a script runtime over the kit's (config/runtimes.json)",
+      "host_path": "stack-kit.json#/runtimes/<name>",
+      "template": "config/extension-templates/runtime.json",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "overlay"
+    },
+    {
+      "id": "targets",
+      "purpose": "the deploy targets file",
+      "host_path": "{deploy.targets|ops/deploy/targets.json}",
+      "template": "scaffold/ops/deploy/targets.json",
+      "schema": "config/deploy-targets.schema.json",
+      "cardinality": "one",
+      "required_by": [
+        "init",
+        "release"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "target",
+      "purpose": "a deploy target",
+      "host_path": "{deploy.targets|ops/deploy/targets.json}#/targets/<name>",
+      "template": "config/extension-templates/target.json",
+      "schema": "config/deploy-targets.schema.json",
+      "cardinality": "many",
+      "required_by": [
+        "release"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "targets-local",
+      "purpose": "this machine's override of the targets (gitignored)",
+      "host_path": "ops/deploy/targets.local.json",
+      "template": "config/extension-templates/targets-local.json",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [],
+      "merges_into": "overlay"
+    },
+    {
+      "id": "known-hosts",
+      "purpose": "the targets' pinned host keys",
+      "host_path": "ops/deploy/known_hosts",
+      "template": "scaffold/ops/deploy/known_hosts",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "runtime-config",
+      "purpose": "a file a module's application reads at run time (named by its module)",
+      "host_path": "stack-kit.json#/modules/<name>/runtimeConfig/-",
+      "template": "config/extension-templates/runtime-config.json",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "instance"
+    },
+    {
+      "id": "config-keys",
+      "purpose": "the configuration catalogue",
+      "host_path": "{config.keys|ops/config/schema/config-keys.json}",
+      "template": "config/extension-templates/config-keys.json",
+      "schema": "config/config-keys.schema.json",
+      "cardinality": "one",
+      "required_by": [],
+      "merges_into": "instance"
+    },
+    {
+      "id": "config-key",
+      "purpose": "a catalogued key, with its env-value policy",
+      "host_path": "{config.keys|ops/config/schema/config-keys.json}#/keys/-",
+      "template": "config/extension-templates/config-key.json",
+      "schema": "config/config-keys.schema.json",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "instance"
+    },
+    {
+      "id": "infra-service",
+      "purpose": "an infra service of the stack (a named template: postgres, sqlserver, minio, redis, keycloak, ...)",
+      "host_path": "{stack.infraComposeDir|ops/compose/infra}/services/<name>.yml",
+      "template": "scaffold/ops/compose/infra/services/<name>.yml",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "overlay",
+      "companions": "infra-service-entry"
+    },
+    {
+      "id": "infra-service-entry",
+      "purpose": "the infra service's selection in the manifest",
+      "host_path": "stack-kit.json#/stack/infra/services/-",
+      "template": "config/extension-templates/infra-service-entry.json",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "list"
+    },
+    {
+      "id": "backup-anchors",
+      "purpose": "what a restore of an infra store must still hold",
+      "host_path": "stack-kit.json#/stack/infra/backup/<name>",
+      "template": "config/extension-templates/backup-anchors.json",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "instance"
+    },
+    {
+      "id": "env-example",
+      "purpose": "a module's env file example (the real values stay ignored)",
+      "host_path": "{secrets|ops/config}/<name>/.env.example",
+      "template": "config/extension-templates/env-example",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "instance"
+    },
+    {
+      "id": "driver",
+      "purpose": "a project driver's release recipe (with its registry entry)",
+      "host_path": "ops/drivers/<name>/container/Dockerfile",
+      "template": "config/extension-templates/driver-recipe",
+      "schema": "",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "registry",
+      "companions": "driver-entry"
+    },
+    {
+      "id": "driver-entry",
+      "purpose": "a project driver's declaration",
+      "host_path": "{drivers.registry|ops/drivers/registry.json}#/<name>",
+      "template": "config/extension-templates/driver-entry.json",
+      "schema": "drivers/registry.schema.json",
+      "cardinality": "many",
+      "required_by": [],
+      "merges_into": "registry"
+    },
+    {
+      "id": "ci-actions",
+      "purpose": "the project's own CI action pins (full SHAs)",
+      "host_path": "{ci.actions|ops/ci/actions.json}",
+      "template": "config/extension-templates/ci-actions.json",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [],
+      "merges_into": "overlay"
+    },
+    {
+      "id": "compose-catalog",
+      "purpose": "the local stack's catalog",
+      "host_path": "{compose.catalog|ops/compose/catalog.json}",
+      "template": "scaffold/ops/compose/catalog.full.json",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-gitignore",
+      "purpose": "laid down by init: .gitignore",
+      "host_path": ".gitignore",
+      "template": "scaffold/.gitignore.example",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-apps-backend-logs-gitignore",
+      "purpose": "laid down by init: apps/backend/logs/.gitignore",
+      "host_path": "apps/backend/logs/.gitignore",
+      "template": "scaffold/apps/backend/logs/.gitignore",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-apps-frontend-logs-gitignore",
+      "purpose": "laid down by init: apps/frontend/logs/.gitignore",
+      "host_path": "apps/frontend/logs/.gitignore",
+      "template": "scaffold/apps/frontend/logs/.gitignore",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-apps-frontend-nginxconftemplate",
+      "purpose": "laid down by init: apps/frontend/nginx.conf.template",
+      "host_path": "apps/frontend/nginx.conf.template",
+      "template": "scaffold/apps/frontend/nginx.conf.template",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-ci-integration-stacksh",
+      "purpose": "laid down by init: ops/ci/integration-stack.sh",
+      "host_path": "ops/ci/integration-stack.sh",
+      "template": "scaffold/ops/ci/integration-stack.sh",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-cli-stack-kitps1",
+      "purpose": "laid down by init: ops/cli/stack-kit.ps1",
+      "host_path": "ops/cli/stack-kit.ps1",
+      "template": "scaffold/ops/cli/stack-kit.ps1",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-cli-stack-kitsh",
+      "purpose": "laid down by init: ops/cli/stack-kit.sh",
+      "host_path": "ops/cli/stack-kit.sh",
+      "template": "scaffold/ops/cli/stack-kit.sh",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-compose-readmemd",
+      "purpose": "laid down by init: ops/compose/README.md",
+      "host_path": "ops/compose/README.md",
+      "template": "scaffold/ops/compose/README.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-compose-infra-readmemd",
+      "purpose": "laid down by init: ops/compose/infra/README.md",
+      "host_path": "ops/compose/infra/README.md",
+      "template": "scaffold/ops/compose/infra/README.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-compose-infra-docker-composebaseyml",
+      "purpose": "laid down by init: ops/compose/infra/docker-compose.base.yml",
+      "host_path": "ops/compose/infra/docker-compose.base.yml",
+      "template": "scaffold/ops/compose/infra/docker-compose.base.yml",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-compose-infra-docker-composeprodyml",
+      "purpose": "laid down by init: ops/compose/infra/docker-compose.prod.yml",
+      "host_path": "ops/compose/infra/docker-compose.prod.yml",
+      "template": "scaffold/ops/compose/infra/docker-compose.prod.yml",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-compose-stack-readmemd",
+      "purpose": "laid down by init: ops/compose/stack/README.md",
+      "host_path": "ops/compose/stack/README.md",
+      "template": "scaffold/ops/compose/stack/README.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-envexample",
+      "purpose": "laid down by init: ops/config/.env.example",
+      "host_path": "ops/config/.env.example",
+      "template": "scaffold/ops/config/.env.example",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-gitignore",
+      "purpose": "laid down by init: ops/config/.gitignore",
+      "host_path": "ops/config/.gitignore",
+      "template": "scaffold/ops/config/.gitignore",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-readmemd",
+      "purpose": "laid down by init: ops/config/README.md",
+      "host_path": "ops/config/README.md",
+      "template": "scaffold/ops/config/README.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-backend-envexample",
+      "purpose": "laid down by init: ops/config/backend/.env.example",
+      "host_path": "ops/config/backend/.env.example",
+      "template": "scaffold/ops/config/backend/.env.example",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-frontend-envexample",
+      "purpose": "laid down by init: ops/config/frontend/.env.example",
+      "host_path": "ops/config/frontend/.env.example",
+      "template": "scaffold/ops/config/frontend/.env.example",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-frontend-embedenvexample",
+      "purpose": "laid down by init: ops/config/frontend/embed.env.example",
+      "host_path": "ops/config/frontend/embed.env.example",
+      "template": "scaffold/ops/config/frontend/embed.env.example",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-frontend-nginxenvexample",
+      "purpose": "laid down by init: ops/config/frontend/nginx.env.example",
+      "host_path": "ops/config/frontend/nginx.env.example",
+      "template": "scaffold/ops/config/frontend/nginx.env.example",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-profiles-readmemd",
+      "purpose": "laid down by init: ops/config/profiles/README.md",
+      "host_path": "ops/config/profiles/README.md",
+      "template": "scaffold/ops/config/profiles/README.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-profiles-gcp-credentialsmd",
+      "purpose": "laid down by init: ops/config/profiles/gcp-credentials.md",
+      "host_path": "ops/config/profiles/gcp-credentials.md",
+      "template": "scaffold/ops/config/profiles/gcp-credentials.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-profiles-worker-disabledmd",
+      "purpose": "laid down by init: ops/config/profiles/worker-disabled.md",
+      "host_path": "ops/config/profiles/worker-disabled.md",
+      "template": "scaffold/ops/config/profiles/worker-disabled.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-ssh-gitignore",
+      "purpose": "laid down by init: ops/config/ssh/.gitignore",
+      "host_path": "ops/config/ssh/.gitignore",
+      "template": "scaffold/ops/config/ssh/.gitignore",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-ssh-readmemd",
+      "purpose": "laid down by init: ops/config/ssh/README.md",
+      "host_path": "ops/config/ssh/README.md",
+      "template": "scaffold/ops/config/ssh/README.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-ssh-configexample",
+      "purpose": "laid down by init: ops/config/ssh/config.example",
+      "host_path": "ops/config/ssh/config.example",
+      "template": "scaffold/ops/config/ssh/config.example",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-config-ssh-id-ed25519example",
+      "purpose": "laid down by init: ops/config/ssh/id_ed25519.example",
+      "host_path": "ops/config/ssh/id_ed25519.example",
+      "template": "scaffold/ops/config/ssh/id_ed25519.example",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-ops-deploy-readmemd",
+      "purpose": "laid down by init: ops/deploy/README.md",
+      "host_path": "ops/deploy/README.md",
+      "template": "scaffold/ops/deploy/README.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-tools-readmemd",
+      "purpose": "laid down by init: tools/README.md",
+      "host_path": "tools/README.md",
+      "template": "scaffold/tools/README.md",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-tools-stack-kitcmd",
+      "purpose": "laid down by init: tools/stack-kit.cmd",
+      "host_path": "tools/stack-kit.cmd",
+      "template": "scaffold/tools/stack-kit.cmd",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    },
+    {
+      "id": "init-tools-stack-kitps1",
+      "purpose": "laid down by init: tools/stack-kit.ps1",
+      "host_path": "tools/stack-kit.ps1",
+      "template": "scaffold/tools/stack-kit.ps1",
+      "schema": "",
+      "cardinality": "one",
+      "required_by": [
+        "init"
+      ],
+      "merges_into": "instance"
+    }
+  ]
+}

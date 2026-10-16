@@ -1,0 +1,9 @@
+{
+  "keep": 7,
+  "anchors": [
+    {
+      "query": "<<pending: a query whose answer a good restore still holds>>",
+      "atLeast": 1
+    }
+  ]
+}

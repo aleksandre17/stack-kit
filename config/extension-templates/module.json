@@ -1,0 +1,6 @@
+{
+  "type": "<<pending: a driver id (stack-kit help lists them)>>",
+  "role": "<<pending: api | ui | worker | ...>>",
+  "path": "<<pending: the module's directory, from the root>>",
+  "secretsModule": "<name>"
+}

@@ -23,7 +23,7 @@
 
 ## რას აკეთებს
 
-1. **apply-scaffold** — `tools/`, `ops/config/*.example`, `apps/*`, `ops/compose/`, `stack-kit.json`
+1. **extension points** — every point init requires (`config/extension-points.json`), and each infra service the manifest selects; nothing overwritten
 2. **catalog** — `catalog.full.json` → `ops/compose/catalog.json` (სრული FE+BE+stack; `-MinimalCatalog` — მხოლოდ API)
 3. **seed** — `.example` → `.env.dev`, `.env.prod`, `nginx.env`
 4. **.gitignore** — scaffold წესების დამატება

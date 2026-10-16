@@ -57,7 +57,7 @@ Gradle/npm monorepo → kit.
 
 `stack-kit init` (`toolkit/init/Invoke-ProjectInit.ps1`; first run from bash: `bash kits/stack-kit/toolkit/init/init.sh [<root>]`, since `cli/stack-kit.sh` stops when no manifest exists yet), in order:
 
-1. Scaffold: `tools/`, `ops/cli/`, `ops/ci/`, `ops/config/*.example`, `ops/compose/`, `apps/*` (ops files only), `stack-kit.json` — merged, never over real secrets.
+1. The extension points init requires (`config/extension-points.json`): `tools/`, `ops/cli/`, `ops/ci/`, `ops/config/*.example`, `ops/compose/`, `ops/deploy/`, `stack-kit.json`, and each infra service the manifest selects -- never overwriting.
 2. Catalog: `catalog.full.json` → `ops/compose/catalog.json` (`-MinimalCatalog`: `catalog.minimal.json`, API only).
 3. Seed `ops/config/` per manifest module (`lib/ci_prepare.py`): `.example` → `.env.dev`, `.env.prod`, `nginx.env`.
 4. Merge `.gitignore` rules.
@@ -76,8 +76,7 @@ Gradle/npm monorepo → kit.
 | `-ForceExamples` | overwrite existing scaffold/env files and the catalog from examples |
 
 Without `-ForceExamples`, existing `.env.*` files and SSH keys are never overwritten.
-Tree only, no seed: `powershell -ExecutionPolicy Bypass -File kits\stack-kit\scaffold\apply-scaffold.ps1`
-(bash: `scaffold/apply-scaffold.sh <root>`). Not part of init: application code. More: [toolkit/init/README.md](../toolkit/init/README.md), [scaffold/README.md](../scaffold/README.md).
+Tree only, no seed: `stack-kit extend --init --root <dir>` (every extension point init requires). Not part of init: application code. More: [toolkit/init/README.md](../toolkit/init/README.md).
 
 ## The manifest
 
@@ -180,6 +179,17 @@ bash ops/ci/integration-stack.sh      # when Docker is available
 - [ ] `compose-gen` run; GENERATED files committed
 - [ ] `.\tools\stack-kit.ps1 stack up -d --build` brings UI + API up locally
 - [ ] CI workflow added; `ops/ci/integration-stack.sh` green
+
+## Extending the kit
+
+Every host extension goes through a declared point: `stack-kit extend --list` shows each (what it is
+for, where the host file goes, `unused` | `drafted` | `answered`); `stack-kit extend <point> [<name>]`
+makes it from its template, idempotently, never overwriting; the answers only the host can give are
+`<<pending: ...>>` markers `validate` shows; `stack-kit extend --upgrade` merges a changed template
+3-way into the host's file and reports a conflict instead of writing. Examples: `extend
+infra-service sqlserver`, `extend catalog-environments staging`, `extend target linux`, `extend
+backup-anchors postgres`, `extend driver go-api`, `extend module` (the draft from the tree, as
+`init --plan`). The kit copy is never edited.
 
 ## Moving an existing host
 

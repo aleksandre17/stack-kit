@@ -293,6 +293,37 @@ Exit codes: 0, 1.
 stack-kit config check --env prod
 ```
 
+### `extend`
+
+extend the kit through a declared point: a host file or entry from its template, pending answers shown, template upgrades merged.
+
+```
+stack-kit extend --list
+stack-kit extend <point> [<name>] [--plan]
+stack-kit extend module [--approve <who>]   (draft the modules from the tree)
+stack-kit extend --upgrade [--plan]
+stack-kit extend --init [--root <dir>] [--plan]
+```
+
+| option | |
+|---|---|
+| `--list` | every point: purpose, where the host file goes, status (unused | drafted | answered) |
+| `--plan` | print what would be made or merged; nothing is written |
+| `--upgrade` | merge each changed template 3-way into the host's file; a conflict is reported, never written |
+| `--init` | every point init requires, then each infra service the manifest selects |
+| `--root <dir>` | the host root (init, before a manifest exists) |
+| `--approve <who>` | module: write the draft, recording who approved it |
+
+A point's file is made only on demand, never overwritten; the answers only the host can give are <<pending: ...>> markers that validate shows (an error where the manifest's `extend.profile` requires the point). A file where a point lives that no point declares is reported. The kit copy is never edited.
+
+Exit codes: 0, 1, 2.
+
+```
+stack-kit extend --list
+stack-kit extend infra-service postgres --plan
+stack-kit extend catalog-environments staging
+```
+
 ### `help`
 
 the verbs, or one verb's help, or the generated operator documentation.

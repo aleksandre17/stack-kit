@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "extension points (shared shape of agent-kit and stack-kit)",
+  "description": "Every place a host extends the kit, declared once. A host file or entry is created from its template on demand (`extend <point> [<name>]`), carries <<pending: question>> markers for the answers only the host can give, and is upgraded by a 3-way merge when the template changes. The kit copy is never edited: the served result is the kit's base composed with the host's extensions as `merges_into` says.",
+  "type": "object",
+  "required": [
+    "schema",
+    "points"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "purpose",
+          "host_path",
+          "template",
+          "cardinality",
+          "merges_into"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1
+          },
+          "host_path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Where the host's file goes, from the host root; <name> for a `many` point; `file#/json/pointer` for an entry inside a JSON file (`-` appends to an array); {manifest.field|default} for a path the manifest names"
+          },
+          "template": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The kit file it is made from (scaffold/..., config/extension-templates/...); <name> picks a named template"
+          },
+          "schema": {
+            "type": "string",
+            "description": "What validates the result (a schema file, or a pointer into one)"
+          },
+          "cardinality": {
+            "enum": [
+              "one",
+              "many"
+            ]
+          },
+          "required_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The profiles that require it answered (`init`: created by init)"
+          },
+          "merges_into": {
+            "type": "string",
+            "minLength": 1,
+            "description": "How the kit serves it: instance | overlay | catalog | registry | list"
+          },
+          "companions": {
+            "type": "string",
+            "description": "Points made with this one, under the same name (comma-separated ids), e.g. an infra service's manifest entry"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "$comment": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

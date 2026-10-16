@@ -1,0 +1,7 @@
+{
+  "key": "<name>",
+  "sensitivity": "INTERNAL",
+  "owner": "<<pending: who owns it>>",
+  "allowedSource": "<<pending: where its value may come from>>",
+  "policy": {}
+}

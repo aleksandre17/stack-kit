@@ -1,0 +1,10 @@
+{
+  "id": "<name>",
+  "engine": [
+    "<<pending: the engine's command>>"
+  ],
+  "compose": [
+    "<<pending: the compose command>>"
+  ],
+  "stack": true
+}

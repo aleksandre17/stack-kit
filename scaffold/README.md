@@ -14,8 +14,8 @@
 
 ## ხელით (მხოლოდ ხე)
 
-```powershell
-powershell -ExecutionPolicy Bypass -File kits\stack-kit\scaffold\apply-scaffold.ps1
+```
+stack-kit extend --init --root <host>
 ```
 
 ## სრული ხე (v2 layout)
@@ -45,3 +45,5 @@ your-app/
 3. [docs/ADOPT.md](../docs/ADOPT.md)
 
 `ops/compose/catalog.full.json` — სრული stack; `catalog.minimal.json` — მხოლოდ API (`init -MinimalCatalog`).
+
+This directory is the template store of the extension points (`config/extension-points.json`): init lays down the points it requires, everything else is made on demand (`stack-kit extend <point> [<name>]`).

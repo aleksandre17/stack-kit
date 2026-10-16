@@ -1,0 +1,7 @@
+{
+  "from": "<<pending: the repository file the application reads at run time>>",
+  "to": "<<pending: its name inside the unit's runtime/>>",
+  "environments": [
+    "<<pending: the environments it is for>>"
+  ]
+}

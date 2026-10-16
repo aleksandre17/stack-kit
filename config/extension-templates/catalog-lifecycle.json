@@ -1,0 +1,5 @@
+{
+  "id": "<name>",
+  "after": "<<pending: the step it follows>>",
+  "optional": true
+}

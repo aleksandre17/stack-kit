@@ -1,4 +1,4 @@
-# Merge into repo root .gitignore after apply-scaffold
+# The extension point init-gitignore: merged into the repo root .gitignore by init
 
 # Secrets (real values)
 secrets/*

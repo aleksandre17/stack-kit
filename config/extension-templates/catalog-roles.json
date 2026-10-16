@@ -1,0 +1,5 @@
+{
+  "id": "<name>",
+  "tier": "<<pending: the tier its units live in>>",
+  "deployOrder": 9
+}

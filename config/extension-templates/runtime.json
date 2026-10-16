@@ -1,0 +1,10 @@
+{
+  "match": [
+    "<<pending: the script files it runs, as globs>>"
+  ],
+  "argv": [
+    "<<pending: the interpreter>>",
+    "{script}",
+    "{operands}"
+  ]
+}

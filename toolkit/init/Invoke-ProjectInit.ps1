@@ -155,30 +155,22 @@ Write-Host ""
 Write-Host "  stack-kit init → $ProjectRoot" -ForegroundColor White
 Write-Host "  package: $PackageRoot" -ForegroundColor DarkGray
 
-# ── 1. Scaffold tree ─────────────────────────────────────────────
-Write-Step "Scaffold (apps/, ops/, tools shim, manifest)"
-$applyArgs = @{ TargetRoot = $ProjectRoot }
-if ($ForceExamples) { $applyArgs["ForceExamples"] = $true }
-& (Join-Path $ScaffoldRoot "apply-scaffold.ps1") @applyArgs
-
-# ── 2. Catalog (full stack by default) ───────────────────────────
-Write-Step "Compose catalog"
-$catDst = Join-Path $ProjectRoot "ops\compose\catalog.json"
-$catFull = Join-Path $ScaffoldRoot "ops\compose\catalog.full.json"
-$catMin = Join-Path $ScaffoldRoot "ops\compose\catalog.minimal.json"
+# ── 1. The points init lays down (config/extension-points.json, required_by init) ──
+# The scaffold is the template store of the extension points; init is `extend` of every point
+# init requires, then of each infra service the manifest selects. Nothing is overwritten.
+Write-Step "Extension points required by init (scaffold, manifest, launchers, infra services)"
 if ($MinimalCatalog) {
+    $catDst = Join-Path $ProjectRoot "ops\compose\catalog.json"
     if (-not (Test-Path $catDst)) {
-        Copy-Item $catMin $catDst -Force
+        New-Item -ItemType Directory -Path (Split-Path $catDst -Parent) -Force | Out-Null
+        Copy-Item (Join-Path $ScaffoldRoot "ops\compose\catalog.minimal.json") $catDst -Force
         Write-Host "  [OK]   ops/compose/catalog.json (minimal)" -ForegroundColor Green
     }
-} elseif (Test-Path $catFull) {
-    if ($ForceExamples -or -not (Test-Path $catDst)) {
-        Copy-Item $catFull $catDst -Force
-        Write-Host "  [OK]   ops/compose/catalog.json (full reference stack)" -ForegroundColor Green
-    } else {
-        Write-Host "  [skip] ops/compose/catalog.json (exists; use -ForceExamples to replace)" -ForegroundColor DarkGray
-    }
 }
+$pyInit = Get-StackKitPythonArgs
+if (-not $pyInit) { Write-Host "  [ERROR] Python 3 is required" -ForegroundColor Red; exit 9009 }
+Invoke-StackKitPythonExe $pyInit "-B" (Join-Path $PackageRoot "cli\stack_kit.py") "extend" "--init" "--root" $ProjectRoot
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # The manifest now exists: the kit's manifest readers answer for this project from here on.
 $env:STACK_KIT_PROJECT_ROOT = $ProjectRoot

@@ -258,6 +258,12 @@ def validate_manifest(
 
     errs.extend(f"deploy: {p}" for p in deploy_targets.problems(ctx.root, ctx.manifest))
     warnings.extend(f"deploy: {n}" for n in deploy_targets.notices(ctx.root, ctx.manifest))
+    # Every host extension through a declared point (amendment 15): pending answers and undeclared files.
+    from lib import extend
+
+    ext_errors, ext_notices = extend.problems(ctx.root, ctx.manifest)
+    errs.extend(ext_errors)
+    warnings.extend(ext_notices)
     # A value has one home (amendment 13): a former one present is refused, naming `migrate`.
     from lib import legacy
 

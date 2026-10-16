@@ -1,0 +1,2 @@
+# The keys module <name> reads, one KEY=value per line (a SECRET's value: __FROM_SECRET_STORE__).
+# <<pending: the keys module <name> reads>>

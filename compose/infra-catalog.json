@@ -98,6 +98,9 @@
           "env": "OTLP_HTTP_PORT",
           "default": "4318"
         }
+      ],
+      "files": [
+        "otel/collector.yaml"
       ]
     },
     "prometheus": {
@@ -108,6 +111,9 @@
           "env": "PROMETHEUS_PORT",
           "default": "9090"
         }
+      ],
+      "files": [
+        "prometheus/prometheus.yml"
       ]
     },
     "grafana": {
@@ -118,6 +124,9 @@
           "env": "GRAFANA_PORT",
           "default": "3000"
         }
+      ],
+      "files": [
+        "grafana/provisioning/datasources/datasources.yml"
       ]
     },
     "tempo": {
@@ -128,6 +137,9 @@
           "env": "TEMPO_PORT",
           "default": "3200"
         }
+      ],
+      "files": [
+        "tempo/tempo.yaml"
       ]
     },
     "keycloak": {

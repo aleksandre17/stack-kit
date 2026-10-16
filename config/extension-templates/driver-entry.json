@@ -1,0 +1,25 @@
+{
+  "label": "<<pending: the toolchain, in a few words>>",
+  "roles": [
+    "<<pending: the role it serves>>"
+  ],
+  "commands": {},
+  "package": {
+    "command": "<<pending: the command that builds it>>",
+    "artifacts": [
+      "<<pending: what it leaves>>"
+    ]
+  },
+  "container": {
+    "template": "container/Dockerfile",
+    "port": 8080
+  },
+  "delivery": {
+    "release": {
+      "via": "release"
+    },
+    "remote-dev": {
+      "via": "dev"
+    }
+  }
+}

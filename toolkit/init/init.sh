@@ -27,7 +27,8 @@ export STACK_KIT_KIT_ROOT="$PKG"
 
 echo ""
 echo "  stack-kit init (bash) → $ROOT"
-bash "$SCAFFOLD/apply-scaffold.sh" "$ROOT"
+PY="$(command -v python3 || command -v python)"
+"$PY" -B "$PKG/cli/stack_kit.py" extend --init --root "$ROOT"
 
 copy_seed() {
   local ex="$1" tg="$2"
