@@ -445,7 +445,7 @@
         "tests/unit/test_projections.py::test_validate_reports_a_projection_its_sources_no_longer_render"
       ],
       "status": "partial",
-      "why": "the release id and the packaged artifact's name are symbolic in the projection; a static service's server config is not projected"
+      "why": "the release id and the packaged artifact's name are symbolic in the projection"
     },
     {
       "standard": "harvested (round 8)",

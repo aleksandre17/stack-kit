@@ -938,7 +938,7 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
 - Windows/IIS delivery (`iis` pending): a host that publishes to IIS by hand keeps its own publish.
 - No separate live-parity CI job.
 - The image scanner's digest, and the OSV-Scanner image's, are the host's to pin; no scanner runs in the suite.
-- A static service's server config is not projected by `render`; the release id and artifact name are symbolic in projections.
+- The release id and artifact name are symbolic in projections.
 - The kit's schemas are draft-07, not JSON Schema 2020-12; commit messages are not machine-checked.
 
 ## Amendment 17 — what a project consumes from a platform it does not own (2026-10-16, owner-delegated)
@@ -1005,3 +1005,5 @@ names neither product: what is consumed is a declaration, and the platform's own
 preflight (present, missing, planned), nuke and regenerate, the projection and its drift with the
 recorded transport (`tests/unit/test_consumes.py`). The platform's own application of the routes
 document is the platform's.
+
+**Amendment 17.1 (2026-10-16):** `render` also projects each static service's web server config (`projections.serverConfig`, default `ops/containers/{module}/server.conf`); a release refuses one that differs from what it ships. A static service runs a pinned server image with the release's files mounted read-only, so it has no Dockerfile of its own -- its config is the part a reviewer needs to see. Rejected: building an image per UI release (an image build on the host for files a pinned server already serves).

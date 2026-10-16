@@ -29,11 +29,12 @@
     },
     "projections": {
       "type": "object",
-      "description": "Where `render` writes the generated projections (lib/projections.py): `containers` ({module}, {service}), `stack` and `routes` ({environment})",
+      "description": "Where `render` writes the generated projections (lib/projections.py): `containers` and `serverConfig` ({module}, {service}), `stack` and `routes` ({environment})",
       "properties": {
         "containers": { "type": "string", "minLength": 1 },
         "stack": { "type": "string", "minLength": 1 },
-        "routes": { "type": "string", "minLength": 1 }
+        "routes": { "type": "string", "minLength": 1 },
+        "serverConfig": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
