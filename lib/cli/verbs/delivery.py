@@ -346,7 +346,13 @@ VERBS = [
     Verb("release", "a unit's releases, and moving `current` back", ["release list [module ...] --env <id>",
                                                                     "release rollback [module ...] [--to <id>] --env <id>"],
          _release, options=[*TARGET_OPTS, Option("--to", "the release to roll back to (default: the one before current)", "id")],
-         group="delivery", exits=(0, 1, 2, 3, 6), examples=["release list --env prod", "release rollback api --env prod --yes"]),
+         group="delivery", exits=(0, 1, 2, 3, 5, 6), examples=["release list --env prod", "release rollback api --env prod --yes"],
+         details="`list` marks `current` with `*` and, with `!` and why, a release that cannot run as its service is "
+                 "declared now. `rollback` is a transaction: such a release is refused (exit 5) with nothing changed and "
+                 "the remedy (deploy that commit); otherwise the stack is brought up on the release -- its image built "
+                 "when missing -- and `current` moves only once each service is healthy on that release's image. Any "
+                 "failure brings the previous release back up, `current` never having left it, and exits 6 naming the "
+                 "failure and the build log."),
     Verb("ops", "operate a deployed environment, per service, module or tier (or all)",
          ["ops status|logs|start|stop|restart|rebuild [module|service|tier ...] --env <id>",
           "ops restart-check [module|service|tier ...] --env <id>   (restart is idempotent: healthy, same image, no drift)",

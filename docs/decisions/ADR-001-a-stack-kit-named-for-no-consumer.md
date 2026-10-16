@@ -1064,3 +1064,49 @@ UI module's own `Dockerfile` with `development` / `production` targets regenerat
 *Unproven:* no real image was built or run by the suite: the recipe, the release on the recorded
 transport (shipped, built, current, rolled back), the local stack's compose and its staged tree
 are proven by `tests/unit/test_ui_release.py`.
+
+## Amendment 19 — a rollback is a transaction, and honest (2026-10-16, owner-delegated)
+
+**Context.** `release rollback` moved `current` first, then regenerated the stack, built and started
+it, and judged health -- reporting a health failure as exit 6 but leaving `current` on the release
+that failed. On a real host, rolling a UI service back to a release made before 2.4.0 (amendment
+18: UI releases were then mounted static files with no recipe) (a) moved `current` and reported
+success while the container kept running the new image, and (b) on a second try failed to build
+(the old release carries no `Dockerfile`) after `current` had already moved. A release can be
+older than the declaration of its service; nothing judged that before acting.
+
+**Decision.**
+
+1. **Judged before anything moves.** For each service the target release is checked against the
+   service as declared now (`release.unrunnable`): a `build` service needs its release to carry its
+   recipe (`Dockerfile`). A release that cannot run is refused, exit 5, with nothing written, linked
+   or run, naming the release, why, and the remedy -- check out that commit and `deploy` it, which
+   packages it with today's recipe (a release is the bytes of a commit; it is never patched in
+   place). `release list` marks such a release `!` with the reason.
+2. **`current` moves last.** The stack is regenerated with the target release as an override of the
+   service's state (`running.regenerate(override)`), its image built when the engine lacks it,
+   scanned, up; `current` moves only when each service is healthy *and* its container runs that
+   release's image (`{{.Config.Image}}` -- a healthy container on another image is not a rollback).
+3. **Any failure puts the previous release back.** A failed build, scan, `up`, health or image check
+   regenerates the stack from `current` (which never left the previous release), brings it back up
+   and waits for it, and the verb exits 6 (a scan refusal keeps 5) naming the failure, what `current`
+   stays, whether the previous release is healthy again, and the build log. A service that ran
+   nothing before has the attempt's container removed.
+4. **Each service its own release.** Services rolled back to different releases are each built and
+   scanned from their own (the shared path built them all from the first one's).
+
+*Rejected:* moving `current` and moving it back on failure (a window in which `current` names a
+release nothing runs, and a crash inside it leaves the lie on disk -- the very failure found);
+rebuilding an old release with today's recipe on the target (a release would no longer be the bytes
+of its commit, which amendment 11 holds; `deploy` of that commit does it honestly, through package,
+projections and provenance); judging only by a release marker such as the kit version that shipped
+it (the release's own contents are the fact, and need no new field); trusting health alone (the
+host's case (a) was healthy on the wrong image).
+
+*What a host does:* nothing. A release it cannot roll back to is now named by `release list`; to
+run that commit again it deploys it.
+
+*Unproven:* on a real engine. On the recorded transport `tests/unit/test_delivery_engine.py`
+proves: an incompatible release refused with no change; a failed build, an unhealthy release and a
+container left on the new image each restore the previous `current` and its container and exit
+non-zero naming the build log; a good rollback links `current` only after the last `up`.

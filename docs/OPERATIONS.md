@@ -13,7 +13,7 @@ exact remote paths and commands -- before it acts; `--plan` stops there and writ
 | 2 | not run: a usage error, or nothing selectable (no target, a pending one, a non-workspace environment) |
 | 3 | refused: ownership -- the directory carries another project's marker, or none |
 | 4 | refused by the preflight: runtime, ports or disk |
-| 5 | refused: provenance -- a dirty checkout or an archive without release.json where a clean commit is required |
+| 5 | refused: provenance -- a dirty checkout or an archive without release.json where a clean commit is required, or a release that cannot run as its service is declared now |
 | 6 | unhealthy: a service did not become healthy (a release in a rolling-back environment was rolled back) |
 | 130 | interrupted |
 
@@ -186,7 +186,9 @@ stack-kit release rollback [module ...] [--to <id>] --env <id>
 | `--target <name>` | the declared deploy target (default: the environment's) |
 | `--env <id>` | the environment (catalogs.environments; --dev / --prod are short for it) |
 
-Exit codes: 0, 1, 2, 3, 6.
+`list` marks `current` with `*` and, with `!` and why, a release that cannot run as its service is declared now. `rollback` is a transaction: such a release is refused (exit 5) with nothing changed and the remedy (deploy that commit); otherwise the stack is brought up on the release -- its image built when missing -- and `current` moves only once each service is healthy on that release's image. Any failure brings the previous release back up, `current` never having left it, and exits 6 naming the failure and the build log.
+
+Exit codes: 0, 1, 2, 3, 5, 6.
 
 ```
 stack-kit release list --env prod

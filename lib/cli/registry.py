@@ -17,7 +17,8 @@ EXIT_CODES = {
     2: "not run: a usage error, or nothing selectable (no target, a pending one, a non-workspace environment)",
     3: "refused: ownership -- the directory carries another project's marker, or none",
     4: "refused by the preflight: runtime, ports or disk",
-    5: "refused: provenance -- a dirty checkout or an archive without release.json where a clean commit is required",
+    5: "refused: provenance -- a dirty checkout or an archive without release.json where a clean commit is required, "
+       "or a release that cannot run as its service is declared now",
     6: "unhealthy: a service did not become healthy (a release in a rolling-back environment was rolled back)",
     130: "interrupted",
 }

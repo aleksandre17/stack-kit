@@ -1,5 +1,29 @@
 # Changelog — stack-kit
 
+## 2.4.1 — 2026-10-16
+
+`release rollback` is a transaction, and never reports a success it is not (ADR-001 amendment 19).
+Found on a host rolling a UI service back to a release made before 2.4.0 (mounted static files, no
+recipe): `current` moved and the verb succeeded while the container kept the new image; a second try
+failed to build but had already moved `current`.
+
+### Fixed
+
+- `release rollback` judges the target release first: one that cannot run as its service is
+  declared now (a `build` service whose release carries no `Dockerfile`) is refused, exit 5, with
+  nothing changed, naming the release, why, and the remedy (check out that commit and `deploy` it).
+- `current` moves only after the stack runs the release: built when the engine lacks its image, up,
+  each service healthy and its container on that release's image. On any failure the previous
+  release is brought back up (`current` never left it) and the verb exits 6 naming the failure and
+  the build log.
+- A rollback of several services to different releases builds and scans each one's own release (it
+  built every service from the first one's).
+
+### Changed
+
+- `release list` marks a release that cannot be rolled back to with `!` and why.
+- Exit 5 also names a release that cannot run as its service is declared now; `release` lists it.
+
 ## 2.4.0 — 2026-10-16
 
 Every deployable module, UI modules included, runs an image built from its driver's recipe, so one

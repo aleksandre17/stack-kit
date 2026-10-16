@@ -7,9 +7,13 @@
               health; on a failed health in an environment that rolls back, `current` returns to the
               previous release -> prune to `keep` (never `current`). Every step is skipped when it
               would change nothing: a second release of the same id writes nothing.
-    rollback  `current` to a named release, or the newest one before it; then the same stack and
-              health flow
-    list      each unit's releases, newest first, `current` marked
+    rollback  a transaction (ADR-001 am. 19): the target release -- a named one, or the newest one
+              before `current` -- is judged against the service as declared now and refused, nothing
+              changed, when it cannot run; the stack is then brought up on it (built when needed),
+              healthy and on its image, and only then does `current` move; on any failure the
+              previous release is brought back up, `current` never having left it, and the verb fails
+    list      each unit's releases, newest first, `current` marked, one that cannot be rolled back
+              to marked with why
 """
 from __future__ import annotations
 
@@ -70,15 +74,22 @@ def prune(ctx: Delivery, service: Service) -> list[str]:
     return removed
 
 
-def _start(ctx: Delivery, svc: list[Service], release: str, revision: str) -> list[str]:
-    """Stack, images, up, health -- the failures."""
-    running.regenerate(ctx)  # the revision label is the release id: what verify can derive again
+def _start(ctx: Delivery, svc: list[Service], release: str, revision: str,
+           override: dict[str, stack.State] | None = None) -> list[str]:
+    """Stack, images, up, health -- the failures. `override`: the release each service runs instead of
+    its `current` (a rollback brings the stack up on a release before `current` moves to it)."""
+    running.regenerate(ctx, override)  # the revision label is the release id: what verify can derive again
     if not ctx.commands["compose"]:
         return []
-    running.build_missing(ctx, svc, release)
     from lib.delivery import scan
 
-    scan.scan(ctx, svc, release)
+    each: dict[str, list[Service]] = {}
+    for s in svc:
+        held = (override or {}).get(s.id)
+        each.setdefault((held.release if held else None) or release, []).append(s)
+    for rid, group in each.items():
+        running.build_missing(ctx, group, rid)
+        scan.scan(ctx, group, rid)
     migrate(ctx, svc)
     running.up(ctx, [s.id for s in svc])
     return [] if ctx.plan else running.wait_healthy(ctx, svc)
@@ -236,36 +247,116 @@ def images_floating(ctx: Delivery, svc: list[Service], trees: dict[str, dict[str
     return [why for why in (image_tag(i, require_digest=digest) for i in images if i) if why]
 
 
+#: What to do instead of rolling back to a release that cannot run as its service is declared now.
+REMEDY = "check out commit {rid} and run `{kit} deploy {module} --env {env}` (it packages that commit with today's recipe)"
+
+
+def unrunnable(ctx: Delivery, service: Service, rid: str) -> str:
+    """Why release `rid` cannot run as `service` is declared now ("" when it can): a `build` service
+    runs an image built from its release's own recipe, so a release without one -- made before the
+    service was built from a recipe (a UI release before 2.4.0) -- has nothing to build from."""
+    if service.kind == "build":
+        recipe = posixpath.join(ctx.places.of("releases", service), rid, "Dockerfile")
+        if not ctx.transport.exists(recipe):
+            return (f"it carries no Dockerfile, and {service.id} is now built from its release's recipe "
+                    f"(the release was made before that)")
+    return ""
+
+
+def _off_image(ctx: Delivery, svc: list[Service], choice: dict[str, str]) -> list[str]:
+    """Each service whose container does not run the image of the release it was brought up on."""
+    from lib import naming
+
+    out = []
+    for s in svc:
+        want = naming.remote_image(ctx.project, ctx.environment, s.id, choice[s.id]) if s.kind == "build" \
+            else str(s.spec.get("image") or "")
+        name = naming.remote_container(ctx.project, ctx.environment, s.id)
+        have = ctx.transport.exec(ctx.engine("inspect", "-f", "{{.Config.Image}}", name), readonly=True).out.strip()
+        if want and have != want:
+            out.append(f"{s.id}: runs {have or 'nothing'}, not {want}")
+    return out
+
+
+def _restore(ctx: Delivery, svc: list[Service], before: dict[str, str | None]) -> list[str]:
+    """The stack back on each service's `current` (which never moved), up; the failures."""
+    from lib import naming
+
+    running.regenerate(ctx)
+    for s in svc:
+        if not before[s.id]:  # it ran nothing before: what the attempt started goes
+            ctx.run(ctx.engine("rm", "-f", naming.remote_container(ctx.project, ctx.environment, s.id)), check=False)
+    back = [s for s in svc if before[s.id]]
+    if not back or not ctx.commands["compose"]:
+        return []
+    r = ctx.run(ctx.compose("up", "-d", *(s.id for s in back)), check=False)
+    if r.code != 0:
+        return [f"up of {', '.join(s.id for s in back)}: exit {r.code}"]
+    return [] if ctx.plan else running.wait_healthy(ctx, back)
+
+
 def rollback(ctx: Delivery, wanted: list[str], to: str = "") -> int:
+    """A transaction: judged before anything moves, `current` moved only once the stack runs the
+    release healthy and on its image, and the previous release back up on any failure -- never a
+    success it is not."""
     svc = [s for s in running.find(ctx, wanted) if s.module is not None]
-    preflight.claim(ctx)
-    moved = {}
+    choice: dict[str, str] = {}
+    before: dict[str, str | None] = {}
     for s in svc:
         have = releases_of(ctx, s)
         cur = running.current_release(ctx, s)
         if to:
             if to not in have:
                 raise DeliveryError(f"{s.id}: no release {to} (releases: {', '.join(have) or 'none'})")
-            choice = to
+            pick = to
         else:
             older = have[have.index(cur) + 1:] if cur in have else have
             if not older:
                 raise DeliveryError(f"{s.id}: no release before {cur or 'none'} to roll back to")
-            choice = older[0]
-        if point(ctx, s, choice):
-            moved[s.id] = (cur, choice)
-            ctx.out(f"[rollback] {s.id}: current {cur or 'none'} -> {choice}")
-    if not moved:
+            pick = older[0]
+        if pick != cur:
+            choice[s.id], before[s.id] = pick, cur
+    moving = [s for s in svc if s.id in choice]
+    refused = [f"{s.id}: release {choice[s.id]} cannot be rolled back to: {why}; instead, "
+               + REMEDY.format(rid=choice[s.id], kit=identity.KIT_NAME, module=s.module, env=ctx.environment)
+               for s in moving for why in [unrunnable(ctx, s, choice[s.id])] if why]
+    if refused:
+        raise DeliveryError("refused, nothing changed:\n  " + "\n  ".join(refused), 5)
+    if not moving:
         ctx.out("[rollback] nothing to move")
         return 0
-    failed = _start(ctx, [s for s in svc if s.id in moved], next(iter(moved.values()))[1], "")
+    preflight.claim(ctx)
+    for s in moving:
+        ctx.out(f"[rollback] {s.id}: bringing up {choice[s.id]} (current stays {before[s.id] or 'none'} until it is healthy)")
+    now = running.states(ctx)
+    override = {s.id: stack.State(release=choice[s.id], workspace=now[s.id].workspace) for s in moving}
+    logs = ", ".join(ctx.places.of("logs", s) + "/build.log" for s in moving if s.kind == "build") or "none"
+    try:
+        failed = _start(ctx, moving, next(iter(choice.values())), "", override)
+        if not failed and not ctx.plan and ctx.commands["compose"]:
+            failed = _off_image(ctx, moving, choice)
+    except DeliveryError as e:
+        failed, code = [str(e)], (e.code if e.code == 5 else 6)  # a scan refusal stays a refusal
+    else:
+        code = 6
     if failed:
-        ctx.out(f"[rollback] health FAILED: {'; '.join(failed)}")
-        return 6
+        ctx.out(f"[rollback] FAILED: {'; '.join(failed)}")
+        again = _restore(ctx, moving, before)
+        after = f"the previous release is not healthy either ({'; '.join(again)})" if again \
+            else "the previous release is back up"
+        raise DeliveryError(f"rollback to {', '.join(f'{k}={v}' for k, v in choice.items())} failed: "
+                            f"{'; '.join(failed)}; current stays "
+                            f"{', '.join(f'{k}={v or 'none'}' for k, v in before.items())} and {after}; "
+                            f"build log: {logs}", code)
+    for s in moving:
+        point(ctx, s, choice[s.id])
+        ctx.out(f"[rollback] {s.id}: current {before[s.id] or 'none'} -> {choice[s.id]}")
+    running.regenerate(ctx)  # the same document: `current` now says what the override ran
     return 0
 
 
 def listing(ctx: Delivery, wanted: list[str]) -> list[str]:
+    """Newest first: `*` current, `!` a release that cannot be rolled back to, with why."""
     lines = []
     for s in running.find(ctx, wanted):
         if s.module is None:
@@ -273,7 +364,11 @@ def listing(ctx: Delivery, wanted: list[str]) -> list[str]:
         cur = running.current_release(ctx, s)
         rel = releases_of(ctx, s)
         lines.append(f"{s.id} ({s.tier}) {ctx.places.of('releases', s)}")
-        lines += [f"  {'*' if r == cur else ' '} {r}" for r in rel] or ["    (no release)"]
+        for r in rel:
+            why = "" if r == cur else unrunnable(ctx, s, r)
+            lines.append(f"  {'*' if r == cur else '!' if why else ' '} {r}" + (f"  (cannot roll back: {why})" if why else ""))
+        if not rel:
+            lines.append("    (no release)")
     return lines
 
 

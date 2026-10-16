@@ -465,3 +465,120 @@ def test_the_safe_prune_touches_only_cache_and_dangling_images_and_schedules_onc
     assert "grep -vF '# stack-kit:safe-prune'" in cron and "| crontab -" in cron, "replaced, never duplicated"
     with pytest.raises(DeliveryError, match="not a cron schedule"):
         manage.schedule_prune(ctx, "every sunday")
+
+
+# ── rollback is a transaction (ADR-001 amendment 19) ─────────────────────────
+
+UNIT = f"{ROOT}/shop/staging/edge/edge"
+
+
+def _two_releases(project, tmp_path):
+    """Two releases of edge, the second current; their ids, oldest first, and the engine's state file."""
+    t = server(tmp_path)
+    ctx = ctx_for(project, t)
+    first = packaged(project)
+    assert release.release(ctx, "edge", first) == 0
+    commit(project, "v2\n")
+    second = packaged(project)
+    assert release.release(ctx, "edge", second) == 0
+    ids = [a.name[len("edge-"):-len(".tgz")] for a in (first, second)]
+    return t, ctx, ids, fake_server.state_file(tmp_path / "server.json")
+
+
+def _engine(path, **change):
+    st = json.loads(path.read_text(encoding="utf-8"))
+    for k, v in change.items():
+        st[k] = v(st[k]) if callable(v) else v
+    path.write_text(json.dumps(st), encoding="utf-8")
+
+
+def _answering(t, rule):
+    """The fake engine, with `rule(argv)` answering first where it returns a Result."""
+    base = t.responses
+
+    def answer(argv, cwd, env):
+        r = rule(list(argv))
+        return r if r is not None else base(argv, cwd, env)
+    t.responses = answer
+
+
+def _restored(t, ctx, engine, current):
+    edge = running.find(ctx, ["edge"])[0]
+    assert running.current_release(ctx, edge) == current
+    assert json.loads(t.read(f"{ROOT}/shop/staging/stack/compose.yml"))["services"]["edge"]["image"] == f"shop-staging-edge:{current}"
+    assert json.loads(engine.read_text(encoding="utf-8"))["containers"]["shop-staging-edge"]["image"] == f"shop-staging-edge:{current}"
+
+
+def test_a_release_that_cannot_run_as_declared_now_is_refused_with_nothing_changed(project, tmp_path):
+    t, ctx, (old, new), _ = _two_releases(project, tmp_path)
+    t.remove(f"{UNIT}/releases/{old}/Dockerfile")  # a release made before its service had a recipe
+    t.log.clear()
+    with pytest.raises(DeliveryError) as e:
+        release.rollback(ctx, ["edge"])
+    assert e.value.code == 5
+    msg = str(e.value)
+    assert "nothing changed" in msg and old in msg and "no Dockerfile" in msg
+    assert f"check out commit {old}" in msg and "deploy edge --env staging" in msg
+    assert t.changes() == [] and not [x for x in t.log if x[0] == "exec" and ("build" in x[1] or "up" in x[1])]
+    assert running.current_release(ctx, running.find(ctx, ["edge"])[0]) == new
+    lines = release.listing(ctx, ["edge"])
+    assert f"  * {new}" in lines
+    assert [ln for ln in lines if ln.startswith(f"  ! {old}  (cannot roll back: it carries no Dockerfile")]
+
+
+def test_a_failed_build_restores_the_previous_release_and_fails_naming_the_build_log(project, tmp_path):
+    t, ctx, (old, new), engine = _two_releases(project, tmp_path)
+    _engine(engine, images=lambda xs: [x for x in xs if not x.endswith(f":{old}")])  # the old image is gone
+    _answering(t, lambda argv: Result(1, "", "failed to solve") if "build" in argv else None)
+    with pytest.raises(DeliveryError) as e:
+        release.rollback(ctx, ["edge"])
+    assert e.value.code == 6
+    msg = str(e.value)
+    assert "build of edge failed" in msg and f"{UNIT}/logs/build.log" in msg and f"current stays edge={new}" in msg
+    assert "the previous release is back up" in msg
+    assert "failed to solve" in t.read(f"{UNIT}/logs/build.log").decode()
+    _restored(t, ctx, engine, new)
+
+
+def test_an_unhealthy_rollback_restores_the_previous_release_and_fails(project, tmp_path):
+    t, ctx, (old, new), engine = _two_releases(project, tmp_path)
+
+    def sick_on_old(argv):
+        if argv[1:2] == ["inspect"] and "{{.Config.Image}}" not in argv:
+            c = json.loads(engine.read_text(encoding="utf-8"))["containers"].get(argv[-1]) or {}
+            if str(c.get("image", "")).endswith(f":{old}"):
+                return Result(0, "running unhealthy\n")
+        return None
+    _answering(t, sick_on_old)
+    with pytest.raises(DeliveryError) as e:
+        release.rollback(ctx, ["edge"])
+    assert e.value.code == 6 and "edge: unhealthy" in str(e.value) and "back up" in str(e.value)
+    _restored(t, ctx, engine, new)
+
+
+def test_a_container_left_on_the_new_image_is_no_successful_rollback(project, tmp_path):
+    """What a real host did: the stack said the old release, the container kept the new image."""
+    t, ctx, (old, new), engine = _two_releases(project, tmp_path)
+    ups = []
+
+    def stale_up(argv):
+        if "up" in argv and not ups:
+            ups.append(argv)
+            return Result(0)  # `up` answered, nothing recreated
+        return None
+    _answering(t, stale_up)
+    with pytest.raises(DeliveryError) as e:
+        release.rollback(ctx, ["edge"])
+    assert e.value.code == 6 and f"runs shop-staging-edge:{new}, not shop-staging-edge:{old}" in str(e.value)
+    _restored(t, ctx, engine, new)
+
+
+def test_a_good_rollback_moves_current_only_after_the_stack_runs_it_healthy(project, tmp_path):
+    t, ctx, (old, new), engine = _two_releases(project, tmp_path)
+    t.log.clear()
+    assert release.rollback(ctx, ["edge"]) == 0
+    _restored(t, ctx, engine, old)
+    ups = [i for i, e in enumerate(t.log) if e[0] == "exec" and "up" in e[1]]
+    links = [i for i, e in enumerate(t.log) if e[0] == "link"]
+    assert ups and links and max(ups) < min(links), t.log
+    assert f"  * {old}" in release.listing(ctx, ["edge"]) and f"    {new}" in release.listing(ctx, ["edge"])

@@ -33,6 +33,25 @@ template in it:
       infra/  backups/
 ```
 
+## Rolling back
+
+`release rollback` moves `current` back to a named release (`--to`) or the one before it, as a
+transaction (ADR-001 amendment 19):
+
+1. **Judged first.** A release that cannot run as its service is declared now is refused, with
+   nothing changed: a `build` service runs an image built from its release's own `Dockerfile`, so a
+   release without one (a UI release made before 2.4.0, when UI files were mounted into a stock
+   nginx) has nothing to build. The refusal names the release, why, and the remedy: check out that
+   commit and `deploy` it, which packages it with today's recipe. `release list` marks such a
+   release `!`, with the reason.
+2. **`current` moves last.** The stack is brought up on the release -- its image built when the
+   engine lacks it -- while `current` still names the running one; only when each service is healthy
+   and its container runs that release's image does `current` move.
+3. **A failure puts the previous release back.** A failed build, a failed `up`, an unhealthy service
+   or a container left on another image brings the previous release back up (`current` never left
+   it), and the verb exits 6 naming the failure and the build log
+   (`{tier}/{service}/logs/build.log`) -- never a success.
+
 ## Isolation
 
 - Only the resolver renders a remote path, and each path is checked to lie under

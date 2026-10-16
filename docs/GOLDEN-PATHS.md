@@ -74,7 +74,7 @@ stack-kit targets --init --env prod        # once: the tree and the ownership ma
 stack-kit deploy api --env prod --plan     # what it will do
 stack-kit deploy all --env prod            # package (once per commit) -> ship -> up -> health
 stack-kit release list --env prod
-stack-kit release rollback api --env prod  # current back to the release before it
+stack-kit release rollback api --env prod  # current back to the release before it, once that one runs healthy
 stack-kit targets --verify --env prod      # read-only: the declared state against the host
 ```
 
