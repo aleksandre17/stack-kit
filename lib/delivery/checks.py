@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import re
 
-TEXT = (".js", ".mjs", ".cjs", ".html", ".css", ".json", ".map", ".txt", ".webmanifest")
+# What the browser executes or the app reads -- never prose shipped beside it (a licence text names
+# its upstream sites over http by quotation, not as an address the app calls).
+TEXT = (".js", ".mjs", ".cjs", ".html", ".css", ".json", ".webmanifest")
 #: URLs that are names, not addresses: XML namespaces and the like.
 NAMESPACES = re.compile(r"http://(?:www\.w3\.org|ns\.adobe\.com|purl\.org|schemas\.\w+\.\w+|xmlns\.com)/")
 HTTP = re.compile(r"http://[A-Za-z0-9.\-\[\]:]+")
