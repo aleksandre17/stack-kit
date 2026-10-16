@@ -9,9 +9,9 @@ never_overwrite() {
   local f="$TARGET/$rel"
   [[ -f "$f" ]] || return 1
   case "$rel" in
-    ops/config/deploy.env|stack-kit.json) return 0 ;;
-    ops/config/frontend/.env.dev|ops/config/frontend/.env.prod|ops/config/frontend/.env.deploy|ops/config/frontend/nginx.env) return 0 ;;
-    ops/config/backend/.env.dev|ops/config/backend/.env.prod|ops/config/backend/.env.deploy|ops/config/backend/google-credentials.json) return 0 ;;
+    stack-kit.json) return 0 ;;
+    ops/config/frontend/.env.dev|ops/config/frontend/.env.prod|ops/config/frontend/nginx.env) return 0 ;;
+    ops/config/backend/.env.dev|ops/config/backend/.env.prod|ops/config/backend/google-credentials.json) return 0 ;;
     ops/config/ssh/id_rsa|ops/config/ssh/id_ed25519|ops/config/ssh/config) return 0 ;;
   esac
   return 1

@@ -19,4 +19,4 @@ If your **java-boot** API needs GCP:
 
 4. `.\tools\stack-kit.ps1 compose-gen`
 
-Do not put project brand names in the kit scaffold — only your `deploy.env` `COMPOSE_*` values.
+Do not put project brand names in the kit scaffold — only your manifest's `project` values.

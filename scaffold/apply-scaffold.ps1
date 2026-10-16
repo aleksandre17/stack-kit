@@ -12,10 +12,9 @@ if (-not $TargetRoot) {
 
 $skipNames = @{ "README.md" = $true; "apply-scaffold.ps1" = $true; "apply-scaffold.sh" = $true }
 $neverOverwrite = @(
-    "ops\config\deploy.env",
-    "ops\config\frontend\.env.dev", "ops\config\frontend\.env.prod", "ops\config\frontend\.env.deploy",
+    "ops\config\frontend\.env.dev", "ops\config\frontend\.env.prod",
     "ops\config\frontend\nginx.env",
-    "ops\config\backend\.env.dev", "ops\config\backend\.env.prod", "ops\config\backend\.env.deploy",
+    "ops\config\backend\.env.dev", "ops\config\backend\.env.prod",
     "ops\config\backend\google-credentials.json",
     "ops\config\ssh\id_rsa", "ops\config\ssh\id_ed25519", "ops\config\ssh\config",
     "stack-kit.json"
@@ -70,6 +69,6 @@ Copy-ScaffoldTree $ScaffoldRoot ""
 Write-Host ""
 Write-Host "  Next:" -ForegroundColor Yellow
 Write-Host "    .\tools\stack-kit.ps1 init          # full bootstrap (recommended)"
-Write-Host "    — or — copy deploy.env + compose-gen manually"
+Write-Host "    — or — copy the .env.example files + compose-gen manually"
 Write-Host "    See kits\stack-kit\scaffold\README.md"
 Write-Host ""

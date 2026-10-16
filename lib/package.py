@@ -1,33 +1,43 @@
 #!/usr/bin/env python3
-"""Build once, promote the same bytes (ADR-001 amendment 11).
+"""Build once, promote the same bytes (ADR-001 amendments 11, 13).
 
 A driver declares how its module is packaged (registry `package`: a driver `command` with `args`,
 `{out}` the module's staging directory, and the `artifacts` it leaves -- globs from the module
-directory, or `{out}` itself). `pack` gathers them into ONE archive named by the commit,
-`.stack-kit/artifacts/<module>-<sha>.tgz`, with its sha256 beside it; `unpack` puts the same bytes
-back where the driver's release reads them, so a deploy that `promotes` (registry rung field) runs
-without building. A developer runs exactly what CI runs: `stack-kit package <module>` /
-`stack-kit unpack <module> <archive>`.
+directory, or `{out}` itself) and how a release of it runs (`container`: a recipe template, or a
+static image serving it). `pack` turns what the package step left into ONE archive per commit,
+`.stack-kit/artifacts/<module>-<release>.tgz`, sha256 beside it:
 
-    package.py plan <module>             the declared package command (JSON) and its staging dir
-    package.py pack <module>             archive what the package step left; prints the archive
-    package.py unpack <module> <archive> restore it into the module, verifying its sha256
+    release.json          the provenance: module, release id, commit, `git describe`, dirty, services
+    <service>/...         each service's tree: its artifacts (under its `context`) and its recipe --
+                          the module's own Dockerfile, or the driver's template rendered for it
+
+The release id is the commit (`-dirty` when the checkout was): a deploy of it ships exactly these
+bytes, and a release to an environment that requires a clean checkout refuses a dirty one.
+
+    package.py plan <module>      the declared package command (JSON) and its staging dir
+    package.py pack <module>      archive what the package step left; prints the archive
 """
 from __future__ import annotations
 
 import fnmatch
 import hashlib
+import io
 import json
 import subprocess
 import sys
 import tarfile
+import time
 from pathlib import Path
+from typing import Any
 
 if __name__ == "__main__":  # run as a file: the kit root, not lib/, is what `lib.` resolves from
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     sys.stdout.reconfigure(encoding="utf-8")
 
 from lib import identity  # noqa: E402
+
+OUT = "{out}"
+RELEASE_JSON = "release.json"
 
 
 class PackageError(ValueError):
@@ -60,71 +70,176 @@ def staging(root: Path, module_id: str) -> Path:
 def plan(root: Path, manifest: dict, module_id: str) -> dict:
     spec = declared(manifest, module_id)
     out = staging(root, module_id).as_posix()
-    return {"command": spec["command"], "args": [str(a).replace("{out}", out) for a in spec.get("args") or []],
+    return {"command": spec["command"], "args": [str(a).replace(OUT, out) for a in spec.get("args") or []],
             "out": out}
 
 
-def revision(root: Path) -> str:
-    ran = subprocess.run(["git", "-C", str(root), "rev-parse", "--short=12", "HEAD"], capture_output=True, text=True)
-    sha = ran.stdout.strip() if ran.returncode == 0 else ""
+def _git(root: Path, *args: str) -> str:
+    ran = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True)
+    return ran.stdout.strip() if ran.returncode == 0 else ""
+
+
+def provenance(root: Path) -> dict[str, Any]:
+    """The commit a package is of: its sha, `git describe --tags --always --dirty`, and whether the
+    checkout was dirty (tracked changes). No commit, no package."""
+    sha = _git(root, "rev-parse", "--short=12", "HEAD")
     if not sha:
         raise PackageError("no commit to name the artifact by: a package is always of a commit")
-    return sha
+    dirty = bool(_git(root, "status", "--porcelain", "--untracked-files=no"))
+    return {"sha": sha, "commit": _git(root, "rev-parse", "HEAD"), "dirty": dirty,
+            "revision": _git(root, "describe", "--tags", "--always", "--dirty") or sha,
+            "id": sha + ("-dirty" if dirty else "")}
+
+
+def revision(root: Path) -> str:
+    return provenance(root)["id"]
 
 
 def _files(module_dir: Path, out: Path, globs: list[str]) -> list[tuple[Path, str]]:
-    """(file, its name inside the archive) for every declared artifact."""
-    found: list[tuple[Path, str]] = []
+    """(file, its module-relative name; `{out}/...` for the staging directory's) per declared artifact."""
+    found: dict[str, Path] = {}
     for g in globs:
-        if g == "{out}":
-            found += [(p, "{out}/" + p.relative_to(out).as_posix()) for p in sorted(out.rglob("*")) if p.is_file()]
+        if g == OUT:
+            for p in sorted(out.rglob("*")) if out.is_dir() else []:
+                if p.is_file():
+                    found[f"{OUT}/" + p.relative_to(out).as_posix()] = p
             continue
-        for p in sorted(module_dir.rglob("*")):
+        for p in sorted(module_dir.rglob("*")) if module_dir.is_dir() else []:
             rel = p.relative_to(module_dir).as_posix()
             if p.is_file() and (fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(rel, g.replace("**/", ""))):
-                found.append((p, rel))
-    return found
+                found[rel] = p
+    return sorted(((p, rel) for rel, p in found.items()), key=lambda x: x[1])
+
+
+def _tree(files: list[tuple[Path, str]], context: str) -> dict[str, Path]:
+    """A service's tree: the artifacts under its context, re-rooted there (`{out}` is a context root)."""
+    out: dict[str, Path] = {}
+    for path, rel in files:
+        rel = rel[len(OUT) + 1:] if rel.startswith(OUT + "/") else rel
+        ctx = context.strip("/")
+        if not ctx:
+            out[rel] = path
+        elif rel.startswith(ctx + "/"):
+            out[rel[len(ctx) + 1:]] = path
+    return out
+
+
+def _artifact(tree: dict[str, Any], spec: dict[str, Any], where: str) -> str:
+    pattern = spec.get("artifact")
+    if not pattern:
+        return ""
+    excluded = [str(x) for x in spec.get("artifactExclude") or []]
+    hits = sorted(r for r in tree if fnmatch.fnmatch(r, str(pattern))
+                  and not any(fnmatch.fnmatch(r.rsplit("/", 1)[-1], x) for x in excluded))
+    if len(hits) != 1:
+        raise PackageError(f"{where}: the recipe needs exactly one `{pattern}` in the release, found "
+                           f"{len(hits)}{': ' + ', '.join(hits) if hits else ''}")
+    return hits[0]
+
+
+def recipe(root: Path, manifest: dict, service: Any, tree: dict[str, Any]) -> dict[str, bytes]:
+    """The files a service's release adds to its artifacts: its container recipe (the module's own
+    Dockerfile, else the driver's template rendered for this module), or its static server config."""
+    from lib import templating
+    from lib.delivery.model import driver_home
+
+    cfg = manifest["modules"][service.module]
+    spec = service.spec
+    where = f"modules.{service.module} service {service.id}"
+    if service.kind == "build":
+        if spec.get("dockerfile"):
+            own = root / cfg["path"] / str(spec["dockerfile"])
+            if not own.is_file():
+                raise PackageError(f"{where}: container.dockerfile {spec['dockerfile']} is not there")
+            return {"Dockerfile": own.read_bytes()}
+        template = driver_home(service.driver) / str(spec["template"])
+        if not template.is_file():
+            raise PackageError(f"{where}: driver template {spec['template']} is not there")
+        extra = {"artifact": _artifact(tree, spec, where), "port": str(spec.get("port") or ""),
+                 "entry": templating.render(str(spec.get("entry") or ""), cfg)}
+        return {"Dockerfile": templating.render(template.read_text(encoding="utf-8"), cfg, extra).encode("utf-8")}
+    if service.kind == "static" and (spec.get("static") or {}).get("config"):
+        conf = driver_home(service.driver) / str(spec["static"]["config"])
+        return {".stack-kit/static.conf": conf.read_bytes()}
+    return {}
 
 
 def pack(root: Path, manifest: dict, module_id: str) -> Path:
+    from lib.delivery.model import module_services
+
     spec = declared(manifest, module_id)
     module_dir = root / manifest["modules"][module_id]["path"]
-    out = staging(root, module_id)
-    files = _files(module_dir, out, list(spec.get("artifacts") or []))
+    files = _files(module_dir, staging(root, module_id), list(spec.get("artifacts") or []))
     if not files:
         raise PackageError(f"{module_id}: the package step left none of {spec.get('artifacts')} -- run it first "
                            f"(`{identity.KIT_NAME} package {module_id}`)")
-    archive = artifacts_dir(root) / f"{module_id}-{revision(root)}.tgz"
+    prov = provenance(root)
+    members: dict[str, bytes] = {}
+    services: dict[str, Any] = {}
+    for service in module_services(manifest, module_id):
+        tree = _tree(files, service.context)
+        if not tree:
+            raise PackageError(f"{module_id}: service {service.id} has no artifact under its context "
+                               f"'{service.context or '.'}'")
+        added = recipe(root, manifest, service, tree)
+        for rel, path in tree.items():
+            members[f"{service.id}/{rel}"] = path.read_bytes()
+        for rel, data in added.items():
+            members[f"{service.id}/{rel}"] = data
+        services[service.id] = {"kind": service.kind, "files": len(tree) + len(added)}
+    meta = {"schema": 1, "module": module_id, **prov, "services": services,
+            "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    archive = artifacts_dir(root) / f"{module_id}-{prov['id']}.tgz"
     archive.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive, "w:gz") as tar:
-        for path, name in files:
-            tar.add(path, arcname=name, recursive=False)
+        for name, data in [(RELEASE_JSON, (json.dumps(meta, indent=1, sort_keys=True) + "\n").encode("utf-8")),
+                           *sorted(members.items())]:
+            info = tarfile.TarInfo(name)
+            info.size, info.mtime, info.mode = len(data), 0, 0o644
+            tar.addfile(info, io.BytesIO(data))
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix(".tgz.sha256").write_text(f"{digest}  {archive.name}\n", encoding="utf-8")
     return archive
 
 
-def unpack(root: Path, manifest: dict, module_id: str, archive: Path) -> list[str]:
-    """The archive's files back where the release reads them; refused if its sha256 disagrees or a
-    member would land outside the module (or its staging directory)."""
+def read(archive: Path) -> tuple[dict[str, Any], dict[str, dict[str, bytes]]]:
+    """(provenance, {service: {path: bytes}}) of an archive -- refused when its sha256 disagrees with
+    the sidecar, when it carries no provenance, or when a member would escape its service."""
     side = archive.with_suffix(".tgz.sha256")
+    if not archive.is_file():
+        raise PackageError(f"{archive}: no such archive")
     if side.is_file():
         want = side.read_text(encoding="utf-8").split()[0]
         if hashlib.sha256(archive.read_bytes()).hexdigest() != want:
             raise PackageError(f"{archive.name}: sha256 differs from {side.name} -- not the bytes that were packaged")
-    module_dir = (root / manifest["modules"][module_id]["path"]).resolve()
-    out = staging(root, module_id).resolve()
-    placed = []
+    meta: dict[str, Any] | None = None
+    trees: dict[str, dict[str, bytes]] = {}
     with tarfile.open(archive, "r:gz") as tar:
         for m in tar.getmembers():
-            base, name = (out, m.name[len("{out}/"):]) if m.name.startswith("{out}/") else (module_dir, m.name)
-            dest = (base / name).resolve()
-            if not dest.is_relative_to(base) or not m.isfile():
-                raise PackageError(f"{archive.name}: member {m.name} escapes its place -- refused")
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(tar.extractfile(m).read())
-            placed.append(dest.relative_to(root.resolve()).as_posix())
-    return placed
+            if not m.isfile():
+                continue
+            data = tar.extractfile(m).read()
+            if m.name == RELEASE_JSON:
+                meta = json.loads(data.decode("utf-8"))
+                continue
+            sid, _, rel = m.name.partition("/")
+            if not rel or rel.startswith("/") or ".." in rel.split("/"):
+                raise PackageError(f"{archive.name}: member {m.name} escapes its service -- refused")
+            trees.setdefault(sid, {})[rel] = data
+    if not meta or not meta.get("id") or not meta.get("commit"):
+        raise PackageError(f"{archive.name}: carries no provenance (release.json) -- a release is always of a "
+                           f"packaged commit (`{identity.KIT_NAME} package <module>`)")
+    return meta, trees
+
+
+def latest(root: Path, module_id: str) -> Path | None:
+    """The archive of this checkout's commit, when it was packaged already (build once)."""
+    try:
+        prov = provenance(root)
+    except PackageError:
+        return None
+    path = artifacts_dir(root) / f"{module_id}-{prov['id']}.tgz"
+    return path if path.is_file() and not prov["dirty"] else None
 
 
 def main(argv: list[str]) -> int:
@@ -136,9 +251,6 @@ def main(argv: list[str]) -> int:
             print(json.dumps(plan(ctx.root, ctx.manifest, argv[1])))
         elif argv[:1] == ["pack"] and len(argv) == 2:
             print(pack(ctx.root, ctx.manifest, argv[1]).relative_to(ctx.root).as_posix())
-        elif argv[:1] == ["unpack"] and len(argv) == 3:
-            for rel in unpack(ctx.root, ctx.manifest, argv[1], Path(argv[2]).resolve()):
-                print(f"  unpacked {rel}")
         else:
             print(__doc__, file=sys.stderr)
             return 2

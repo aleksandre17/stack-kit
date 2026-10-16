@@ -95,7 +95,7 @@ def main() -> int:
         return 1
 
     env: dict[str, str] = {}
-    for path in (env_example, env_file, ctx.secrets_root / "deploy.env"):
+    for path in (env_example, env_file):
         env.update(parse_env(path))
 
     ancestors = env.get("NGINX_FRAME_ANCESTORS", DEFAULT_ANCESTORS).strip() or DEFAULT_ANCESTORS

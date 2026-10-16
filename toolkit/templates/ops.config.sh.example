@@ -1,6 +1,0 @@
-# Copy to <module>/ops.config.sh — set secretsModule from stack-kit.json modules.<id>
-OPS_SECRETS_MODULE="<secretsModule>"
-OPS_PROJECT_NAME=""
-OPS_TARGET_DEFAULT="<moduleId>"
-VERSIONS_KEEP=5
-HEALTH_RETRIES=24

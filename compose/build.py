@@ -35,13 +35,9 @@ def catalog_path(root: Path, manifest: dict) -> Path:
 
 
 def global_fmt(root: Path) -> dict[str, str]:
-    from lib.compose_identity import build_global_fmt, load_deploy_env
-    from lib.manifest_defaults import default_field
+    from lib.compose_identity import build_global_fmt
 
-    manifest = load_manifest(root)
-    secrets_rel = manifest.get("secrets") or default_field("secrets") or "ops/config"
-    deploy = load_deploy_env(root / secrets_rel)
-    return build_global_fmt(manifest=manifest, deploy=deploy, repo_name=root.name)
+    return build_global_fmt(manifest=load_manifest(root), root=root)
 
 
 def load_catalog(root: Path) -> tuple[dict, dict, dict]:

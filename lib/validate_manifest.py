@@ -188,9 +188,13 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
         if len(files) != len(set(files)):
             errs.append(f"modules.{mid}.credentials: duplicate file names")
 
-    from lib.stack_deploy import validate_stack_deploy
+    # Every deployed service assembles from its declarations (driver container/dev, module, stack).
+    from lib.delivery.model import ModelError, all_services
 
-    warnings.extend(validate_stack_deploy(ctx.manifest))
+    try:
+        all_services(ctx.manifest)
+    except (ModelError, ValueError) as e:
+        errs.append(f"delivery: {e}")
 
     try:
         from lib.config_gen import check_module_drift, config_gen_modules_with_datastores
@@ -254,7 +258,10 @@ def validate_manifest(
 
     errs.extend(f"deploy: {p}" for p in deploy_targets.problems(ctx.root, ctx.manifest))
     warnings.extend(f"deploy: {n}" for n in deploy_targets.notices(ctx.root, ctx.manifest))
-    warnings.extend(f"deploy: {n}" for n in deploy_targets.legacy_notices(ctx.secrets_root, ctx.manifest))
+    # A value has one home (amendment 13): a former one present is refused, naming `migrate`.
+    from lib import legacy
+
+    errs.extend(f"legacy: {p}" for p in legacy.problems(ctx.root, ctx.secrets_root, ctx.manifest))
     # A development run reads development configuration only (amendment 8): what it lost is named.
     from lib.migrate_manifest import run_env_notices
 

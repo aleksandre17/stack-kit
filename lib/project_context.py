@@ -25,9 +25,7 @@ from lib.manifest_defaults import (
     resolve_cli_alias,
 )
 from lib.modules import (
-    default_stack_deploy_steps,
     infer_cli_aliases,
-    layout_simulator_for_type,
     module_by_role,
     module_by_type,
     module_ids,
@@ -116,13 +114,6 @@ class ProjectContext:
     def list_module_ids(self) -> list[str]:
         return module_ids(self.manifest)
 
-    def stack_deploy_steps_default(self) -> list[dict[str, Any]]:
-        return default_stack_deploy_steps(self.manifest)
-
-    def layout_simulator_script(self, module_id: str) -> str | None:
-        typ = _read_nested(self.manifest, f"modules.{module_id}.type", "")
-        return layout_simulator_for_type(typ) if typ else None
-
     @property
     def secrets_root(self) -> Path:
         return self.root / self.field("secrets")
@@ -182,25 +173,6 @@ class ProjectContext:
             return str(cfg["secretsModule"])
         return module_id
 
-    def default_remote_deploy_base(
-        self, secrets_folder: str, *, server_base: str = "", project_slug: str = ""
-    ) -> str:
-        slug = project_slug or self.root.name
-        deploy = self.secrets_root / "deploy.env"
-        if deploy.is_file():
-            for line in deploy.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line.startswith("#") or "=" not in line:
-                    continue
-                k, _, v = line.partition("=")
-                if k.strip() == "DEPLOY_PROJECT" and v.strip():
-                    slug = v.strip().strip("\"'").lower().replace("_", "-")
-                    break
-        # No invented base (ADR-001 amendment 9): a target's root, or the operator's, is declared.
-        if not server_base:
-            raise ValueError(f"no remote base for '{secrets_folder}': declare a deploy target's `root`")
-        return f"{server_base.rstrip('/')}/{slug}/{secrets_folder}"
-
     def list_secrets_module_folders(self) -> list[str]:
         seen: set[str] = set()
         out: list[str] = []
@@ -213,7 +185,5 @@ class ProjectContext:
 
     def compose_service_names(self) -> dict[str, Any]:
         from lib.compose_identity import compose_service_names as resolve_names
-        from lib.compose_identity import load_deploy_env
 
-        deploy = load_deploy_env(self.secrets_root)
-        return resolve_names(self.manifest, deploy, self.root.name)
+        return resolve_names(self.manifest, self.root)

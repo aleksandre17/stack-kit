@@ -57,7 +57,7 @@
           "root": {
             "type": "string",
             "pattern": "^(/|[A-Za-z]:[/\\\\])",
-            "description": "The absolute remote base every layout path is rendered under"
+            "description": "The absolute directory the platform shares between projects; this project's own is {root}/{project}. Never acted on itself"
           },
           "ssh": {
             "type": "object",
@@ -136,11 +136,23 @@
                 "type": "string",
                 "minLength": 1
               },
+              "stackCompose": {
+                "type": "string",
+                "minLength": 1
+              },
               "stackEnv": {
                 "type": "string",
                 "minLength": 1
               },
+              "stackState": {
+                "type": "string",
+                "minLength": 1
+              },
               "infra": {
+                "type": "string",
+                "minLength": 1
+              },
+              "backups": {
                 "type": "string",
                 "minLength": 1
               }
@@ -166,7 +178,7 @@
             "type": "integer",
             "minimum": 1,
             "default": 5,
-            "description": "Releases (or versioned artifacts) a unit keeps: the prune limit, and what verify holds"
+            "description": "Releases a unit keeps: the prune limit (never `current`), and what verify holds"
           },
           "health": {
             "type": "object",
@@ -183,6 +195,76 @@
             "type": "string",
             "minLength": 1,
             "description": "The CI runner a deploy to this target runs on (default ubuntu-latest)"
+          },
+          "compose": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "This target's compose invocation over its runtime's (catalogs.targetRuntimes `compose`), e.g. [\"docker-compose\"] on a host with only the standalone binary"
+          },
+          "engine": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "This target's container engine invocation over its runtime's (`engine`)"
+          },
+          "healthWait": {
+            "type": "object",
+            "properties": {
+              "retries": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "interval": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "description": "How long a deploy waits for a service to be healthy (default config/delivery.json)"
+          },
+          "minFreeMb": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The free disk the preflight requires under the project's directory"
+          },
+          "legacyLayout": {
+            "type": "object",
+            "description": "This project's paths in a tree laid out before the layout, for `layout migrate` to plan their move (applied only with --approve). Every path at least two levels under the root: the root's own children are shared between projects",
+            "properties": {
+              "environment": {
+                "type": "string",
+                "minLength": 1
+              },
+              "units": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^\\{root\\}/"
+                }
+              },
+              "places": {
+                "type": "object",
+                "propertyNames": {
+                  "enum": [
+                    "infra",
+                    "backups",
+                    "stack"
+                  ]
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^\\{root\\}/"
+                }
+              }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": false

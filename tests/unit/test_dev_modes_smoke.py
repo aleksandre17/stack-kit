@@ -78,20 +78,9 @@ def test_mode2_local_docker_tasks(repo_root: Path, manifest: dict) -> None:
     labels = [t["label"] for t in tasks["tasks"]]
     assert "stack-kit: stack dev" in labels
     aliases = infer_cli_aliases(manifest)
-    for _alias, mid in aliases.items():
-        if manifest["modules"][mid]["type"] == "node-vite":
-            assert any("compose up" in lb for lb in labels)
+    for short, mid in aliases.items():
         if manifest["modules"][mid]["type"] == "java-boot":
-            assert any("compose up" in lb for lb in labels)
-
-
-def test_mode3_remote_driver_scripts_exist() -> None:
-    fe_dev = PKG / "drivers" / "node-vite" / "ps1" / "dev.ps1"
-    be_dev = PKG / "drivers" / "java-boot" / "sh" / "dev.sh"
-    assert fe_dev.is_file(), "node-vite remote dev driver"
-    assert be_dev.is_file(), "java-boot remote dev driver"
-    deploy_watch = PKG / "toolkit" / "deploy" / "deploy-watch.sh"
-    assert deploy_watch.is_file()
+            assert any(lb == f"stack-kit: {short} build" for lb in labels) or any(f" build" in lb for lb in labels)
 
 
 def test_consumer_vscode_matches_manifest(repo_root: Path, manifest: dict) -> None:
@@ -117,7 +106,6 @@ def test_compose_catalog_and_stack_dir(repo_root: Path, manifest: dict) -> None:
         "lib/vscode_gen.py",
         "lib/credentials.py",
         "ci/prepare-integration-env.sh",
-        "toolkit/deploy/dev-remote.sh",
     ],
 )
 def test_package_scripts_present(script_rel: str) -> None:

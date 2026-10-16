@@ -4,26 +4,25 @@
 
     resolve_cli.py [--shell bash|pwsh] context
     resolve_cli.py [--shell bash|pwsh] notice <former> <current>
-    resolve_cli.py [--shell bash] env-files <folder> [dev|prod|deploy|all]
+    resolve_cli.py [--shell bash] env-files <folder> [<environment>|all]
     resolve_cli.py env-value <folder> <KEY> [default]
-    resolve_cli.py run-env <folder> [dev|prod]   (one JSON object: what a run sets; for the process, never a console)
-    resolve_cli.py deploy-env-value <KEY> [default]
-    resolve_cli.py project-slug | compose-slug | docker-network | server-base | infra-slug
-    resolve_cli.py [--shell bash] infra-deploy-path | deploy-base <folder>
+    resolve_cli.py run-env <folder> [<environment>]   (one JSON object: what a run sets; for the process, never a console)
+    resolve_cli.py project-slug
     resolve_cli.py infra-services | infra-compose-files | infra-compose-args | infra-sync-paths
     resolve_cli.py infra-tunnel-forwards     (local<TAB>remote<TAB>service<TAB>env per line)
     resolve_cli.py slugify <text>
     resolve_cli.py alias <alias>            (also: resolve_cli.py <alias>, the former form)
     resolve_cli.py driver-types              (id<TAB>roles<TAB>label per line)
-    resolve_cli.py remote-path <folder> <kind> <container> [dev|prod] [service]   (kind: module, runtime,
-                   workspace, static, compose, compose-dev, compose-prod -- from the selected target)
     resolve_cli.py ssh-args                  (one openssh argument per line, for ssh, scp and rsync -e)
     resolve_cli.py target                    (the selected target's name; empty when none is declared)
-    resolve_cli.py compose-project [dev|prod] | target-keep | remote-preflight [service...] | confined <path>
+    resolve_cli.py compose-project [<environment>]
+    resolve_cli.py compose-command           (this machine's compose invocation, one argument per line)
     resolve_cli.py driver-command <module|alias> <command>
-    resolve_cli.py stack-steps [dev|prod] [flag...]   (module<TAB>command<TAB>args... per line)
     resolve_cli.py stack-health              (module<TAB>url<TAB>expect per line; expect '-' = status only)
     resolve_cli.py stack-endpoints | compose-names | compose-service <module>
+
+Remote paths are not answered here: only the delivery engine renders them (lib/targets/layout.py),
+for the verbs of the CLI (ADR-001 amendment 13).
 
 `context` first carries every former-prefixed variable to its current name and then answers; for
 bash it prints shell to `eval` (the variables to export and unset, and the context as one
@@ -141,13 +140,10 @@ def main(argv: list[str]) -> int:
 #: Verbs whose answer is one path per line.
 PATH_VERBS = {"env-files"}
 
-VERBS = {"context", "notice", "slugify", "alias", "env-files", "env-value", "run-env", "deploy-env-value",
-         "project-slug", "compose-slug", "docker-network", "server-base", "infra-slug",
-         "infra-deploy-path", "deploy-base", "infra-tunnel-forwards", "infra-compose-files",
-         "infra-compose-args", "infra-sync-paths", "infra-services",
-         "driver-types", "driver-command", "stack-steps", "stack-health", "stack-endpoints",
-         "compose-names", "compose-service", "remote-path", "ssh-args", "target",
-         "compose-project", "target-keep", "remote-preflight", "confined"}
+VERBS = {"context", "notice", "slugify", "alias", "env-files", "env-value", "run-env", "project-slug",
+         "infra-tunnel-forwards", "infra-compose-files", "infra-compose-args", "infra-sync-paths", "infra-services",
+         "driver-types", "driver-command", "stack-health", "stack-endpoints", "compose-names", "compose-service",
+         "compose-command", "ssh-args", "target", "compose-project"}
 
 
 def _answer(r, verb: str, args: list[str]) -> list[str] | None:
@@ -157,13 +153,6 @@ def _answer(r, verb: str, args: list[str]) -> list[str] | None:
         return [r.env_value(args[0], args[1], args[2] if len(args) == 3 else "")]
     if verb == "run-env" and 1 <= len(args) <= 2:
         return [json.dumps(r.run_env(args[0], args[1] if len(args) == 2 else ""), ensure_ascii=False)]
-    if verb == "deploy-env-value" and 1 <= len(args) <= 2:
-        return [r.deploy_env_value(args[0], args[1] if len(args) == 2 else "")]
-    if verb == "deploy-base" and len(args) == 1:
-        return [r.deploy_base(args[0])]
-    if verb == "remote-path" and 3 <= len(args) <= 5:
-        return [r.remote_path(args[0], args[1], args[2], args[3] if len(args) > 3 else "",
-                              args[4] if len(args) > 4 else "")]
     if verb == "ssh-args" and not args:
         return r.ssh_args()
     if verb == "target" and not args:
@@ -171,31 +160,18 @@ def _answer(r, verb: str, args: list[str]) -> list[str] | None:
         return [chosen[0] if chosen else ""]
     if verb == "compose-project" and len(args) <= 1:
         return [r.compose_project(args[0] if args else "")]
-    if verb == "target-keep" and not args:
+    if verb == "project-slug" and not args:
+        return [r.project_slug()]
+    if verb == "compose-command" and not args:
         from lib import targets
 
-        try:
-            chosen = r.target()
-        except targets.TargetError:
-            chosen = None
-        return [str(targets.keep(chosen[1]) if chosen else 5)]
-    if verb == "remote-preflight":
-        return [r.remote_preflight(args)]
-    if verb == "confined" and len(args) == 1:
-        if not r.confined(args[0]):
-            raise ValueError(f"{args[0]} is outside this project's directory on the target -- refused")
-        return [args[0]]
+        return targets.local_commands(r.manifest)["compose"]
     if verb == "infra-tunnel-forwards" and not args:
         return ["\t".join((f["local"], f["remote"], f["service"], f["env"])) for f in r.infra_tunnel_forwards()]
     lists = {"infra-compose-files": r.infra_compose_files, "infra-compose-args": r.infra_compose_args,
              "infra-sync-paths": r.infra_sync_paths, "infra-services": r.infra_services}
     if verb in lists and not args:
         return lists[verb]()
-    simple = {"project-slug": r.project_slug, "compose-slug": r.compose_slug,
-              "docker-network": r.docker_network, "server-base": r.server_base,
-              "infra-slug": r.infra_slug, "infra-deploy-path": r.infra_deploy_path}
-    if verb in simple and not args:
-        return [simple[verb]()]
     return _modules_answer(verb, args)
 
 
@@ -218,15 +194,6 @@ def _modules_answer(verb: str, args: list[str]) -> list[str] | None:
         if args[1] not in commands:
             raise ValueError(f"driver '{typ}' has no command '{args[1]}' (available: {', '.join(sorted(commands))})")
         return [str(commands[args[1]])]
-    if verb == "stack-steps":
-        from lib.stack_deploy import stack_deploy_lines
-
-        from lib import catalogs
-
-        envs = catalogs.ids("environments", ctx.manifest)
-        environment = args[0] if args and args[0] in envs else catalogs.default_environment("deploy", ctx.manifest)
-        flags = args[1:] if args and args[0] in envs else args
-        return stack_deploy_lines(ctx.manifest, environment, flags)
     if verb == "stack-health" and not args:
         from lib.ci_health import stack_health_targets
 
@@ -236,13 +203,12 @@ def _modules_answer(verb: str, args: list[str]) -> list[str] | None:
 
         return list(stack_endpoint_lines(ctx))
     if verb in ("compose-names", "compose-service"):
-        from lib.compose_identity import compose_service_names, load_deploy_env, resolve_module_service_name
+        from lib.compose_identity import compose_service_names, resolve_module_service_name
 
-        deploy = load_deploy_env(ctx.secrets_root)
         if verb == "compose-names" and not args:
-            return [json.dumps(compose_service_names(ctx.manifest, deploy, ctx.root.name))]
+            return [json.dumps(compose_service_names(ctx.manifest, ctx.root))]
         if verb == "compose-service" and len(args) == 1:
-            return [resolve_module_service_name(args[0], ctx.manifest, deploy, ctx.root.name)]
+            return [resolve_module_service_name(args[0], ctx.manifest, ctx.root)]
     return None
 
 

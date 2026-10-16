@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 CATALOGS = Path(__file__).resolve().parent.parent / "config" / "catalogs"
-KINDS = ("roles", "environments", "lifecycle", "targetRuntimes")
+KINDS = ("roles", "environments", "lifecycle", "targetRuntimes", "tiers")
 
 
 class CatalogError(ValueError):

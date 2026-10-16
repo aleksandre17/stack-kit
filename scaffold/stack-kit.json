@@ -13,9 +13,12 @@
   "stack": {
     "composeDir": "ops/compose/stack",
     "infraComposeDir": "ops/compose/infra",
-    "networkName": "app-net",
     "infra": {
-      "services": ["postgres", "redis", "qdrant"]
+      "services": [
+        "postgres",
+        "redis",
+        "qdrant"
+      ]
     }
   },
   "cli": {

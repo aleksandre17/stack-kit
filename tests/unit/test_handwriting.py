@@ -53,7 +53,7 @@ def test_every_relative_link_in_a_guide_reaches_a_file():
 
 
 #: The launchers the kit ships: its CLI, its former name, and the two a host is scaffolded with.
-LAUNCHERS = [f"cli/{KIT_NAME}.ps1", f"cli/{LEGACY_KIT_NAME}.ps1", f"scaffold/tools/{KIT_NAME}.ps1",
+LAUNCHERS = [f"cli/{KIT_NAME}.ps1", f"scaffold/tools/{KIT_NAME}.ps1",
              f"scaffold/ops/cli/{KIT_NAME}.ps1"]
 
 

@@ -39,33 +39,6 @@ function Get-ModuleIdsByDriverType {
     Get-KitContextLines "type:$DriverType"
 }
 
-function Get-ModuleIdsByLayoutSimulator {
-    # The modules whose driver declares this layout simulator (registry `layoutSimulator`).
-    param([Parameter(Mandatory = $true)][string]$Simulator)
-    foreach ($mid in @(Get-KitContextLines 'modules')) {
-        if ((Get-KitContextValue "driver:$(Get-ModuleType $mid):layoutSimulator") -eq $Simulator) { $mid }
-    }
-}
-
-function Get-LayoutSimulatorScript {
-    # The layout simulator the module's driver DECLARES, or $null.
-    param([Parameter(Mandatory = $true)][string]$ModuleId)
-    Get-KitContextValue "driver:$(Get-ModuleType $ModuleId):layoutSimulator"
-}
-
-function Invoke-ModuleLayoutSimulator {
-    param(
-        [Parameter(Mandatory = $true)][string]$ModuleId,
-        [Parameter(ValueFromRemainingArguments = $true)][string[]]$LayoutArgs
-    )
-    $sim = Get-LayoutSimulatorScript $ModuleId
-    if (-not $sim) {
-        throw "No layout simulator for module '$ModuleId' (type $(Get-ModuleType $ModuleId))"
-    }
-    $path = Join-Path (Join-Path (Get-OpsPackageRoot) "toolkit\layout") $sim
-    & $path -ModuleId $ModuleId @LayoutArgs
-}
-
 function Get-InferredCliAliases {
     Get-CliAliasesFromManifest
 }

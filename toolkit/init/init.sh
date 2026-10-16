@@ -54,5 +54,5 @@ echo "  ▸ compose-gen"
 python3 "$PKG/compose/build.py" || echo "  [warn] compose-gen failed"
 
 echo ""
-echo "  Next: edit ops/config/deploy.env, then: ./tools/stack-kit.sh compose-gen"
+echo "  Next: fill the module env files and ops/deploy/targets.json, then: ./tools/stack-kit.sh compose-gen"
 echo ""

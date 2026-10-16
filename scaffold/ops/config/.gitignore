@@ -6,7 +6,6 @@
 !README.md
 !**/.gitignore
 !**/.env.example
-!deploy.env.example
 !profiles/
 !profiles/**
 !frontend/nginx.env.example

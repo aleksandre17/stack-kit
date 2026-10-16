@@ -8,7 +8,6 @@ from typing import Any
 
 from lib.compose_identity import (
     embedded_worker_enabled,
-    load_deploy_env,
     primary_api_module_id,
     resolve_module_service_name,
     stack_compose_module_ids,
@@ -174,11 +173,10 @@ def render_module_service(
     port_env, port_default = _module_port(ctx, module_id, role, stack_cat)
     role_cfg = _role_catalog_entry(stack_cat, role)
     health_path = str(role_cfg.get("urlPath") or "/health")
-    deploy = load_deploy_env(ctx.secrets_root)
     primary = primary_api_module_id(manifest)
     cred_vols, cred_env = _credential_blocks(manifest, module_id, secrets_rel, primary)
     df_dev, df_prod, prod_ctx_suffix = _resolve_dockerfiles(module_path, module_id, role, driver_type)
-    service = resolve_module_service_name(module_id, manifest, deploy, ctx.root.name)
+    service = resolve_module_service_name(module_id, manifest, ctx.root)
     tpl = _template_for(driver_type, role, profile, compose_cat)
     module_build_context = module_context
     if prod_ctx_suffix == "src" and profile == "prod":
@@ -204,7 +202,7 @@ def render_module_service(
         "credential_volumes_block": cred_vols,
         "credential_env_block": cred_env,
         "primary_api_service": (
-            resolve_module_service_name(primary, manifest, deploy, ctx.root.name)
+            resolve_module_service_name(primary, manifest, ctx.root)
             if primary
             else fmt_global["api_service"]
         ),
@@ -332,7 +330,6 @@ def ops_modules_lines(
 ) -> list[str]:
     """Gradle/docker registry lines for the modules whose driver declares `compose.opsModules`, plus the
     embedded backend worker."""
-    deploy = load_deploy_env(ctx.secrets_root)
     lines: list[str] = []
     module_ids = stack_compose_module_ids(ctx.manifest)
     mods = ctx.manifest.get("modules") or {}
@@ -341,7 +338,7 @@ def ops_modules_lines(
         if not isinstance(cfg, dict) or not _ops_modules_kind(str(cfg.get("type") or "")):
             continue
         role = str(cfg.get("role") or "")
-        service = resolve_module_service_name(mid, ctx.manifest, deploy, ctx.root.name)
+        service = resolve_module_service_name(mid, ctx.manifest, ctx.root)
         module_path = ctx.module_path(mid)
         _, df_prod, prod_suffix = _resolve_dockerfiles(module_path, mid, role, str(cfg.get("type")))
         if prod_suffix == "src" and not df_prod.startswith("src/"):

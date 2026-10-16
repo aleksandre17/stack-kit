@@ -2,6 +2,7 @@
   "version": 2,
   "package": "kits/stack-kit",
   "secrets": "ops/config",
+  "project": "golden-consumer",
   "features": {
     "gcpCredentials": true
   },
@@ -22,7 +23,6 @@
   },
   "stack": {
     "composeDir": "ops/compose/stack",
-    "networkName": "golden-consumer-net",
     "composeModules": [
       "api",
       "search",

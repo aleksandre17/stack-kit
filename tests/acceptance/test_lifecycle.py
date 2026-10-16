@@ -240,11 +240,7 @@ def test_a_host_whose_every_target_is_pending_builds_tests_and_runs_but_never_de
     ran = _cli(root, "mod", "web", "run")
     assert ran.returncode == 0 and "started" in ran.stdout, ran.stdout + ran.stderr
 
-    # Every remote deploy passes the preflight first; it is refused, naming the reason.
-    env = {k: v for k, v in os.environ.items() if not k.startswith(identity.ENV_PREFIX + "_")}
-    env.update({identity.env_name("PROJECT_ROOT"): str(root), "PYTHONPATH": str(PKG)})
-    gate = subprocess.run([sys.executable, "-B", str(PKG / "lib" / "resolve_cli.py"), "remote-preflight"],
-                          cwd=root, env=env, capture_output=True, text=True)
-    assert gate.returncode != 0 and "pending: the platform's host is not known yet" in gate.stderr, gate.stderr
-    verify = _cli(root, "targets", "--verify")
-    assert verify.returncode == 2 and "pending: the platform's host is not known yet" in verify.stdout
+    # Every remote verb opens its target first; a pending one is refused, naming the reason.
+    for argv in (["deploy", "web", "--plan"], ["targets", "--verify"], ["release", "list"], ["ops", "status"]):
+        ran = _cli(root, *argv)
+        assert ran.returncode == 2 and "pending: the platform's host is not known yet" in ran.stdout + ran.stderr, (argv, ran.stdout + ran.stderr)

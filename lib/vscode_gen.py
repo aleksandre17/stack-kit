@@ -278,13 +278,12 @@ LAUNCH_BUILDERS["data"] = _launch_from_data
 
 
 def _driver_watch_tasks(driver_id: str) -> dict[str, list[str]]:
-    tasks = (driver_registry().get(driver_id) or {}).get("tasks")
-    if not isinstance(tasks, dict):
-        return {}
-    out: dict[str, list[str]] = {}
-    for name, argv in tasks.items():
-        if isinstance(argv, list) and argv:
-            out[str(name)] = [str(a) for a in argv]
+    """Tasks a driver declares (`tasks`), and -- when it declares remote dev (`dev`) -- its dev watch."""
+    entry = driver_registry().get(driver_id) or {}
+    tasks = entry.get("tasks") if isinstance(entry.get("tasks"), dict) else {}
+    out: dict[str, list[str]] = {str(n): [str(a) for a in argv] for n, argv in tasks.items() if isinstance(argv, list) and argv}
+    if entry.get("dev"):
+        out.setdefault("devWatch", ["dev", "watch"])
     return out
 
 
@@ -400,22 +399,20 @@ def build_tasks_json(ctx: ProjectContext) -> dict[str, Any]:
     ]
     if _stack_infra_services(ctx):
         tasks.append(_infra_tunnel_task(ctx))
-        tasks.append(_task("stack-kit: infra remote up", ["infra", "remote", "up"]))
-        tasks.append(_task("stack-kit: infra remote status", ["infra", "remote", "status"]))
+        tasks.append(_task("stack-kit: infra remote up", ["infra", "remote", "up", "--env", "dev"]))
+        tasks.append(_task("stack-kit: infra remote status", ["infra", "remote", "status", "--env", "dev"]))
     for alias in sorted(set(aliases.values()), key=lambda x: aliases.get(x, x)):
         short = next((k for k, v in aliases.items() if v == alias), alias)
-        tasks.append(_task(f"stack-kit: {short} check", [short, "check"]))
-        tasks.append(
-            _task(
-                f"stack-kit: {short} compose up",
-                [short, "compose", "up", "-d", "--build"],
-            )
-        )
         # Watch tasks are DECLARED per driver in drivers/registry.json — a driver that
         # declares none simply gets none, and a new driver needs no generator edit.
         driver_id = read_nested(ctx.manifest, f"modules.{alias}.type", "")
+        from lib.modules import driver_commands, lifecycle_steps
+
+        for step in [s for s in lifecycle_steps(ctx.manifest) if s in driver_commands(driver_id)]:
+            tasks.append(_task(f"stack-kit: {short} {step}", [step, short]))
         for _name, argv in sorted(_driver_watch_tasks(driver_id).items()):
-            tasks.append(_task(f"stack-kit: {short} {' '.join(argv)}", [short, *argv]))
+            # a kit verb over the module (`dev watch <module>`), never a driver script
+            tasks.append(_task(f"stack-kit: {' '.join(argv)} {short}", [*argv, short]))
 
     return {"version": "2.0.0", "tasks": tasks}
 

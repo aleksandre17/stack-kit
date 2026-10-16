@@ -29,7 +29,7 @@ def test_tasks_include_validate(repo_root: Path, manifest: dict) -> None:
     assert "stack-kit: validate" in labels
     # Per-module check tasks are labelled by the manifest cli alias, not by any
     # consumer vocabulary: the fixture declares w -> web, a -> api.
-    assert any("w check" in lb or "a check" in lb for lb in labels)
+    assert any("w build" in lb or "a build" in lb for lb in labels)
 
 
 def test_write_vscode_tmp(tmp_path: Path) -> None:

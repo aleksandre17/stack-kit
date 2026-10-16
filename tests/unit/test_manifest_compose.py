@@ -147,7 +147,6 @@ def test_ops_modules_lists_all_java_services(mini_project: ProjectContext) -> No
 
 def test_resolve_service_names() -> None:
     manifest = _fixture_manifest()
-    deploy: dict[str, str] = {}
-    assert resolve_module_service_name("backend", manifest, deploy, "x") == "x-api"
-    assert resolve_module_service_name("retrieval", manifest, deploy, "x") == "x-retrieval"
-    assert resolve_module_service_name("ingestion", manifest, deploy, "x") == "x-ingestion"
+    assert resolve_module_service_name("backend", manifest, Path("x")) == "x-api"
+    assert resolve_module_service_name("retrieval", manifest, Path("x")) == "x-retrieval"
+    assert resolve_module_service_name("ingestion", manifest, Path("x")) == "x-ingestion"

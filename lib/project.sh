@@ -4,7 +4,7 @@
 # This file holds no rule. Which directory is the project, which manifest name is read, what a
 # field defaults to, which module has which role: the resolver answers, once per shell, as one
 # associative array `_SK` of `kind:key` -> text; every function below is a lookup into it. What
-# the ENVIRONMENT says (env files, deploy values, slugs) is asked of the resolver each time, in
+# the ENVIRONMENT says (env files, values, slugs) is asked of the resolver each time, in
 # lib/env.sh. A test holds this: no manifest field is spelled here.
 
 # Every kit script speaks UTF-8 (PYTHONUTF8), for this child only: a Python writing to a pipe on
@@ -101,14 +101,6 @@ stack_kit_kit_package_root() {
   _stack_kit_ctx packageRoot
 }
 
-stack_kit_kit_toolkit_bash() {
-  echo "$(stack_kit_kit_package_root)/toolkit/bash"
-}
-
-stack_kit_kit_deploy_lib() {
-  echo "$(stack_kit_kit_package_root)/toolkit/deploy"
-}
-
 stack_kit_kit_compose_catalog() {
   _stack_kit_ctx path:composeCatalog
 }
@@ -151,13 +143,6 @@ stack_kit_module_id_for_type() {
   sed -n "$(( ${2:-0} + 1 ))p" <<<"$ids" | grep .
 }
 
-# The first (or Nth) module whose driver deploys as <kind> (`deployKind`: runtime, static, artifact).
-stack_kit_module_id_for_deploy_kind() {
-  local ids
-  ids="$(_stack_kit_ctx "deployKind:$1")" || return 1
-  sed -n "$(( ${2:-0} + 1 ))p" <<<"$ids" | grep .
-}
-
 # Secrets folder names of the manifest's modules, one per line, in declaration order.
 stack_kit_list_secrets_module_folders() {
   _stack_kit_ctx secretsFolders || true
@@ -166,11 +151,6 @@ stack_kit_list_secrets_module_folders() {
 # A module's credential files: file<TAB>mount<TAB>envVar per line.
 stack_kit_module_credentials_lines() {
   _stack_kit_ctx "module:$1:credentials" || true
-}
-
-# A secrets folder's remote base: its DEPLOY_PATH, else {server base}/{project slug}/{folder}.
-stack_kit_default_remote_deploy_base() {
-  _stack_kit_resolve deploy-base "$1"
 }
 
 # Resolved here, in the sourcing shell: former variables are carried to their current names

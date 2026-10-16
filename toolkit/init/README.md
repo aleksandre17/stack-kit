@@ -25,7 +25,7 @@
 
 1. **apply-scaffold** — `tools/`, `ops/config/*.example`, `apps/*`, `ops/compose/`, `stack-kit.json`
 2. **catalog** — `catalog.full.json` → `ops/compose/catalog.json` (სრული FE+BE+stack; `-MinimalCatalog` — მხოლოდ API)
-3. **seed** — `.example` → `deploy.env`, `.env.dev`, `.env.prod`, `.env.deploy`, `nginx.env`
+3. **seed** — `.example` → `.env.dev`, `.env.prod`, `nginx.env`
 4. **.gitignore** — scaffold წესების დამატება
 5. **compose-gen** — `docker-compose*.yml`, `backend/ops.modules`
 6. **nginx-gen** — თუ არსებობს `frontend/nginx.conf.template`

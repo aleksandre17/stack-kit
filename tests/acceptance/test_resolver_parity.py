@@ -26,8 +26,7 @@ import pytest
 from conftest import PKG, WORKING_ROOT
 from lib import identity
 
-SHIMS = ["lib/project.sh", "lib/env.sh", "lib/drivers.sh", "lib/project.ps1", "lib/env.ps1", "lib/drivers.ps1",
-         "lib/modules.ps1"]
+SHIMS = ["lib/project.sh", "lib/env.sh", "lib/project.ps1", "lib/env.ps1", "lib/drivers.ps1", "lib/modules.ps1"]
 TOP_LEVEL_FIELDS = list(json.loads((PKG / "manifest.schema.json").read_text(encoding="utf-8"))["properties"])
 
 #: The questions, as (name, bash call, PowerShell call). Python's answer is computed below.
@@ -50,16 +49,9 @@ QUESTIONS = [
      "(Get-SecretsEnvFiles -Module api -Profile all) -join ','"),
     ("env.last-wins", "stack_kit_env_value api PARITY_KEY none",
      "Get-SecretsEnvValue -Module api -Key PARITY_KEY -Default none"),
-    ("deploy.process-env-first", "stack_kit_deploy_env_value DEPLOY_PROJECT",
-     "Get-DeployEnvValue DEPLOY_PROJECT"),
-    ("slug.project", "stack_kit_project_slug", "Get-ProjectSlug"),
-    ("slug.compose", "stack_kit_compose_slug", "Get-ComposeSlug"),
-    ("network", "stack_kit_docker_network", "Get-DockerNetworkName"),
-    ("server.base", "stack_kit_server_base", "Get-DeployServerBase"),
-    ("deploy.base", "stack_kit_default_remote_deploy_base worker", "Get-DefaultRemoteDeployPathBase worker"),
-    ("module.type", "stack_kit_module_type web", "Get-ModuleType web"),
-    ("driver.command", "stack_kit_driver_command_path api deploy", "Get-DriverCommandPath api deploy"),
-    ("alias", "stack_kit_cli_resolve_alias ui", "Resolve-CliAlias ui"),
+    # No bash driver script is left (amendment 13): the driver lookups are PowerShell's and Python's.
+    ("module.type", None, "Get-ModuleType web"),
+    ("alias", None, "Resolve-CliAlias ui"),
 ]
 
 PROCESS_PROJECT = "from-the-environment"
@@ -79,17 +71,14 @@ def host(tmp_path_factory) -> Path:
     api = root / "ops" / "config" / "api"
     with (api / ".env.dev").open("a", encoding="utf-8") as f:
         f.write("\nPARITY_KEY=from-dev\n")
-    with (api / ".env.deploy").open("a", encoding="utf-8") as f:
-        f.write("\nPARITY_KEY=from-deploy\n")
-    (root / "ops" / "config" / "deploy.env").write_text(
-        "DEPLOY_PROJECT=from-the-file\nDEPLOY_SERVER=ops@example.invalid\n", encoding="utf-8")
+    with (api / ".env.prod").open("a", encoding="utf-8") as f:
+        f.write("\nPARITY_KEY=from-prod\n")
     return root
 
 
 def _env(host: Path) -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if not k.startswith(identity.ENV_PREFIX + "_")}
     env[identity.env_name("PROJECT_ROOT")] = str(host)
-    env["DEPLOY_PROJECT"] = PROCESS_PROJECT
     env["PYTHONPATH"] = str(PKG)
     env.pop("OPS_PACKAGE_ROOT", None)
     env.pop("OPS_MONOREPO_ROOT", None)
@@ -112,11 +101,7 @@ def _python_answers(host: Path) -> dict[str, str]:
         " 'folders': c['secretsFolders'].replace('\\n', ','), 'secrets.root': c['secretsRoot'],\n"
         " 'env.files': ','.join(str(p) for p in r.env_files('api')),\n"
         " 'env.last-wins': r.env_value('api', 'PARITY_KEY', 'none'),\n"
-        " 'deploy.process-env-first': r.deploy_env_value('DEPLOY_PROJECT'),\n"
-        " 'slug.project': r.project_slug(), 'slug.compose': r.compose_slug(),\n"
-        " 'network': r.docker_network(), 'server.base': r.server_base(), 'deploy.base': r.deploy_base('worker'),\n"
         " 'module.type': c['module:web:type'], 'alias': c['alias:ui'],\n"
-        " 'driver.command': c['driver:' + c['module:api:type'] + ':command:deploy'],\n"
         "}))\n")
     ran = subprocess.run([sys.executable, "-B", "-c", probe], cwd=host, env=_env(host),
                          capture_output=True, text=True)
@@ -162,19 +147,18 @@ def test_the_reference_host_exercises_every_rule_that_drifted(host):
 
     assert answers["field.convention"] == default_field("secrets"), "the convention default was not read"
     assert answers["role.inferred"], "the driver's declared role was not inferred"
-    assert answers["env.last-wins"] == "from-deploy", "a later env file's value must win"
-    assert answers["deploy.process-env-first"] == PROCESS_PROJECT, "the process environment must win"
-    assert answers["server.base"] == "/home/ops"
+    assert answers["env.last-wins"] == "from-prod", "a later env file's value must win"
 
 
 @pytest.mark.skipif(_bash() is None, reason="no POSIX bash on this machine")
 def test_bash_answers_what_python_answers(host):
-    script = "".join(f'source "{(PKG / "lib" / name).as_posix()}"\n' for name in ("env.sh", "drivers.sh")) + "".join(
+    script = "".join(f'source "{(PKG / "lib" / name).as_posix()}"\n' for name in ("env.sh",)) + "".join(
         f'printf "%s\\t%s\\n" {name!r} "$({call} 2>/dev/null)"\n' for name, call, _ in QUESTIONS)
     ran = subprocess.run([_bash(), "-c", script], cwd=host, env=_env(host), capture_output=True, text=True)
     assert ran.returncode == 0, ran.stderr
     got = dict(line.split("\t", 1) for line in ran.stdout.splitlines() if "\t" in line)
-    wrong = _agree(_python_answers(host), got)
+    asked = {name for name, call, _ in QUESTIONS if call}
+    wrong = _agree({k: v for k, v in _python_answers(host).items() if k in asked}, got)
     assert not wrong, "bash and python disagree:\n  " + "\n  ".join(wrong)
 
 

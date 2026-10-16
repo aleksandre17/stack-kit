@@ -47,7 +47,7 @@ def test_an_environment_declared_by_the_host_is_one_in_every_place(tmp_path, mon
     assert r.run_env(folder, "staging")["WHERE"] == "staging"
     assert (root / manifest["secrets"] / folder / ".env.staging") in r.env_files(folder, "staging")
     target = {"runtime": "docker-compose", "host": "h", "user": "u", "root": "/srv"}
-    assert targets.render(target, "unit", project="p", environment="staging", service="s") == "/srv/p/staging/modules/s"
+    assert targets.render(target, "unit", project="p", environment="staging", service="s", tier="backend") == "/srv/p/staging/backend/s"
     with pytest.raises(ValueError, match="not 'qa'"):
         envfile.run_files(root / manifest["secrets"], folder, "qa", catalogs.ids("environments", manifest))
 
@@ -90,11 +90,10 @@ def test_a_lifecycle_step_declared_by_the_host_is_a_step_and_a_ci_step(tmp_path,
 # ── roles and target runtimes ────────────────────────────────────────────────
 
 def test_a_role_declared_by_the_host_orders_the_stack_and_validates(tmp_path):
-    from lib.stack_deploy import role_deploy_order
     from lib.validate_manifest import registry_problems
 
     manifest = {"catalogs": {"roles": [{"id": "edge", "deployOrder": 0}]}, "modules": {}}
-    assert role_deploy_order(manifest)[0] == "edge"
+    assert catalogs.ordered("roles", "deployOrder", manifest)[0] == "edge"
     reg = {"edge-proxy": {"label": "x", "roles": ["edge"], "commands": {}},
            "typo": {"label": "x", "roles": ["egde"], "commands": {}}}
     found = registry_problems(reg, manifest)

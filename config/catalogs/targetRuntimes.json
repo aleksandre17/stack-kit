@@ -1,8 +1,8 @@
 {
-  "$comment": "What runs a deployed module on a deploy target (`targets.<name>.runtime`), declared once (ADR-001 amendment 12). A host adds one in its manifest (`catalogs.targetRuntimes`).",
+  "$comment": "What runs a deployed service on a deploy target (`targets.<name>.runtime`), declared once (ADR-001 amendments 12, 13). engine: the container engine's command line; compose: the compose invocation (a host whose server has only the standalone binary declares `compose` on its target); stack: whether the runtime runs the environment's compose stack (static: a release and its `current` pointer only, served by something else). local: the runtime this machine's own stacks run under (compose-gen's stack, the local infra) -- its `engine` and `compose` are the local invocations too. A host adds one in its manifest (`catalogs.targetRuntimes`).",
   "entries": [
-    { "id": "docker-compose" },
-    { "id": "static" },
-    { "id": "iis" }
+    { "id": "docker-compose", "engine": ["docker"], "compose": ["docker", "compose"], "stack": true, "local": true },
+    { "id": "static", "stack": false },
+    { "id": "iis", "pending": "Windows/IIS delivery is not built: a release to an IIS site needs its own transport and is deferred" }
   ]
 }

@@ -3,8 +3,8 @@
 # Usage: stack-kit dev up [alias|moduleId|all] [--mode hybrid|local|docker|remote] [--no-infra] [--no-tunnel]
 #
 # Modes (auto-detected when not set):
-#   hybrid   Apps on host (Windows), infra remote Docker + SSH tunnel.  Default when DEPLOY_SERVER set.
-#   local    Apps on host only — no infra management.                   Default when DEPLOY_SERVER not set.
+#   hybrid   Apps on host (Windows), infra remote Docker + SSH tunnel.  Default with deploy targets.
+#   local    Apps on host only — no infra management.                   Default without.
 #   docker   Full stack via stack-kit stack up -d --build.                Ignores per-module target.
 #   remote   Source on Windows, rsync → Linux server, Docker reloads.
 #
@@ -76,8 +76,8 @@ function Show-DevHelp {
 
     stack-kit dev up <alias|moduleId|all> [flags]
 
-  Modes (auto-detected from ops/config/deploy.env DEPLOY_SERVER):
-    hybrid    Apps on host + infra remote Docker + SSH tunnel  [default when DEPLOY_SERVER set]
+  Modes (hybrid when the manifest declares deploy targets, else local):
+    hybrid    Apps on host + infra remote Docker + SSH tunnel  [default with deploy targets]
     local     Apps on host only; no infra management           [default otherwise]
     docker    Full stack via compose (stack-kit stack up)
     remote    rsync source → Linux server, Docker reloads
@@ -115,8 +115,8 @@ function Resolve-DevTarget {
 function Get-DevMode {
     param([string]$ExplicitMode)
     if ($ExplicitMode) { return $ExplicitMode.ToLower().Trim() }
-    $server = Get-DeployEnvValue "DEPLOY_SERVER"
-    if ($server) { return "hybrid" }
+    # A host that declares deploy targets runs its infra there (hybrid); one that declares none, locally.
+    if (Get-ManifestField "deploy.targets") { return "hybrid" }
     return "local"
 }
 
@@ -145,7 +145,7 @@ function Start-TunnelInNewWindow {
         '-NoExit',
         '-ExecutionPolicy', 'Bypass',
         '-Command',
-        "& '$gs' infra tunnel"
+        "& '$gs' infra tunnel --env dev"
     )
     Write-DevLog "Waiting 4 s for tunnel to establish..."
     Start-Sleep -Seconds 4
@@ -219,55 +219,12 @@ if ($mode -eq "docker") {
     exit $LASTEXITCODE
 }
 
-# ── Remote watch mode ─────────────────────────────────────────────────────────
-# Source stays on Windows; the driver's declared devWatch argv rsyncs to the Linux
-# server and reloads the container. Requires DEPLOY_SERVER + DEPLOY_LAYOUT=structured.
+# ── Remote dev ────────────────────────────────────────────────────────────────
+# The CLI's own (`stack-kit dev up <module> --target <t>`): the layout's workspace, the driver's
+# dev container, sync and watch -- never a script of this file.
 if ($mode -eq "remote") {
-    $gs = Get-StackKitScript
-    $server = Get-DeployEnvValue "DEPLOY_SERVER"
-    if (-not $server) {
-        Write-DevLog "DEPLOY_SERVER not set in ops/config/deploy.env — remote watch requires a server." "ERROR"
-        exit 1
-    }
-
-    function Get-RemoteWatchCommand {
-        param([string]$ModuleId)
-        $modType = Get-ManifestField "modules.$ModuleId.type"
-        $argv = Get-DriverTaskArgs -Type $modType -TaskName "devWatch"
-        if (-not $argv -or $argv.Count -eq 0) {
-            Write-DevLog "Driver '$modType' declares no tasks.devWatch in drivers/registry.json — $ModuleId cannot be watched remotely." "ERROR"
-            return $null
-        }
-        Write-DevLog "remote watch: $ModuleId ($modType) -> $server"
-        return @($gs, $ModuleId) + $argv
-    }
-
-    if ($target -eq "all") {
-        $ordered = Get-ModulesInRoleOrder
-        if ($ordered.Count -eq 0) { Write-DevLog "No modules in manifest" "ERROR"; exit 1 }
-        $opened = 0
-        foreach ($mid in $ordered) {
-            $cmd = Get-RemoteWatchCommand $mid
-            if (-not $cmd) { continue }
-            $cmdStr = "& '" + ($cmd -join "' '") + "'"
-            Start-Process powershell -ArgumentList @('-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $cmdStr)
-            $opened++
-            Start-Sleep -Milliseconds 500
-        }
-        if ($opened -eq 0) { Write-DevLog "No module declares a devWatch task." "ERROR"; exit 1 }
-        Write-DevLog "$opened remote watch window(s) opened." "OK"
-        exit 0
-    }
-
-    $resolved = Resolve-DevTarget $target
-    if (-not $resolved) {
-        Write-DevLog "Unknown target: '$target'" "ERROR"
-        exit 1
-    }
-    $cmdArgs = Get-RemoteWatchCommand $resolved
-    if (-not $cmdArgs) { exit 1 }
-    & $cmdArgs[0] $cmdArgs[1..($cmdArgs.Count - 1)]
-    exit $LASTEXITCODE
+    Write-DevLog "remote dev is: stack-kit dev up $target [--target <t>] (then: dev watch $target)" "ERROR"
+    exit 2
 }
 
 # ── Infra + tunnel (hybrid only) ──────────────────────────────────────────────
@@ -275,7 +232,7 @@ if ($mode -eq "hybrid") {
     if (-not $skipInfra) {
         Write-DevLog "Starting remote infra (stack-kit infra remote up)..."
         $gs = Get-StackKitScript
-        & $gs infra remote up
+        & $gs infra remote up --env dev --yes
         if ($LASTEXITCODE -ne 0) {
             Write-DevLog "infra remote up failed (exit $LASTEXITCODE). Pass --no-infra to skip." "ERROR"
             exit $LASTEXITCODE

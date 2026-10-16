@@ -13,8 +13,7 @@ from pathlib import Path
 _LINE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
 
 #: The kit's environments when a caller passes none (the catalog's, config/catalogs/environments.json,
-#: is what the resolver passes); a folder's files are read in this order, then `deploy`, a later
-#: file's value winning, as compose does with repeated --env-file.
+#: is what the resolver passes); a folder's files are read in this order, a later file's value winning, as compose does with repeated --env-file.
 DEFAULT_ENVIRONMENTS = ("dev", "prod")
 
 #: A run on this machine (`run`, `hybrid boot`) reads ONE environment's configuration (12-factor III):
@@ -68,17 +67,14 @@ def dev_run_loses(secrets_root: Path, folder: str) -> list[str]:
 
 def folder_files(secrets_root: Path, folder: str, profile: str = "all",
                  environments: tuple[str, ...] | list[str] = DEFAULT_ENVIRONMENTS) -> list[Path]:
-    """The env files of one secrets folder that exist: one per environment in catalog order, then the
-    shared deploy.env and the folder's .env.deploy -- or only one profile's."""
+    """The env files of one secrets folder that exist: the shared `.env`, then one per environment in
+    catalog order -- or the shared one and one environment's. (Before 2.0.0 a shared deploy.env and a
+    folder's .env.deploy were read too; `validate` now refuses them, naming `migrate`.)"""
     d = secrets_root / folder
-    order = (*environments, "deploy")
-    wanted = order if profile == "all" else (profile,)
-    files: list[Path] = []
-    for p in (order if profile == "all" or profile in order else (profile,)):
-        if p not in wanted:
-            continue
-        if p == "deploy":
-            files += [secrets_root / "deploy.env", d / ".env.deploy"]
-        else:
-            files.append(d / f".env.{p}")
+    wanted = list(environments) if profile == "all" else [profile]
+    files = [d / SHARED, *(d / f".env.{p}" for p in wanted)]
     return [f for f in files if f.is_file()]
+
+
+#: The legacy homes `validate` refuses and `migrate` carries (ADR-001 amendment 13).
+LEGACY_FILES = ("deploy.env", ".env.deploy")

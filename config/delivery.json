@@ -1,0 +1,9 @@
+{
+  "$comment": "The delivery engine's own defaults (ADR-001 amendment 13), each overridable where the fact lives. keep: releases a unit keeps (a target's `keep`, a service's `keep`). healthWait: how long a deploy waits for a service to be healthy, judged by the engine's health status; a service with no healthcheck counts as healthy once running (a target's `healthWait`, a service's `healthWait`). credentialPatterns: the files of a module's secrets folder uploaded to its runtime/credentials, mode 600, mounted read-only, never written into the stack configuration (a module's `credentialPatterns`). neverShip: what a remote-dev sync never sends, whatever a driver or .gitignore says -- env files, keys, credential files (one list, beside the credential patterns it includes).",
+  "keep": 5,
+  "healthWait": { "retries": 24, "interval": 10 },
+  "credentialPatterns": ["*.p12", "*.jks", "*.keystore", "*.pem", "*.crt", "*credentials*.json", "*service-account*.json"],
+  "neverShip": [".env", ".env.*", "*.env", "*.key", "id_rsa*", "id_ed25519*", ".git/", ".stack-kit/"],
+  "credentialsMount": "/run/stack-kit/credentials",
+  "runtimeConfigMount": "/run/stack-kit/config"
+}

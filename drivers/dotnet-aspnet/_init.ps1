@@ -20,8 +20,6 @@ $entry = Get-ModuleManifestEntry $env:STACK_KIT_MODULE_ID
 $OpsModuleRoot = $modPath
 $OpsScriptRoot = $OpsModuleRoot
 $OpsSecretsModule = if ($entry.secretsModule) { $entry.secretsModule } else { $env:STACK_KIT_MODULE_ID }
-$OpsComposeFile = "docker-compose.yml"
-
-$OpsToolkitRoot = Get-OpsToolkitPowerShellRoot
-. (Join-Path $OpsToolkitRoot "_common.ps1")
+. (Join-Path $PackageRoot "lib\env.ps1")
+$SECRETS_DIR = Get-SecretsModuleDir -Module $OpsSecretsModule
 . (Join-Path $DriverRoot "ps1\_project.ps1")

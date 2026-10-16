@@ -142,10 +142,6 @@ function Get-OpsPackageRoot {
     Get-KitContextValue 'packageRoot'
 }
 
-function Get-OpsToolkitPowerShellRoot {
-    Join-Path (Get-OpsPackageRoot) "toolkit\powershell"
-}
-
 function Get-ManifestModulePath {
     param([Parameter(Mandatory = $true)][string]$ModuleId)
     if (-not (Get-ProjectRootFromManifest)) { throw "$((Get-KitIdentity).manifestFilename) not found" }
@@ -177,10 +173,6 @@ function Get-ModuleEnvPathLabels {
     )
     $base = "$(Get-SecretsConfigRel)/$(Get-ModuleSecretsFolder $ModuleId)"
     foreach ($name in $FileNames) { "$base/$name" }
-}
-
-function Get-DeployEnvPathLabel {
-    "$(Get-SecretsConfigRel)/deploy.env"
 }
 
 function Get-ListedSecretsModuleFolders {
@@ -222,13 +214,6 @@ function Get-InfraTunnelForwards {
 
 function Get-InfraSyncRelativePaths {
     @(Invoke-KitResolver -Arguments @('infra-sync-paths') | Where-Object { $_ })
-}
-
-function Get-DefaultRemoteDeployPathBase {
-    # A secrets folder's remote base: its DEPLOY_PATH, else {server base}/{project slug}/{folder};
-    # $null when neither can be known.
-    param([Parameter(Mandatory = $true)][string]$SecretsFolder)
-    Invoke-KitResolver -Arguments @('deploy-base', $SecretsFolder) -Optional -Quiet | Select-Object -First 1
 }
 
 # Resolved at load: former variables are carried to their current names before anything reads them.

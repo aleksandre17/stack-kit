@@ -67,24 +67,18 @@ LEGACY_REMOVED_IN: str = _DECLARATION.get("legacyRemovedIn") or ""
 
 
 def manifest_filenames() -> tuple[str, ...]:
-    """Every filename that may hold a project manifest — canonical first."""
-    return (MANIFEST_FILENAME, *LEGACY_MANIFEST_FILENAMES)
+    """The filename a project manifest is read from. Since 2.0.0 (LEGACY_REMOVED_IN) only the
+    canonical one: a former name is refused by `validate` and carried by `migrate --apply`."""
+    return (MANIFEST_FILENAME,)
 
 
 def find_manifest(directory: Path) -> Path | None:
     """The manifest in `directory`, preferring the canonical name.
 
     Returns None when the directory holds no manifest under any accepted name.
-    A legacy hit is announced once per name so a consumer learns it is on a
-    deprecated name instead of discovering it at the next major version.
     """
-    for name in manifest_filenames():
-        candidate = directory / name
-        if candidate.is_file():
-            if name != MANIFEST_FILENAME:
-                notice(name, MANIFEST_FILENAME)
-            return candidate
-    return None
+    candidate = directory / MANIFEST_FILENAME
+    return candidate if candidate.is_file() else None
 
 
 def has_manifest(directory: Path) -> bool:
@@ -97,74 +91,41 @@ def env_name(suffix: str) -> str:
 
 
 def env(suffix: str, default: str = "", environ: MutableMapping[str, str] | None = None) -> str:
-    """The value of the kit variable `suffix`: the canonical name, else the legacy one (noticed)."""
+    """The value of the kit variable `suffix` (a former prefix is no longer read: `validate` names it)."""
     environ = os.environ if environ is None else environ
     value = environ.get(env_name(suffix))
-    if value is not None:
-        return value
-    if LEGACY_ENV_PREFIX:
-        old = f"{LEGACY_ENV_PREFIX}_{suffix}"
-        if old in environ:
-            notice(old, env_name(suffix))
-            return environ[old]
-    return default
+    return default if value is None else value
 
 
 def adopt_legacy_env(environ: MutableMapping[str, str] | None = None) -> list[str]:
-    """Carry every legacy-prefixed variable to its canonical name, once, for this process tree.
-
-    The canonical name wins when both are set. The legacy name is then removed, so a child
-    process sees one name and the notice is printed once, by the process that adopted it.
-    Returns the legacy names adopted.
-    """
+    """Since 2.0.0 nothing is adopted: a former-prefixed variable is not read (the shells still call
+    this through `context`, which answers no changes). Returns the former names that are set."""
     environ = os.environ if environ is None else environ
-    if not LEGACY_ENV_PREFIX:
-        return []
-    adopted = []
-    for old in sorted(k for k in environ if k.startswith(LEGACY_ENV_PREFIX + "_")):
-        new = env_name(old[len(LEGACY_ENV_PREFIX) + 1:])
-        environ.setdefault(new, environ[old])
-        notice(old, new)
-        del environ[old]
-        adopted.append(old)
-    return adopted
+    return sorted(k for k in environ if LEGACY_ENV_PREFIX and k.startswith(LEGACY_ENV_PREFIX + "_"))
 
 
 def manifest_field(manifest: dict[str, Any], dotted: str) -> Any:
-    """`dotted` read from `manifest`, falling back to the legacy field it replaced (noticed)."""
-    found = _dig(manifest, dotted)
-    if found is not None:
-        return found
-    for old, new in LEGACY_MANIFEST_FIELDS.items():
-        if new == dotted:
-            legacy = _dig(manifest, old)
-            if legacy is not None:
-                notice(f"{MANIFEST_FILENAME}: {old}", dotted)
-                return legacy
-    return None
+    """`dotted` read from `manifest` (a former field is not read since 2.0.0: `validate` names it)."""
+    return _dig(manifest, dotted)
 
 
 def with_current_fields(manifest: dict[str, Any]) -> dict[str, Any]:
-    """A copy of `manifest` with every renamed field under its current name only (each former one
-    noticed). What the schema and the resolver read, so a host on a former field is held to the
-    same contract as one on the current field -- and is not refused for the spelling."""
+    """The manifest as read: since 2.0.0 a former field is not carried here (`migrate --apply` renames
+    it, `validate` refuses it)."""
     import copy
 
-    out = copy.deepcopy(manifest)
-    for old, new in LEGACY_MANIFEST_FIELDS.items():
-        *oparent, oleaf = old.split(".")
-        holder = _dig(out, ".".join(oparent)) if oparent else out
-        if not isinstance(holder, dict) or oleaf not in holder:
-            continue
-        value = holder.pop(oleaf)
-        if _dig(out, new) is not None:
-            continue  # the current name is already there; it wins, as everywhere
-        notice(f"{MANIFEST_FILENAME}: {old}", new)
-        node = out
-        *nparent, nleaf = new.split(".")
-        for part in nparent:
-            node = node.setdefault(part, {})
-        node[nleaf] = value
+    return copy.deepcopy(manifest)
+
+
+def legacy_names_in(root: Path, manifest: dict[str, Any], environ: MutableMapping[str, str] | None = None) -> list[str]:
+    """Every former name a host still carries: a manifest under a former filename, a former field, a
+    former-prefixed variable -- each a `validate` error naming `migrate`."""
+    environ = os.environ if environ is None else environ
+    out = [f"{name}: a former manifest filename (now {MANIFEST_FILENAME})" for name in LEGACY_MANIFEST_FILENAMES
+           if (root / name).is_file()]
+    out += [f"{MANIFEST_FILENAME}: {old} is the former name of {new}" for old, new in LEGACY_MANIFEST_FIELDS.items()
+            if _dig(manifest, old) is not None]
+    out += [f"${k}: the former prefix {LEGACY_ENV_PREFIX}_ (now {ENV_PREFIX}_)" for k in adopt_legacy_env(environ)]
     return out
 
 

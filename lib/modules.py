@@ -259,11 +259,6 @@ def resolve_cli_alias(alias: str, manifest: dict[str, Any]) -> str | None:
     return None
 
 
-def layout_simulator_for_type(driver_type: str) -> str | None:
-    """The layout simulator a driver DECLARES, or None when it declares none."""
-    value = driver_capability(driver_type, "layoutSimulator")
-    return str(value) if isinstance(value, str) and value else None
-
 
 def driver_supports_config_gen(driver_type: str) -> bool:
     """Does this driver DECLARE that its modules take generated config?"""
@@ -275,11 +270,6 @@ def driver_accepts_global_credentials(driver_type: str) -> bool:
     return bool(driver_capability(driver_type, "acceptsGlobalCredentials", False))
 
 
-def driver_deploy_kind(driver_type: str) -> str:
-    """The deploy artefact a driver DECLARES it produces ('runtime', 'static', ...)."""
-    value = driver_capability(driver_type, "deployKind", "")
-    return str(value).strip().lower()
-
 
 def driver_delivery(driver_type: str) -> dict[str, dict[str, Any]]:
     """The delivery ladder a driver DECLARES: rung name -> `{command, args}`, `{via}` (a kit verb)
@@ -288,21 +278,7 @@ def driver_delivery(driver_type: str) -> dict[str, dict[str, Any]]:
     return {str(k): v for k, v in value.items() if isinstance(v, dict)} if isinstance(value, dict) else {}
 
 
-def driver_deploy_args(driver_type: str) -> list[str]:
-    """The argv of a driver's `release` rung -- what its stack deploy step runs (default: none).
-    A project registry written before the ladder may still say `deployArgs`; it is read."""
-    release = driver_delivery(driver_type).get("release") or {}
-    value = release.get("args") if "args" in release else driver_capability(driver_type, "deployArgs", [])
-    return [str(a) for a in value] if isinstance(value, list) else []
-
 
 def module_driver_type(manifest: dict[str, Any], module_id: str) -> str:
     cfg = _modules(manifest).get(module_id) or {}
     return str(cfg.get("type") or "")
-
-
-def default_stack_deploy_steps(manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    """Role-ordered deploy plan when stackDeploy.steps omitted."""
-    from lib.stack_deploy import default_stack_deploy_steps as _steps
-
-    return _steps(manifest)

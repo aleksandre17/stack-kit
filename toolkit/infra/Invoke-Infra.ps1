@@ -1,5 +1,7 @@
-﻿# stack-kit — Postgres, Redis, Qdrant (local / remote / tunnel)
-# Usage: stack-kit infra [prereqs|local|remote|tunnel] [up|down|sync|status|purge] [-Prod] [-Confirm]
+﻿# stack-kit — the infra stack (Postgres, Redis, Qdrant ...) on THIS machine.
+# Usage: stack-kit infra local up|down|status [-Prod]
+# On a target, the infra stack is the delivery engine's (`stack-kit infra remote ...`, `infra tunnel`):
+# it lives in the layout's infra place and runs under the target's declared compose invocation.
 
 param(
     [Parameter(Position = 0)]
@@ -19,8 +21,6 @@ $PackageRoot = if ($env:STACK_KIT_KIT_ROOT) {
 
 . (Join-Path $PackageRoot "lib\project.ps1")
 . (Join-Path $PackageRoot "lib\env.ps1")
-$SshLib = Join-Path $PackageRoot "lib\ssh.ps1"
-if (Test-Path $SshLib) { . $SshLib }
 
 $Root = Get-ProjectRootFromManifest
 if (-not $Root) {
@@ -86,9 +86,11 @@ function Invoke-InfraLocalCompose {
     $composeArgs = Resolve-InfraComposeFileArgs -IsProd $Prod
     Push-Location $InfraComposeDir
     try {
-        $cmd = @('compose') + $composeArgs + @('--env-file', $envFile, $ComposeAction)
-        Write-InfraLog "docker $($cmd -join ' ')"
-        & docker @cmd
+        # This machine's compose invocation is the runtime catalog's (the entry flagged `local`).
+        $compose = @(Invoke-KitResolver -Arguments @('compose-command'))
+        $cmd = @($compose | Select-Object -Skip 1) + $composeArgs + @('--env-file', $envFile) + @($ComposeAction -split ' ')
+        Write-InfraLog "$($compose[0]) $($cmd -join ' ')"
+        & $compose[0] @cmd
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
     finally {
@@ -96,160 +98,17 @@ function Invoke-InfraLocalCompose {
     }
 }
 
-function Get-InfraRemotePaths {
-    $remoteBase = (Resolve-InfraDeployPath -replace '\\', '/').TrimEnd('/')
-    return @{
-        Base    = $remoteBase
-        Compose = "$remoteBase/compose"
-        Env     = "$remoteBase/.env.runtime"
-    }
-}
-
-function Upload-InfraToRemote {
-    $server = Get-DeployEnvValue "DEPLOY_SERVER"
-    if (-not $server) {
-        Write-InfraLog "Set DEPLOY_SERVER in ops/config/deploy.env" "ERROR"
-        exit 1
-    }
-    $paths = Get-InfraRemotePaths
-    $remoteBase = $paths.Base
-    $remoteCompose = $paths.Compose
-    $slug = Get-InfraConsumerSlug
-    Write-InfraLog "Sync -> ${server}:$remoteCompose (slug=$slug)"
-
-    if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {
-        Write-InfraLog "ssh not found" "ERROR"
-        exit 1
-    }
-    $mkdirRc = Invoke-StackKitRemoteBash "mkdir -p '$remoteCompose'"
-    if ($mkdirRc -ne 0) {
-        Write-InfraLog "mkdir on server failed (exit $mkdirRc)" "ERROR"
-        exit 1
-    }
-
-    $rsync = Get-Command rsync -ErrorAction SilentlyContinue
-    if ($rsync) {
-        $src = ($InfraComposeDir -replace "\\", "/") + "/"
-        $dest = "${server}:$remoteCompose/"
-        $excludes = @('--exclude', '.git', '--exclude', 'ps1', '--exclude', 'sh', '--exclude', 'logs')
-        & rsync -avz --delete $excludes $src $dest
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    }
-    else {
-        Write-InfraLog "rsync not found - using scp" "WARN"
-        foreach ($rel in (Get-InfraSyncRelativePaths)) {
-            $local = Join-Path $InfraComposeDir ($rel -replace '/', '\')
-            if (-not (Test-Path $local)) { continue }
-            $remoteFile = "$remoteCompose/" + ($rel -replace '\\', '/')
-            $remoteDir = ($remoteFile -replace '\\', '/')
-            if ($remoteDir -match '/') {
-                $parent = $remoteDir.Substring(0, $remoteDir.LastIndexOf('/'))
-                if ($parent) {
-                    $null = Invoke-StackKitRemoteBash "mkdir -p '$parent'"
-                }
-            }
-            $scpRc = Invoke-StackKitScp $local $remoteFile
-            if ($scpRc -ne 0) { exit $scpRc }
-        }
-    }
-
-    $envFile = Assert-InfraEnvFile
-    $remoteEnv = "$remoteBase/.env.runtime"
-    $scpRc = Invoke-StackKitScp $envFile $remoteEnv
-    if ($scpRc -ne 0) { exit $scpRc }
-    Write-InfraLog "Synced compose + .env.runtime"
-}
-
-function Invoke-InfraRemoteCompose {
-    param([string]$ComposeAction)
-    $server = Get-DeployEnvValue "DEPLOY_SERVER"
-    if (-not $server) {
-        Write-InfraLog "Set DEPLOY_SERVER in ops/config/deploy.env" "ERROR"
-        exit 1
-    }
-    $paths = Get-InfraRemotePaths
-    $remoteBase = $paths.Base
-    $remoteCompose = $paths.Compose
-    $envRemote = $paths.Env
-    $composeParts = [System.Collections.ArrayList]@()
-    Add-InfraComposeFileArgs -Target $composeParts
-    $composeFiles = (($composeParts -join ' ') -replace '\\', '/')
-    if ($Prod) { $composeFiles += " -f docker-compose.prod.yml" }
-    $coexist = Join-Path $InfraComposeDir "docker-compose.coexist.yml"
-    if ($Prod -and (Test-Path $coexist)) { $composeFiles += " -f docker-compose.coexist.yml" }
-    $prodFlag = if ($Prod) { " (prod overlay)" } else { "" }
-    Write-InfraLog "Remote $ComposeAction on $server$prodFlag -> $remoteBase"
-
-    $remoteScript = (
-        'set -euo pipefail; cd "{0}"; ' +
-        'if docker compose version >/dev/null 2>&1; then docker compose {1} --env-file "{2}" {3}; ' +
-        'else docker-compose {1} --env-file "{2}" {3}; fi'
-    ) -f $remoteCompose, $composeFiles, $envRemote, $ComposeAction
-    $sshRc = Invoke-StackKitRemoteBash $remoteScript
-    if ($sshRc -ne 0) { exit $sshRc }
-}
-
-function Invoke-InfraRemotePurge {
-    if (-not $Confirm) {
-        Write-InfraLog "remote purge removes THIS project containers and volumes only. Pass -Confirm." "ERROR"
-        exit 1
-    }
-    $remoteBase = (Get-InfraRemotePaths).Base
-    $slug = Get-InfraConsumerSlug
-    if ($remoteBase -notmatch "/infra/$([regex]::Escape($slug))`$") {
-        Write-InfraLog "Refusing purge: path must end with /infra/$slug (got $remoteBase)" "ERROR"
-        exit 1
-    }
-    Write-InfraLog "Purge infra stack at $remoteBase (other projects under .../infra/ are untouched)" "WARN"
-    Invoke-InfraRemoteCompose "down -v --remove-orphans"
-}
-
-function Start-InfraTunnel {
-    $server = Get-DeployEnvValue "DEPLOY_SERVER"
-    if (-not $server) {
-        Write-InfraLog "Set DEPLOY_SERVER in ops/config/deploy.env" "ERROR"
-        exit 1
-    }
-    try {
-        $forwards = Get-InfraTunnelForwards
-    }
-    catch {
-        Write-InfraLog $_.Exception.Message "ERROR"
-        exit 1
-    }
-    $sshExtra = @(Get-StackKitSshExtraArgs)
-    $portList = ($forwards | ForEach-Object { $_.Local }) -join ','
-    $svcList = ($forwards | ForEach-Object { "$($_.Service)($($_.Env))" }) -join ', '
-    Write-InfraLog "SSH tunnel (Ctrl+C) services: $svcList"
-    Write-InfraLog "localhost ports -> ${server}: $portList"
-    Write-InfraLog "Set INFRA_HOST=127.0.0.1 in app .env.dev (hybrid)"
-    $sshArgs = [System.Collections.ArrayList]@()
-    $sshArgs.AddRange($sshExtra)
-    [void]$sshArgs.Add('-N')
-    foreach ($f in $forwards) {
-        [void]$sshArgs.Add('-L')
-        [void]$sshArgs.Add("$($f.Local):127.0.0.1:$($f.Remote)")
-    }
-    [void]$sshArgs.Add($server)
-    & ssh @sshArgs
-}
 
 function Show-InfraHelp {
     Write-Host @"
 
-  stack-kit infra - Postgres, Redis, Qdrant (stack-kit)
+  stack-kit infra - the infra stack (stack.infra.services)
 
-    prereqs              SSH: docker network + checks
-    local up|down|status Docker on this machine
-    remote sync          Upload compose + .env.runtime (scoped to infra/<INFRA_SLUG>/)
-    remote up|down|status
-    remote purge -Confirm  down -v for THIS slug only (not sibling projects)
-    tunnel               ssh -L (ports from stack.infra.services + infra-catalog)
+    local up|down|status   Docker on this machine (-Prod: .env.prod + docker-compose.prod.yml)
+    remote sync|up|down|status|purge   on the target, in its layout's infra place (the Python CLI)
+    tunnel                 ssh -L to the target's infra ports (the Python CLI)
 
-    -Prod                .env.prod + docker-compose.prod.yml overlay
-
-  Compose dir: stack.infraComposeDir in stack-kit.json
-  Remote path: {DEPLOY_SERVER_BASE}/{DEPLOY_PROJECT}/infra/{INFRA_SLUG}
+  Compose dir: stack.infraComposeDir in the manifest
 
 "@
 }
@@ -257,11 +116,6 @@ function Show-InfraHelp {
 $bash = Get-Command bash -ErrorAction SilentlyContinue
 switch ($Mode.ToLowerInvariant()) {
     "help" { Show-InfraHelp; exit 0 }
-    "prereqs" {
-        if (-not $bash) { Write-InfraLog "Git Bash required for prereqs" "ERROR"; exit 1 }
-        & $bash (Join-Path $PackageRoot "toolkit\infra\ensure-prereqs.sh")
-        exit $LASTEXITCODE
-    }
     "local" {
         switch ($Action.ToLowerInvariant()) {
             "up" { Invoke-InfraLocalCompose "up -d" }
@@ -270,17 +124,11 @@ switch ($Mode.ToLowerInvariant()) {
             default { Write-InfraLog "Usage: stack-kit infra local up|down|status" "ERROR"; exit 1 }
         }
     }
-    "remote" {
-        switch ($Action.ToLowerInvariant()) {
-            "sync" { Upload-InfraToRemote }
-            "up" {
-                Upload-InfraToRemote
-                Invoke-InfraRemoteCompose "up -d --remove-orphans"
-            }
-            "down" { Invoke-InfraRemoteCompose "down" }
-            "status" { Invoke-InfraRemoteCompose "ps" }
-            "purge" { Invoke-InfraRemotePurge }
-            default { Write-InfraLog "Usage: stack-kit infra remote up|down|sync|status|purge -Confirm" "ERROR"; exit 1 }
+    { $_ -in @("remote", "tunnel", "prereqs") } {
+        Write-InfraLog "infra $Mode runs on the target through the CLI: stack-kit infra remote <action> --target <t> --env <id> (prereqs: stack-kit targets --verify)" "ERROR"
+        exit 2
+    }
+    default { Write-InfraLog "Usage: stack-kit infra remote up|down|sync|status|purge -Confirm" "ERROR"; exit 1 }
         }
     }
     "tunnel" { Start-InfraTunnel }

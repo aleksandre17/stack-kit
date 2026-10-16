@@ -1,39 +1,16 @@
 # SSH — სად ჩასვა გასაღები (clone-ის შემდეგ)
 
-Deploy (`stack-kit fe/be deploy`, `manage`, `dev`) იყენებს **OpenSSH**-ს (`ssh` / `scp`).  
-პრივატული გასაღები **არასოდეს** არ უნდა იყოს git-ში.
+ყველა remote ზმნა (`deploy`, `release`, `ops`, `dev`, `targets --verify`) იყენებს **OpenSSH**-ს.
+პრივატული გასაღები **არასოდეს** არ უნდა იყოს git-ში. სად მიდის deploy — ეს `ops/deploy/targets.json`-ია,
+ვინაობა იქ მხოლოდ **მითითებაა** (`ssh.identity`), არასოდეს გასაღები.
 
-## სწრაფი არჩევანი
+| მეთოდი | სად არის key | `targets.<name>.ssh.identity` |
+|--------|--------------|-------------------------------|
+| **A — ssh-agent (რეკომენდებული)** | `~/.ssh/id_ed25519`, agent-ში | `agent` (ნაგულისხმევი) |
+| **B — პროექტის ფოლდერი** | `ops/config/ssh/id_ed25519` (gitignored) | `file:ops/config/ssh/id_ed25519` |
+| **C — ცვლადი** | სადმე, გზა ცვლადში | `env:DEPLOY_KEY_PATH` |
+| **D — SSH config** | `ops/config/ssh/config` (gitignored) | `ssh.config: "ops/config/ssh/config"` |
 
-| მეთოდი | სად არის key | რა ჩაწერო `ops/config/deploy.env`-ში |
-|--------|--------------|-------------------------------------|
-| **A — სტანდარტული (რეკომენდებული)** | `~/.ssh/id_ed25519` (ან `id_rsa`) | `DEPLOY_SERVER=user@host` |
-| **B — პროექტის ფოლდერი** | `ops/config/ssh/id_ed25519` (gitignored) | `DEPLOY_SERVER=user@host` + `DEPLOY_SSH_IDENTITY_FILE=ops/config/ssh/id_ed25519` |
-| **C — SSH config alias** | `ops/config/ssh/config` (gitignored) | `DEPLOY_SERVER=stack-kit-deploy` + `DEPLOY_SSH_CONFIG_FILE=ops/config/ssh/config` |
-
-## A — `~/.ssh`
-
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519
-ssh-copy-id user@YOUR_SERVER
-```
-
-`ops/config/deploy.env`: `DEPLOY_SERVER=user@host`
-
-## B — `ops/config/ssh/`
-
-დააკოპირე პრივატული key → `ops/config/ssh/id_ed25519` (ან `id_rsa` + შესაბამისი `DEPLOY_SSH_IDENTITY_FILE`).
-
-## C — config alias
-
-`copy config.example config` → შეავსე → `DEPLOY_SSH_CONFIG_FILE=ops/config/ssh/config`, `DEPLOY_SERVER=stack-kit-deploy`.
-
-## Ops ცვლადები
-
-| ცვლადი | ფაილი |
-|--------|--------|
-| `DEPLOY_SERVER` | `ops/config/deploy.env` |
-| `DEPLOY_SSH_IDENTITY_FILE` | optional |
-| `DEPLOY_SSH_CONFIG_FILE` | optional |
+სერვერის გასაღები მიმაგრებულია (`ssh.knownHosts`, `hostKeys: pinned`); `BatchMode=yes` — პაროლით შესვლა არ ხდება.
 
 სრული adoption: [kits/stack-kit/docs/ADOPT.md#configuration](../../../kits/stack-kit/docs/ADOPT.md#configuration)

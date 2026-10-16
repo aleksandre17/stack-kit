@@ -1,9 +1,9 @@
-# Env files, deploy values and naming for PowerShell -- a SHIM over lib/resolve_cli.py
+# Env files and run environments for PowerShell -- a SHIM over lib/resolve_cli.py
 # (ADR-001 decision 2).
 #
 # What the environment says changes during a run, so none of it is cached: each function asks the
 # resolver, which holds the one rule -- which files a secrets folder reads and in what order, that a
-# later file's value wins, that an operator's process environment beats deploy.env, how a slug is made.
+# later file's value wins, how a slug is made.
 
 . (Join-Path $PSScriptRoot "project.ps1")
 
@@ -30,7 +30,7 @@ function Get-SecretsModuleDir {
 function Get-SecretsEnvFiles {
     param(
         [Parameter(Mandatory = $true)][string]$Module,
-        [ValidateScript({ $_ -in @("deploy", "all") -or (Test-KitEnvironment $_) })][string]$Profile = "all"
+        [ValidateScript({ $_ -eq "all" -or (Test-KitEnvironment $_) })][string]$Profile = "all"
     )
     @(Invoke-KitResolver -Arguments @('env-files', $Module, $Profile) | Where-Object { $_ })
 }
@@ -68,60 +68,3 @@ function Get-ComposeEnvFileArgs {
     return $args
 }
 
-function Get-DeployEnvFile {
-    Join-Path (Get-SecretsRoot) "deploy.env"
-}
-
-function Get-DeployEnvValue {
-    # A shared deploy value: the process environment first, then deploy.env, else Default.
-    param([string]$Key, [string]$Default = $null)
-    $v = Invoke-KitResolver -Arguments @('deploy-env-value', $Key, $Default) | Select-Object -First 1
-    if ($v) { return $v }
-    return $Default
-}
-
-function Get-ProjectSlug {
-    Invoke-KitResolver -Arguments @('project-slug') | Select-Object -First 1
-}
-
-function Get-ComposeSlug {
-    Invoke-KitResolver -Arguments @('compose-slug') | Select-Object -First 1
-}
-
-function Get-DockerNetworkName {
-    Invoke-KitResolver -Arguments @('docker-network') | Select-Object -First 1
-}
-
-function Get-DeployServerBase {
-    $b = Invoke-KitResolver -Arguments @('server-base') | Select-Object -First 1
-    if ($b) { return $b }
-    return $null
-}
-
-function Get-InfraConsumerSlug {
-    Invoke-KitResolver -Arguments @('infra-slug') | Select-Object -First 1
-}
-
-function Resolve-InfraDeployPath {
-    Invoke-KitResolver -Arguments @('infra-deploy-path') | Select-Object -First 1
-}
-
-function Get-StackComposeEnvFileArgs {
-    param([ValidateScript({ Test-KitEnvironment $_ })][string]$Environment)
-    $args = [System.Collections.ArrayList]@()
-    $seen = @{}
-    foreach ($folder in (Get-ListedSecretsModuleFolders)) {
-        foreach ($f in (Get-SecretsEnvFiles -Module $folder -Profile $Environment)) {
-            if ($seen[$f]) { continue }
-            $seen[$f] = $true
-            [void]$args.Add("--env-file")
-            [void]$args.Add($f)
-        }
-    }
-    $deployEnv = Get-DeployEnvFile
-    if ((Test-Path $deployEnv) -and -not $seen[$deployEnv]) {
-        [void]$args.Add("--env-file")
-        [void]$args.Add($deployEnv)
-    }
-    return $args
-}

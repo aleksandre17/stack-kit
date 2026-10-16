@@ -33,9 +33,9 @@ class TestRegistryEntry:
         assert entry["roles"] == ["api"]
         assert "runtime" not in entry  # a command runs by its script's runtime (config/runtimes.json)
         assert all(str(c).endswith(".ps1") for c in entry["commands"].values())
-        assert entry["deployKind"] == "artifact"
-        assert entry["delivery"]["release"] == {"command": "deploy", "args": ["artifact"]}
-        assert {"run", "check", "deploy"} <= set(driver_commands(DRIVER))
+        assert entry["delivery"]["release"] == {"via": "release"}
+        assert entry["package"]["command"] == "package" and entry["container"]["template"]
+        assert {"run", "check", "package"} <= set(driver_commands(DRIVER))
 
     def test_declared_scripts_exist(self) -> None:
         entry = driver_registry()[DRIVER]

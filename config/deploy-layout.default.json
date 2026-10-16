@@ -1,21 +1,18 @@
 {
-  "$comment": "The kit's ONE default remote layout (ADR-001 amendment 9): one root on the server; one directory per project directly under it; inside a project, one disjoint tree per environment; inside an environment, one directory per deployed service (its `unit`) and the stack's own configuration. A target overrides any template (`layout`). Value placeholders: {root} the target's absolute root, {project} the project slug, {environment} dev|prod, {service} the compose service, {container} its container, {folder} the module's secrets folder, {infraSlug} the infra stack's slug. `{@kind}` is another template of this file. Every rendered path must lie under `project` (the resolver refuses one that escapes). `pending` names the places declared ahead of the delivery that fills them.",
+  "$comment": "The kit's ONE default remote layout (ADR-001 amendments 9, 13): one root on the server; one directory per project under it; one disjoint tree per environment inside it; inside an environment, one directory per tier (catalogs.tiers: backend, frontend) holding one unit per service, and the stack's own configuration. A unit holds releases/<id> (one per packaged commit), `current` (the pointer a deploy and a rollback move), logs/ and runtime/ (the runtime config, mounted read-only), and in an environment with a workspace, workspace/ (remote dev). stack/ holds the environment's one compose file, each service's env file and the state of its units (which run their workspace); infra/ the environment's infra stack; backups/ what a backup of the environment writes. A target overrides any template (`layout`). Value placeholders: {root}, {project} (the project slug), {environment}, {tier} (the service's, from its role), {service}, {infraSlug}; `{@kind}` is another template of this file. Every rendered path must lie under `project`, and `project` strictly under the root: the root is shared between projects and never acted on. `unproven` is the one thing this layout's delivery may still say it lacks.",
   "project": "{root}/{project}",
   "environment": "{@project}/{environment}",
-  "unit": "{@environment}/modules/{service}",
+  "unit": "{@environment}/{tier}/{service}",
   "logs": "{@unit}/logs",
   "releases": "{@unit}/releases",
   "current": "{@unit}/current",
   "runtime": "{@unit}/runtime",
-  "workspace": "{@project}/dev/modules/{service}/workspace",
+  "workspace": "{@unit}/workspace",
   "stack": "{@environment}/stack",
+  "stackCompose": "{@stack}/compose.yml",
   "stackEnv": "{@stack}/env/{service}.env",
+  "stackState": "{@stack}/state.json",
   "infra": "{@environment}/infra",
-  "pending": {
-    "releases": "a release per version and a `current` pointer replace the unit's versions/ folder once the delivery is proven against a docker host",
-    "current": "see releases",
-    "runtime": "runtime config (modules.<id>.runtimeConfig) is declared and validated; its upload and read-only mount are proven against a docker host first",
-    "stack": "one compose file per environment, and the env files beside it, replace each unit's own once proven against a docker host",
-    "stackEnv": "see stack"
-  }
+  "backups": "{@environment}/backups",
+  "unproven": "The release delivery (releases, current, rollback, the stack compose, runtime config) is proven with a recording transport and an in-memory server, not yet against a real docker host."
 }

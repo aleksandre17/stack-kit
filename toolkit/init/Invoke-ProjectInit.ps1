@@ -97,50 +97,6 @@ function Merge-GitIgnore {
     }
 }
 
-function Get-ProjectSlug([string]$Root) {
-    $name = Split-Path $Root -Leaf
-    $s = [regex]::Replace($name, '[^a-zA-Z0-9._-]+', '-').Trim('-').ToLower()
-    if (-not $s) { return 'app' }
-    return $s
-}
-
-function Update-DeployEnvAbstractNames {
-    param([string]$Root, [switch]$Force)
-    $path = Join-Path $Root 'ops\config\deploy.env'
-    if (-not (Test-Path $path)) { return }
-    $slug = Get-ProjectSlug $Root
-    $lines = Get-Content $path -Encoding UTF8
-    $map = @{
-        'DEPLOY_PROJECT'       = $slug
-        'COMPOSE_PROJECT_NAME' = $slug
-        'DOCKER_NETWORK'       = "$slug-net"
-    }
-    $seen = @{}
-    $out = [System.Collections.Generic.List[string]]::new()
-    foreach ($line in $lines) {
-        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
-            $key = $Matches[1]
-            $val = $Matches[2].Trim()
-            $seen[$key] = $true
-            if ($map.ContainsKey($key)) {
-                $placeholder = $val -match 'YOUR_|^$|example\.com'
-                if ($Force -or $placeholder) {
-                    $line = "$key=$($map[$key])"
-                    Write-Host "  [OK]   deploy.env $key=$($map[$key]) (from repo slug)" -ForegroundColor Green
-                }
-            }
-        }
-        [void]$out.Add($line)
-    }
-    foreach ($key in $map.Keys) {
-        if (-not $seen[$key]) {
-            [void]$out.Add("$key=$($map[$key])")
-            Write-Host "  [OK]   deploy.env +$key=$($map[$key])" -ForegroundColor Green
-        }
-    }
-    Set-Content -Path $path -Value $out -Encoding UTF8
-}
-
 function Show-Checklist {
     param([string]$Root)
     $env:STACK_KIT_PROJECT_ROOT = $Root
@@ -152,9 +108,8 @@ function Show-Checklist {
     Write-Host "  Fill in (search for YOUR_ / example.com / empty values)" -ForegroundColor Yellow
     Write-Host "  ═══════════════════════════════════════════════════════" -ForegroundColor DarkCyan
 
-    $checks = @(
-        @{ File = (Get-DeployEnvPathLabel -replace '/', '\'); Hints = @("DEPLOY_SERVER", "DEPLOY_PROJECT") }
-    )
+    # Where deploys go is declared in the targets file (`deploy.targets`), never an env file.
+    $checks = @()
     foreach ($mid in Get-ProjectModules) {
         $role = Get-ModuleRole $mid
         $sm = Get-ModuleSecretsFolder $mid
@@ -166,7 +121,6 @@ function Show-Checklist {
         }
         $checks += @{ File = "$(Get-SecretsConfigRel)/$sm/.env.dev" -replace '/', '\'; Hints = $hints }
         $checks += @{ File = "$(Get-SecretsConfigRel)/$sm/.env.prod" -replace '/', '\'; Hints = $hints }
-        $checks += @{ File = "$(Get-SecretsConfigRel)/$sm/.env.deploy" -replace '/', '\'; Hints = @("DEPLOY_PATH") }
     }
     $uiMod = Get-ModuleIdByRole "ui"
     if ($uiMod) {
@@ -183,7 +137,6 @@ function Show-Checklist {
         $raw = Get-Content $path -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
         $todo = $false
         if ($raw -match 'YOUR_|example\.com|CHANGEME|user@YOUR') { $todo = $true }
-        if ($c.File -eq "ops\config\deploy.env" -and $raw -match 'DEPLOY_PROJECT=\s*$') { $todo = $true }
         $color = if ($todo) { "Yellow" } else { "Green" }
         $mark = if ($todo) { "[ ]" } else { "[✓]" }
         Write-Host "  $mark $($c.File)" -ForegroundColor $color
@@ -249,8 +202,6 @@ if (-not $SkipSeed) {
     if ($nginxEx -and $nginxTg) {
         Copy-IfMissing -ExampleRel $nginxEx -TargetRel $nginxTg -Optional:$true -Force:$ForceExamples
     }
-    Write-Step "Abstract deploy identity (COMPOSE_PROJECT_NAME / network from repo folder; service names from manifest)"
-    Update-DeployEnvAbstractNames -Root $ProjectRoot -Force:$ForceExamples
 }
 
 # ── 4. .gitignore merge ──────────────────────────────────────────

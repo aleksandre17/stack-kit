@@ -1,0 +1,7 @@
+{
+  "$comment": "Tiers, declared once (ADR-001 amendment 13): the part of a project's environment a service's unit lives in on a server ({root}/{project}/{environment}/{tier}/{service}). Each role names its tier (catalogs.roles `tier`). A host adds one in its manifest (`catalogs.tiers`).",
+  "entries": [
+    { "id": "backend" },
+    { "id": "frontend" }
+  ]
+}

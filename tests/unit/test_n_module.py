@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 
 from lib.modules import (
-    default_stack_deploy_steps,
     infer_cli_aliases,
     module_by_role,
     modules_by_role,
@@ -67,14 +66,6 @@ def test_resolve_alias_module_id_or_shortcut() -> None:
     assert resolve_cli_alias("web", m) == "web"
 
 
-def test_default_stack_deploy_api_before_ui() -> None:
-    m = _manifest_three_modules()
-    steps = default_stack_deploy_steps(m)
-    ids = [s["module"] for s in steps]
-    assert ids.index("api") < ids.index("web")
-    assert "worker" in ids
-
-
 def test_project_context_role_api(tmp_path) -> None:
     mf = tmp_path / "stack-kit.json"
     data = _manifest_three_modules()
@@ -82,5 +73,4 @@ def test_project_context_role_api(tmp_path) -> None:
     ctx = ProjectContext(root=tmp_path, manifest=data)
     assert ctx.module_id_for_role("ui") == "web"
     assert ctx.module_ids_for_role("api") == ["api"]
-    assert ctx.layout_simulator_script("web") == "simulate-frontend-layout.ps1"
     assert module_by_role(data, "api") == "api"

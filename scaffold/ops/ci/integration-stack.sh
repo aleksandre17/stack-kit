@@ -12,8 +12,7 @@ source "$PKG/lib/project.sh"
 source "$PKG/lib/env.sh"
 
 API_MOD="$(stack_kit_module_id_for_role api)"
-[[ -n "$API_MOD" ]] || API_MOD="$(stack_kit_module_id_for_deploy_kind runtime)"
-[[ -n "$API_MOD" ]] || { echo "[ci] ERROR: no api module, and no module whose driver deploys as runtime" >&2; exit 1; }
+[[ -n "$API_MOD" ]] || { echo "[ci] ERROR: no api module" >&2; exit 1; }
 
 BE="$(stack_kit_module_path "$API_MOD")"
 SECRETS_API="$(stack_kit_secrets_dir_for_module "$API_MOD")"
@@ -26,18 +25,19 @@ python3 "$PKG/compose/build.py"
 cd "$BE"
 export API_PORT WORKER_PORT
 ENV_ARGS=(--env-file "$SECRETS_API/.env.dev")
-[[ -f "$(stack_kit_secrets_root)/deploy.env" ]] && ENV_ARGS+=(--env-file "$(stack_kit_secrets_root)/deploy.env")
+# This machine's compose invocation: the runtime catalog's (the entry flagged `local`), never spelled here.
+mapfile -t COMPOSE < <(stack_kit_python "$PKG/lib/resolve_cli.py" compose-command | tr -d $'\r')
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.dev.yml}"
-echo "[ci] docker compose up (module=$API_MOD)..."
-docker compose "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" up -d --build
+echo "[ci] ${COMPOSE[*]} up (module=$API_MOD)..."
+"${COMPOSE[@]}" "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" up -d --build
 
 bash "$PKG/ci/wait-health.sh" "http://127.0.0.1:${API_PORT}/health" "UP" 120
 
-if docker compose "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" ps --format json 2>/dev/null | grep -q worker; then
+if "${COMPOSE[@]}" "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" ps --format json 2>/dev/null | grep -q worker; then
   bash "$PKG/ci/wait-health.sh" "http://127.0.0.1:${WORKER_PORT}/actuator/health" "UP" 120
 fi
 
-echo "[ci] docker compose down..."
-docker compose "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" down -v
+echo "[ci] ${COMPOSE[*]} down..."
+"${COMPOSE[@]}" "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" down -v
 echo "[ci] Integration stack passed."

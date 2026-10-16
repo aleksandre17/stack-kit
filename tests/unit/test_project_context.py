@@ -47,12 +47,3 @@ def test_list_secrets_module_folders(repo_root: Path, manifest: dict) -> None:
     assert "web" in folders
 
 
-def test_default_remote_deploy_base_uses_secrets_folder(tmp_path: Path) -> None:
-    mf = tmp_path / "stack-kit.json"
-    mf.write_text(
-        '{"secrets":"ops/config","modules":{"web":{"secretsModule":"web"}}}',
-        encoding="utf-8",
-    )
-    ctx = ProjectContext(root=tmp_path, manifest=json.loads(mf.read_text(encoding="utf-8")))
-    base = ctx.default_remote_deploy_base("web", server_base="/home/u", project_slug="my-app")
-    assert base == "/home/u/my-app/web"

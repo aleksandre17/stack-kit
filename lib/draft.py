@@ -35,7 +35,11 @@ from lib import identity  # noqa: E402
 KIT = Path(__file__).resolve().parents[1]
 PROFILES = KIT / "config" / "layout-profiles"
 #: Directories that are never a module's own evidence: build output, dependencies, VCS.
-NEVER = {"node_modules", "bin", "obj", "dist", "build", ".git", ".angular", ".gradle", "target", "out"}
+def never() -> set[str]:
+    """Directories never drafted from: git's, and every one a driver declares its tools generate."""
+    from lib.modules import driver_registry
+
+    return {".git", *(str(g) for d in driver_registry().values() for g in d.get("generated") or [])}
 
 
 class DraftRefused(ValueError):
@@ -53,7 +57,8 @@ def repository_files(root: Path, package: str | None) -> list[str]:
         files = None
     if files is None:
         files = [p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()]
-    out = [f for f in files if not NEVER.intersection(f.split("/")[:-1])]
+    skip = never()
+    out = [f for f in files if not skip.intersection(f.split("/")[:-1])]
     if package:
         out = [f for f in out if not (f + "/").startswith(package.rstrip("/") + "/")]
     nested = {posixpath.dirname(f) for f in out

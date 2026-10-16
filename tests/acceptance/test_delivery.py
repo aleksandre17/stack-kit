@@ -99,8 +99,9 @@ def test_every_built_rung_of_a_kit_driver_plans_to_a_script_it_declares(host, ty
         if "command" in how:
             script = driver_commands(typ)[how["command"]]
             assert Path(script).name in ran.stdout, (rung, ran.stdout)
-        else:
-            assert f"{how['via']} boot {module}" in ran.stdout
+        else:  # a rung `via` a kit verb plans to that verb of this module
+            verb = {"hybrid": "hybrid boot", "release": "deploy", "dev": "dev up"}[how["via"]]
+            assert f"-> {identity.KIT_NAME} {verb} {module}" in ran.stdout, (rung, ran.stdout)
 
 
 def test_a_built_rung_runs_binding_operands_by_the_scripts_own_parameters(host):

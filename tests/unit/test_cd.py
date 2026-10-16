@@ -53,13 +53,15 @@ TWO = {"schema": 1, "defaults": {"dev": "stage", "prod": "live"},
 def test_build_once_and_promote_the_same_bytes_dev_then_prod(tmp_path):
     text = _render(_host(tmp_path, TWO))
     dev, prod = _job(text, "deploy-dev"), _job(text, "deploy-prod")
-    assert "needs: [api, search, worker]" in dev and "needs: [deploy-dev]" in prod
-    assert "environment: 'stage'" in dev and "environment: 'live'" in prod
+    assert "needs: [api, search, worker, web, svc]" in dev and "needs: [deploy-dev]" in prod
+    assert "environment: 'dev'" in dev and "environment: 'prod'" in prod  # GitHub Environments gate them
     assert "group: 'deploy-live-prod'" in prod and "cancel-in-progress: false" in prod
+    assert "inputs.environment == 'prod'" in prod and "workflow_dispatch:" in text and "type: choice" in text
     for job in (dev, prod):
-        assert "unpack api .stack-kit/artifacts/api-*.tgz" in job and "name: package-api" in job
+        assert "name: package-api" in job
         assert not any(f" mod api {s}'" in job for s in ("build", "test", "lint")), "a deploy job builds"
-    assert "'pwsh tools/stack-kit.ps1 mod api deliver release --env prod --target live --no-build'" in prod
+    # CD runs the same CLI an operator runs -- the packaged archive, never its own deploy logic
+    assert "'pwsh tools/stack-kit.ps1 deploy api --env prod --target live --yes --artifact $(ls .stack-kit/artifacts/api-*.tgz)'" in prod
     assert "'pwsh tools/stack-kit.ps1 targets --health --target live --env prod'" in prod
     assert "'pwsh tools/stack-kit.ps1 targets --verify --target live --env prod'" in prod
     assert "secrets.STACK_KIT_SSH_KEY_LIVE" in prod and "ssh-add -" in prod
@@ -75,10 +77,10 @@ def test_every_package_carries_an_sbom_and_a_provenance_attestation(tmp_path):
     assert "subject-path: '.stack-kit/artifacts/api-*.tgz'" in api
 
 
-def test_a_module_whose_release_cannot_promote_is_named_never_deployed(tmp_path):
+def test_every_packaging_driver_is_deployed_by_the_kit_release(tmp_path):
     text = _render(_host(tmp_path, TWO))
-    assert "web (node-vite): packaging is pending" in text and "svc (node-api): packaging is pending" in text
-    assert " mod web deliver" not in text and " mod svc deliver" not in text
+    for mid in ("api", "search", "worker", "web", "svc"):
+        assert f" deploy {mid} --env prod --target live --yes" in text, mid
 
 
 @pytest.mark.parametrize("document,reason", [
@@ -96,49 +98,52 @@ def test_without_reachable_dev_and_prod_targets_it_is_ci_only_and_says_why(tmp_p
 
 # ── the commands behind the steps ────────────────────────────────────────────
 
-def test_a_package_is_one_archive_per_commit_and_unpacks_to_the_same_bytes(tmp_path, monkeypatch):
+def _committed(tmp_path: Path, name: str) -> tuple[Path, dict]:
     import subprocess
 
-    root = tmp_path / "pkg"
+    root = tmp_path / name
     shutil.copytree(WORKING_ROOT, root, symlinks=True)
     git = ["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t"]
     subprocess.run([*git, "init", "-q"], check=True)
     subprocess.run([*git, "add", "-A"], check=True)
     subprocess.run([*git, "commit", "-qm", "c"], check=True)
-    manifest = json.loads((root / identity.MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    return root, json.loads((root / identity.MANIFEST_FILENAME).read_text(encoding="utf-8"))
+
+
+def test_a_package_is_one_archive_per_commit_with_its_provenance_and_recipe(tmp_path):
+    root, manifest = _committed(tmp_path, "pkg")
     mid = next(m for m, c in manifest["modules"].items() if c["type"] == "java-boot")
     libs = root / manifest["modules"][mid]["path"] / "build" / "libs"
     libs.mkdir(parents=True)
     (libs / "app-1.0-boot.jar").write_bytes(b"JAR-BYTES")
+    (libs / "app-1.0-plain.jar").write_bytes(b"PLAIN")
     archive = package.pack(root, manifest, mid)
     assert archive.name.startswith(f"{mid}-") and archive.with_suffix(".tgz.sha256").is_file()
-    (libs / "app-1.0-boot.jar").unlink()
-    assert package.unpack(root, manifest, mid, archive)
-    assert (libs / "app-1.0-boot.jar").read_bytes() == b"JAR-BYTES"
+    meta, trees = package.read(archive)
+    assert meta["module"] == mid and meta["dirty"] is False and meta["commit"]
+    (svc,) = trees
+    assert trees[svc]["build/libs/app-1.0-boot.jar"] == b"JAR-BYTES"
+    recipe = trees[svc]["Dockerfile"].decode()
+    assert "COPY build/libs/app-1.0-boot.jar /app/app.jar" in recipe and "eclipse-temurin:17-jre" in recipe
     archive.write_bytes(archive.read_bytes() + b"x")
     with pytest.raises(package.PackageError, match="sha256 differs"):
-        package.unpack(root, manifest, mid, archive)
+        package.read(archive)
 
 
-def test_an_archive_member_that_escapes_its_module_is_refused(tmp_path):
-    root = tmp_path / "esc"
-    shutil.copytree(WORKING_ROOT, root, symlinks=True)
-    manifest = json.loads((root / identity.MANIFEST_FILENAME).read_text(encoding="utf-8"))
-    mid = next(iter(manifest["modules"]))
+def test_an_archive_member_that_escapes_its_service_is_refused(tmp_path):
     evil = tmp_path / "evil.tgz"
     payload = tmp_path / "x.txt"
     payload.write_text("x", encoding="utf-8")
     with tarfile.open(evil, "w:gz") as tar:
-        tar.add(payload, arcname="../../outside.txt")
-    with pytest.raises(package.PackageError, match="escapes its place"):
-        package.unpack(root, manifest, mid, evil)
+        tar.add(payload, arcname="api/../../outside.txt")
+    with pytest.raises(package.PackageError, match="escapes its service"):
+        package.read(evil)
 
 
-def test_a_pending_package_names_its_reason():
-    manifest = json.loads((WORKING_ROOT / identity.MANIFEST_FILENAME).read_text(encoding="utf-8"))
-    mid = next(m for m, c in manifest["modules"].items() if c["type"] == "node-vite")
-    with pytest.raises(package.PackageError, match="per environment"):
-        package.plan(WORKING_ROOT, manifest, mid)
+def test_a_driver_without_a_package_step_names_it():
+    manifest = {"modules": {"x": {"type": "no-such-driver", "path": "x"}}}
+    with pytest.raises(package.PackageError, match="declares no package step"):
+        package.plan(WORKING_ROOT, manifest, "x")
 
 
 class _Health(http.server.BaseHTTPRequestHandler):
@@ -155,25 +160,31 @@ def test_health_passes_the_declared_endpoints_and_names_a_failing_one(capsys):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_port}"
     try:
-        doc = {"targets": {"live": {**TARGET, "health": {"prod": {"api": f"{base}/ok"}}}}}
-        assert targets.health(doc, ["--env", "prod"], attempts=1, pause=0.01) == 0
-        doc["targets"]["live"]["health"]["prod"]["web"] = f"{base}/down"
-        assert targets.health(doc, ["--env", "prod"], attempts=2, pause=0.01) == 1
-        assert "FAILED web" in capsys.readouterr().out
-        pending = {"targets": {"live": {"runtime": "iis", "pending": "not yet"}}}
-        assert targets.health(pending, ["--env", "prod"], attempts=1) == 2
+        urls = {"api": f"{base}/ok"}
+        assert targets.check_health_urls(urls, attempts=1, pause=0.01) == []
+        urls["web"] = f"{base}/down"
+        failed = targets.check_health_urls(urls, attempts=2, pause=0.01)
+        assert len(failed) == 1 and failed[0].startswith("web ")
     finally:
         server.shutdown()
 
 
-def test_a_packaged_module_whose_release_cannot_promote_gets_its_package_and_no_deploy(tmp_path):
+def test_a_module_whose_driver_does_not_release_through_the_kit_gets_its_package_and_no_deploy(tmp_path, monkeypatch):
     root = _host(tmp_path, TWO)
+    monkeypatch.setenv(identity.env_name("PROJECT_ROOT"), str(root))
+    reg = root / "ops" / "drivers"
+    reg.mkdir(parents=True)
+    (reg / "registry.json").write_text(json.dumps({"own-pack": {
+        "label": "packages, releases by hand", "roles": ["api"], "commands": {"build": "b.py"},
+        "package": {"command": "build", "artifacts": ["out/**"]}, "delivery": {"release": {"pending": "by hand"}}}}),
+        encoding="utf-8")
     mf = root / identity.MANIFEST_FILENAME
     manifest = json.loads(mf.read_text(encoding="utf-8"))
     (root / "apps" / "edge").mkdir(parents=True)
-    manifest["modules"]["edge"] = {"type": "dotnet-aspnet", "role": "api", "path": "apps/edge", "secretsModule": "edge"}
+    manifest["drivers"] = {"registry": "ops/drivers/registry.json"}
+    manifest["modules"]["edge"] = {"type": "own-pack", "role": "api", "path": "apps/edge", "secretsModule": "edge"}
     mf.write_text(json.dumps(manifest), encoding="utf-8")
     text = _render(root)
-    assert "edge (dotnet-aspnet): its release does not deploy a packaged artifact (no `promotes`)" in text
+    assert "edge (own-pack): its release is pending -- by hand" in text
     assert "pwsh tools/stack-kit.ps1 package edge" in _job(text, "edge")
-    assert " mod edge deliver" not in text and "unpack edge" not in text
+    assert " deploy edge " not in text

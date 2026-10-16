@@ -41,7 +41,6 @@ Not used, by design — reject in review:
 | `config/` | `config-gen` entry (`build.py`) and `config-catalog.json` (profile boilerplate) |
 | `adapters/` | `render_nginx.py` (`nginx-gen`) |
 | `ci/` | generic CI helpers: `prepare-integration-env.sh`, `wait-health.sh`, `wait-stack-health.sh` |
-| `contracts/` | manage/log contracts ([MANAGE-CONTRACT.md](../contracts/MANAGE-CONTRACT.md)) |
 | `scaffold/` | everything `init` copies into a host ([scaffold/README.md](../scaffold/README.md)) |
 | `scripts/` | `dev-modes-verify.*`, `module-ops-smoke.sh`, `publish-git.ps1` |
 | `tests/` | `unit/` (in-process), `acceptance/` (shells and CLIs), `fixtures/golden-consumer/` ([tests/README.md](../tests/README.md)) |
@@ -167,7 +166,6 @@ Module commands are the driver's `commands` in the registry (table in [Drivers](
 - `<java-boot> deploy watch` → JAR publish loop (`toolkit/deploy/deploy-watch.sh`).
 - `<node-vite> deploy <local|dist|remote|sync|watch> [-Environment dev|prod]` (default `prod`).
 - `<node-vite> dev <bootstrap|sync|watch|restart>`; `<node-vite> compose [-Prod] <args>`.
-- `<java-boot> deploy [service|all] [--dev|--prod] [--no-build] [--skip-checks]`; `dev <bootstrap|sync|watch|restart> [--no-build] [--no-initial-sync] [--restart]`; `manage <svc> <action> [--prod]` ([contract](../contracts/MANAGE-CONTRACT.md)); `modules`.
 - A bash-runtime driver needs Git Bash on Windows; a PowerShell driver that throws exits 1 with the message.
 - Role shortcuts: `ui`, `api`, `worker`, `gateway` resolve to the module when exactly one module has that role and no alias of that name exists.
 

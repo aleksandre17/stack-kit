@@ -1,45 +1,14 @@
-"""Compose service naming — manifest modules + optional deploy.env legacy overrides."""
+"""The local stack's compose names (compose-gen), each from lib/naming.py -- its one home.
+
+Before 2.0.0 deploy.env could rename any of them (`COMPOSE_PROJECT_NAME`, `COMPOSE_*_SERVICE`,
+`DOCKER_NETWORK`); those keys are now a validate error naming `migrate` (ADR-001 amendment 13).
+"""
 from __future__ import annotations
 
-import os
-import re
 from pathlib import Path
 from typing import Any
 
-# Keys read from deploy.env (optional overrides for canonical slots only).
-DEPLOY_IDENTITY_KEYS = (
-    "DEPLOY_PROJECT",
-    "COMPOSE_PROJECT_NAME",
-    "COMPOSE_API_SERVICE",
-    "COMPOSE_APP_SERVICE",
-    "COMPOSE_WORKER_SERVICE",
-    "DOCKER_NETWORK",
-    "STACK_KIT_DOCKER_NETWORK",
-)
-
-
-def slugify(text: str) -> str:
-    s = re.sub(r"[^a-zA-Z0-9._-]+", "-", (text or "").strip()).strip("-").lower()
-    return s or "app"
-
-
-def parse_env_file(path: Path) -> dict[str, str]:
-    from lib.envfile import parse
-
-    return parse(path)
-
-
-def load_deploy_env(secrets_root: Path) -> dict[str, str]:
-    deploy = parse_env_file(secrets_root / "deploy.env")
-    for key in DEPLOY_IDENTITY_KEYS:
-        if key in os.environ and os.environ[key]:
-            deploy[key] = os.environ[key]
-    return deploy
-
-
-def compose_slug(deploy: dict[str, str], repo_name: str) -> str:
-    """Docker service prefix. Uses COMPOSE_PROJECT_NAME or repo folder — not DEPLOY_PROJECT (remote tree)."""
-    return slugify(deploy.get("COMPOSE_PROJECT_NAME") or repo_name)
+from lib import naming
 
 
 def stack_compose_module_ids(manifest: dict[str, Any]) -> list[str]:
@@ -52,24 +21,7 @@ def stack_compose_module_ids(manifest: dict[str, Any]) -> list[str]:
 
 
 def primary_module_id(manifest: dict[str, Any], role: str, module_ids: list[str] | None = None) -> str | None:
-    """A role's primary module: the one the role's `primaryField` names (catalogs.roles), else the
-    first module of the role. No module id is spelled here -- an id is the project's word (ADR-001)."""
-    from lib import catalogs
-
-    ids = module_ids if module_ids is not None else stack_compose_module_ids(manifest)
-    mods = manifest.get("modules") or {}
-    field = (catalogs.entry("roles", role, manifest) or {}).get("primaryField")
-    if field:
-        cur: Any = manifest
-        for part in str(field).split("."):
-            cur = cur.get(part) if isinstance(cur, dict) else None
-        if cur in ids and isinstance(mods.get(cur), dict):
-            return cur
-    for mid in ids:
-        cfg = mods.get(mid)
-        if isinstance(cfg, dict) and cfg.get("role") == role:
-            return mid
-    return None
+    return naming.primary_module_id(manifest, role, module_ids if module_ids is not None else stack_compose_module_ids(manifest))
 
 
 def primary_api_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
@@ -77,140 +29,69 @@ def primary_api_module_id(manifest: dict[str, Any], module_ids: list[str] | None
     return primary_module_id(manifest, "api", module_ids)
 
 
-def embedded_worker_enabled(
-    manifest: dict[str, Any], catalog_features: dict[str, Any] | None = None
-) -> bool:
-    """P0-kit-13: manifest modules.<primary-api>.compose.embeddedWorker replaces catalog features.worker."""
+def primary_worker_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
+    return primary_module_id(manifest, "worker", module_ids)
+
+
+def primary_ui_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
+    return primary_module_id(manifest, "ui", module_ids)
+
+
+def embedded_worker_enabled(manifest: dict[str, Any], catalog_features: dict[str, Any] | None = None) -> bool:
+    """manifest modules.<primary-api>.compose.embeddedWorker replaces the catalog's features.worker."""
     primary = primary_api_module_id(manifest)
     if primary:
         cfg = (manifest.get("modules") or {}).get(primary) or {}
         compose = cfg.get("compose") if isinstance(cfg, dict) else None
         if isinstance(compose, dict) and "embeddedWorker" in compose:
             return bool(compose.get("embeddedWorker"))
-    catalog = catalog_features if isinstance(catalog_features, dict) else {}
-    return bool(catalog.get("worker", False))
+    return bool((catalog_features or {}).get("worker", False)) if isinstance(catalog_features, dict) else False
 
 
-def effective_compose_features(
-    manifest: dict[str, Any], catalog_features: dict[str, Any] | None = None
-) -> dict[str, Any]:
-    """Merge catalog features with manifest-driven embedded worker flag."""
+def effective_compose_features(manifest: dict[str, Any], catalog_features: dict[str, Any] | None = None) -> dict[str, Any]:
     catalog = dict(catalog_features) if isinstance(catalog_features, dict) else {}
     catalog["worker"] = embedded_worker_enabled(manifest, catalog_features)
     return catalog
 
 
-def primary_worker_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
-    return primary_module_id(manifest, "worker", module_ids)
-
-
-def primary_ui_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
-    """The first `ui` module. (It once privileged a module literally named `frontend`, a consumer's
-    word; the role is the agnostic form.)"""
-    return primary_module_id(manifest, "ui", module_ids)
-
-
-def resolve_module_service_name(
-    module_id: str,
-    manifest: dict[str, Any],
-    deploy: dict[str, str],
-    repo_name: str,
-) -> str:
-    """Docker compose service key for a manifest module (single source of truth)."""
-    mods = manifest.get("modules") or {}
-    cfg = mods.get(module_id)
-    if not isinstance(cfg, dict):
+def resolve_module_service_name(module_id: str, manifest: dict[str, Any], root: Path) -> str:
+    """The local compose service of a module: {project}-{service id}."""
+    if not isinstance((manifest.get("modules") or {}).get(module_id), dict):
         raise KeyError(f"manifest modules.{module_id} missing")
-    from lib import catalogs
-
-    role = str(cfg.get("role") or "")
-    target = str(cfg.get("target") or module_id)
-    slug = compose_slug(deploy, repo_name)
-    # A role's primary module takes the role's own service name (catalogs.roles `primaryService`),
-    # or the deploy.env key that renames it (`serviceOverride`); every other module its target or id.
-    declared = catalogs.entry("roles", role, manifest) or {}
-    if declared and module_id == primary_module_id(manifest, role):
-        override = declared.get("serviceOverride")
-        if override and deploy.get(override):
-            return deploy[override]
-        if declared.get("primaryService"):
-            return f"{slug}-{declared['primaryService']}"
-    return f"{slug}-{(target or module_id).replace('_', '-')}"
+    return naming.local_service(manifest, Path(root), module_id)
 
 
-def module_service_names(
-    manifest: dict[str, Any],
-    deploy: dict[str, str],
-    repo_name: str,
-) -> dict[str, str]:
+def module_service_names(manifest: dict[str, Any], root: Path) -> dict[str, str]:
     mods = manifest.get("modules") or {}
-    return {
-        str(mid): resolve_module_service_name(str(mid), manifest, deploy, repo_name)
-        for mid in mods
-        if isinstance(mods.get(mid), dict)
-    }
+    return {str(m): resolve_module_service_name(str(m), manifest, root) for m in mods if isinstance(mods.get(m), dict)}
 
 
-def compose_service_names(
-    manifest: dict[str, Any],
-    deploy: dict[str, str],
-    repo_name: str,
-) -> dict[str, Any]:
-    """
-    Legacy role aliases + per-module map.
-    `api` / `app` / `worker` match deploy drivers; `modules` is manifest-complete.
-    """
-    slug = compose_slug(deploy, repo_name)
-    by_module = module_service_names(manifest, deploy, repo_name)
-    api_mid = primary_api_module_id(manifest)
-    ui_mid = primary_ui_module_id(manifest)
-    worker_mid = primary_worker_module_id(manifest)
-
-    api_name = (
-        by_module.get(api_mid or "")
-        or deploy.get("COMPOSE_API_SERVICE")
-        or f"{slug}-api"
-    )
-    app_name = (
-        by_module.get(ui_mid or "")
-        or deploy.get("COMPOSE_APP_SERVICE")
-        or f"{slug}-app"
-    )
-    if worker_mid and worker_mid in by_module:
-        worker_name = by_module[worker_mid]
-    else:
-        worker_name = deploy.get("COMPOSE_WORKER_SERVICE") or f"{slug}-worker"
-
+def compose_service_names(manifest: dict[str, Any], root: Path) -> dict[str, Any]:
+    """The role aliases (`api`, `app`, `worker`) and the per-module map."""
+    slug = naming.project_slug(manifest, Path(root))
+    by_module = module_service_names(manifest, root)
+    api_mid, ui_mid, worker_mid = (primary_api_module_id(manifest), primary_ui_module_id(manifest),
+                                   primary_worker_module_id(manifest))
     return {
         "compose_slug": slug,
         "modules": by_module,
-        "api": api_name,
-        "app": app_name,
-        "worker": worker_name,
+        "api": by_module.get(api_mid or "") or f"{slug}-api",
+        "app": by_module.get(ui_mid or "") or f"{slug}-app",
+        "worker": by_module.get(worker_mid or "") or f"{slug}-worker",
         "primary_api_module": api_mid,
         "primary_ui_module": ui_mid,
         "primary_worker_module": worker_mid,
     }
 
 
-def build_global_fmt(
-    *,
-    manifest: dict[str, Any],
-    deploy: dict[str, str],
-    repo_name: str,
-) -> dict[str, str]:
-    """Placeholders for catalog templates + manifest_compose (compose-gen)."""
-    names = compose_service_names(manifest, deploy, repo_name)
+def build_global_fmt(*, manifest: dict[str, Any], root: Path) -> dict[str, str]:
+    """Placeholders for the catalog templates (compose-gen)."""
+    names = compose_service_names(manifest, root)
     slug = names["compose_slug"]
     api_svc = names["api"]
-    network = (
-        deploy.get("DOCKER_NETWORK")
-        or deploy.get("STACK_KIT_DOCKER_NETWORK")
-        or f"{slug}-net"
-    )
-    compose_name = deploy.get("COMPOSE_PROJECT_NAME") or repo_name
+    network = naming.local_network(manifest, Path(root))
     return {
-        "compose_project_name": compose_name,
+        "compose_project_name": slug,
         "compose_slug": slug,
         "api_service": api_svc,
         "api_image": api_svc,
@@ -222,9 +103,6 @@ def build_global_fmt(
         "network_name": network,
         "api_storage_vol": f"{api_svc}-storage",
         "api_uploads_vol": f"{api_svc}-uploads",
-        # Optional container resource-limit block (brand-agnostic seam). Empty by
-        # default — a consumer opts in by supplying `resource_limits` in a compose
-        # target's `fmt` (e.g. "    mem_limit: 1g\n    cpus: 1.5\n"). Keeps project
-        # sizing constants in the consumer catalog, not in kit runtime (Law 10).
+        # An optional resource-limit block a consumer's compose target supplies in its `fmt`.
         "resource_limits": "",
     }

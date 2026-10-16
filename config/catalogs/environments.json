@@ -1,5 +1,5 @@
 {
-  "$comment": "Environments, declared once and in promotion order (ADR-001 amendment 12): a host run reads one (`.env.<id>`), a target tree splits by them, CD promotes through them in this order. workspace: the environment remote dev syncs source into. A host adds one (e.g. staging) in its manifest (`catalogs.environments`, with `after`) and touches no code. runDefault: what a host run reads without --env; deployDefault: what a deploy targets without one.",
+  "$comment": "Environments, declared once and in promotion order (ADR-001 amendments 12, 13): a host run reads one (`.env.<id>`), a target tree splits by them, CD promotes through them in this order. workspace: the environment remote dev syncs source into. runDefault: what a host run reads without --env; deployDefault: what a deploy targets without one. requireClean: a release to it is refused from a dirty checkout. rollbackOnFailure: a release whose health fails is rolled back to the previous one. confirm: a deploy, rollback or removal there asks first (`--yes` answers for CI). A host adds one (e.g. staging) in its manifest (`catalogs.environments`, with `after`) and touches no code.",
   "entries": [
     {
       "id": "dev",
@@ -8,7 +8,10 @@
     },
     {
       "id": "prod",
-      "deployDefault": true
+      "deployDefault": true,
+      "requireClean": true,
+      "rollbackOnFailure": true,
+      "confirm": true
     }
   ]
 }

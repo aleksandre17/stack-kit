@@ -21,7 +21,6 @@ from lib.vscode_gen import LAUNCH_BUILDERS, build_tasks_json
 from conftest import PKG
 
 
-
 # ── 1. No driver is named outside its own directory ───────────────────────────
 
 #: Where a driver may be named: its own directory and the tests. Everything else -- every interpreter,
@@ -108,7 +107,7 @@ def test_node_api_gets_watch_tasks(repo_root: Path, manifest: dict) -> None:
     assert node_api_ids, "fixture must carry a node-api module"
     ctx = ProjectContext(root=repo_root, manifest=manifest)
     labels = [t["label"] for t in build_tasks_json(ctx)["tasks"]]
-    assert any("dev watch" in lb for lb in labels), labels
+    assert any("dev watch" in lb for lb in labels), labels  # from the driver's `dev` declaration
 
 
 # ── 2. Schema declares every new key ──────────────────────────────────────────
@@ -161,18 +160,9 @@ def test_catalog_renders_narrow_default_when_module_declares_nothing() -> None:
         assert "include: health,info\n" in rendered.replace("\\n", "\n")
 
 
-def test_prebuild_scripts_absent_runs_nothing() -> None:
-    """The loop is fed a newline list; absent/empty must iterate zero times."""
-    src = (PKG / "toolkit" / "deploy" / "pnpm-build.sh").read_text(encoding="utf-8")
-    assert "build:engine" not in src, "no consumer's script name may live in the kit"
-    assert 'NODE_PREBUILD_SCRIPTS:-' in src, "must default to empty"
-    assert "prebuild script not defined in workspace" in src, "declared-but-missing must fail"
-
-
 def test_dev_orchestrator_is_registry_driven() -> None:
     src = (PKG / "toolkit" / "dev" / "Invoke-DevUp.ps1").read_text(encoding="utf-8")
     for token in ("node-vite", "java-boot", "node-api", "chat-api", "frontend"):
         assert token not in src, f"Invoke-DevUp.ps1 names '{token}'"
-    assert "Get-DriverTaskArgs" in src
     # A module's role is the resolver's answer (declared, else its driver's) -- never inferred here.
     assert "Get-ModuleRole" in src and "ConvertFrom-Json" not in src

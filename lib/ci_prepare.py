@@ -24,10 +24,6 @@ def prepare(ctx: ProjectContext) -> None:
     ctx.secrets_root.mkdir(parents=True, exist_ok=True)
     ctx.stack_compose_dir.mkdir(parents=True, exist_ok=True)
 
-    deploy = ctx.secrets_root / "deploy.env"
-    deploy_ex = ctx.secrets_root / "deploy.env.example"
-    _seed_env_example(deploy, deploy_ex)
-
     seen_dirs: set[Path] = set()
     for _mid, sdir in ctx.secrets_module_dirs().items():
         if sdir in seen_dirs:
@@ -37,8 +33,6 @@ def prepare(ctx: ProjectContext) -> None:
         ex = sdir / ".env.example"
         for name in (".env.dev", ".env.prod"):
             _seed_env_example(sdir / name, ex)
-        if (sdir / ".env.deploy.example").is_file():
-            _seed_env_example(sdir / ".env.deploy", sdir / ".env.deploy.example")
 
     seeded_cred: set[tuple[Path, str]] = set()
     for mid in (ctx.manifest.get("modules") or {}):

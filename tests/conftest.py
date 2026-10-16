@@ -112,29 +112,11 @@ def _link_kit_into_fixture(fixture_root: Path, kit_root: Path) -> None:
         os.symlink(kit_root, link, target_is_directory=True)
 
 
-def _write_volatile_secrets(fixture_root: Path) -> None:
-    """Create the gitignored ``deploy.env`` the suite reads.
-
-    ``**/deploy.env`` is gitignored by the kit (never commit real secrets), so
-    the fixture's copy can't be committed. Its identity values are fixed and
-    drive compose-service naming + migrate-rename assertions, so we write a
-    deterministic copy at session start from the committed ``.example``-shaped
-    template, with the canonical service names the tests expect.
-    """
-    secrets = fixture_root / "ops" / "config"
-    secrets.mkdir(parents=True, exist_ok=True)
-    template = secrets / "deploy.env.fixture"
-    target = secrets / "deploy.env"
-    if template.is_file():
-        target.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
-
-
 @pytest.fixture(scope="session", autouse=True)
 def _fixture_project(request: pytest.FixtureRequest) -> None:
     """Prepare the synthetic consumer + wire the kit CLI env for the session."""
     if REPO == WORKING_ROOT:
         _link_kit_into_fixture(WORKING_ROOT, PKG)
-        _write_volatile_secrets(WORKING_ROOT)
     os.environ.setdefault("STACK_KIT_PROJECT_ROOT", str(REPO))
     os.environ["STACK_KIT_KIT_ROOT"] = str(PKG)
 

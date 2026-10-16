@@ -1,17 +1,15 @@
-# ops/config/ — project configuration (consumer repo, not in stack-kit package)
+# ops/config/ -- project configuration (consumer repo, not in stack-kit package)
 
-All runtime values live here. Application folders (`frontend/`, `backend/`) hold code only.
+All runtime values live here. Application folders (`frontend/`, `backend/`) hold code only. Where a
+deploy goes is not configuration of this folder: it is the targets file (`ops/deploy/targets.json`).
 
 ## First-time setup
 
 ```powershell
-copy deploy.env.example deploy.env
 copy frontend\.env.example frontend\.env.dev
 copy frontend\.env.example frontend\.env.prod
-copy frontend\.env.deploy.example frontend\.env.deploy
 copy backend\.env.example backend\.env.dev
 copy backend\.env.example backend\.env.prod
-copy backend\.env.deploy.example backend\.env.deploy
 # SSH: ssh/README.md
 # GCP (if needed): backend/google-credentials.json
 ```

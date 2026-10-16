@@ -1,4 +1,4 @@
-"""K1 — the kit names no consumer, and a host still on the old names keeps running (ADR-001 decision 1).
+"""K1 — the kit names no consumer, and a host still on the old names is told, then carried (ADR-001 decision 1).
 
 Two properties, both read from the one declaration (`lib/identity.json`) and never restated here:
 
@@ -6,10 +6,10 @@ Two properties, both read from the one declaration (`lib/identity.json`) and nev
      itself, the decision records and the changelog (history), and the former command's shims, whose
      PATH is the old name and whose content is not. A consumer's own credential cannot hide in the kit
      under the old prefix, because the old prefix is a legacy name too.
-  2. EXPAND–CONTRACT. A host built on the old names -- derived here from the reference consumer by
-     turning every declared rename back, so the ancestor follows the declaration under test -- is
-     resolved to the same root by Python, bash and PowerShell, reads its renamed field, runs the former
-     command, and is told each replacement ONCE per name across the whole process tree.
+  2. EXPAND–CONTRACT, contracted at 2.0.0 (legacyRemovedIn). A host built on the old names -- derived
+     here from the reference consumer by turning every declared rename back -- is no longer read:
+     no runtime finds its root, `validate` names each former name, and `migrate --apply`, the one
+     reader left, carries it to the current names.
 """
 from __future__ import annotations
 
@@ -30,8 +30,8 @@ LEGACY = DECLARATION["legacyKitName"]
 LEGACY_PREFIX = DECLARATION["legacyEnvPrefix"]
 #: Places that must spell the legacy name: the declaration, history, and nothing else by content.
 SPELLS_THE_LEGACY_NAME = ("lib/identity.json", "CHANGELOG.md", "docs/decisions/")
-#: The former command keeps its path for 1.x; its content reads the declaration.
-LEGACY_PATHS = {f"cli/{LEGACY}.ps1", f"cli/{LEGACY}.sh"}
+#: The former command's shims are gone with 2.0.0.
+LEGACY_PATHS: set[str] = set()
 
 
 def _tracked() -> list[str]:
@@ -138,63 +138,26 @@ def _pwsh() -> str | None:
     return shutil.which("pwsh") or shutil.which("powershell")
 
 
-def test_python_resolves_a_legacy_host_and_tells_each_name_once(tmp_path):
+def test_no_runtime_reads_a_host_on_the_former_names(tmp_path):
     host = _legacy_host(tmp_path)
-    ran = subprocess.run([sys.executable, "-B", "-c", PY_PROBE], cwd=tmp_path, env=_legacy_env(host),
+    ran = subprocess.run([sys.executable, "-B", "-c", PY_PROBE], cwd=host, env=_legacy_env(host),
                          capture_output=True, text=True)
-    assert ran.returncode == 0, ran.stderr
-    root, field = ran.stdout.split()[:2]
-    assert Path(root).resolve() == host.resolve()
-    assert field
-    _assert_told_once_each(ran.stderr, f"{LEGACY_PREFIX}_PROJECT_ROOT", identity.LEGACY_MANIFEST_FILENAMES[0],
-                           f"{identity.MANIFEST_FILENAME}: {FIELD_OLD}")
+    assert ran.returncode != 0 and "not found" in (ran.stdout + ran.stderr).lower(), ran.stdout + ran.stderr
 
 
-@pytest.mark.skipif(_bash() is None, reason="no POSIX bash on this machine")
-def test_bash_resolves_a_legacy_host_like_python_and_tells_each_name_once(tmp_path):
+def test_each_former_name_is_named_for_migrate(tmp_path):
     host = _legacy_host(tmp_path)
-    lib = (PKG / "lib" / "project.sh").as_posix()
-    script = (f'source "{lib}"; r="$(stack_kit_find_project_root)"; echo "$r"; '
-              f'stack_kit_read_manifest_field {FIELD_NEW}; _stack_kit_manifest_file >/dev/null')
-    ran = subprocess.run([_bash(), "-c", script], cwd=tmp_path, env=_legacy_env(host),
-                         capture_output=True, text=True)
-    assert ran.returncode == 0, ran.stderr
-    lines = ran.stdout.split()
-    assert lines[0].rstrip("/").lower().endswith(host.name.lower())
-    assert lines[1]
-    _assert_told_once_each(ran.stderr, f"{LEGACY_PREFIX}_PROJECT_ROOT", identity.LEGACY_MANIFEST_FILENAMES[0])
+    manifest = json.loads((host / identity.LEGACY_MANIFEST_FILENAMES[0]).read_text(encoding="utf-8"))
+    found = identity.legacy_names_in(host, manifest, {f"{LEGACY_PREFIX}_PROJECT_ROOT": "x"})
+    assert any(identity.LEGACY_MANIFEST_FILENAMES[0] in f for f in found)
+    assert any(FIELD_OLD in f for f in found) and any(f"{LEGACY_PREFIX}_PROJECT_ROOT" in f for f in found)
 
 
-@pytest.mark.skipif(_pwsh() is None, reason="no PowerShell on this machine")
-def test_powershell_resolves_a_legacy_host_like_python_and_tells_each_name_once(tmp_path):
-    host = _legacy_host(tmp_path)
-    lib = PKG / "lib" / "project.ps1"
-    script = (f". '{lib}'; Get-ProjectRootFromManifest; Get-ManifestField '{FIELD_NEW}'; "
-              f"$null = Get-ProjectManifestPath")
-    ran = subprocess.run([_pwsh(), "-NoProfile", "-NonInteractive", "-Command", script], cwd=tmp_path,
-                         env=_legacy_env(host), capture_output=True, text=True)
-    assert ran.returncode == 0, ran.stderr
-    lines = ran.stdout.split()
-    assert Path(lines[0]).resolve() == host.resolve()
-    assert lines[1]
-    _assert_told_once_each(ran.stderr, f"{LEGACY_PREFIX}_PROJECT_ROOT", identity.LEGACY_MANIFEST_FILENAMES[0],
-                           f"{identity.MANIFEST_FILENAME}: {FIELD_OLD}")
-
-
-@pytest.mark.skipif(_bash() is None, reason="no POSIX bash on this machine")
-def test_the_former_command_runs_the_current_one_after_one_notice(tmp_path):
-    host = _legacy_host(tmp_path)
-    ran = subprocess.run([_bash(), (PKG / "cli" / f"{LEGACY}.sh").as_posix(), "help"], cwd=host,
-                         env=_legacy_env(host), capture_output=True, text=True)
-    assert ran.returncode == 0, ran.stderr
-    _assert_told_once_each(ran.stderr, f"cli/{LEGACY}.sh", f"{LEGACY_PREFIX}_PROJECT_ROOT")
-
-
-def test_the_current_name_wins_when_both_are_set():
-    environ = {f"{LEGACY_PREFIX}_PROJECT_ROOT": "old", identity.env_name("PROJECT_ROOT"): "new"}
-    adopted = identity.adopt_legacy_env(environ)
-    assert adopted == [f"{LEGACY_PREFIX}_PROJECT_ROOT"]
-    assert environ == {identity.env_name("PROJECT_ROOT"): "new"}
+def test_a_former_variable_is_never_read():
+    environ = {f"{LEGACY_PREFIX}_PROJECT_ROOT": "old"}
+    assert identity.env("PROJECT_ROOT", "none", environ) == "none"
+    assert identity.adopt_legacy_env(environ) == [f"{LEGACY_PREFIX}_PROJECT_ROOT"]
+    assert environ == {f"{LEGACY_PREFIX}_PROJECT_ROOT": "old"}, "nothing is carried at run time"
 
 
 # ── 3. the migration a host replays ───────────────────────────────────────────
@@ -235,16 +198,3 @@ def test_migrate_refuses_two_manifest_homes_and_writes_nothing(tmp_path):
     ran = _migrate(host, "--apply")
     assert ran.returncode != 0
     assert former.read_bytes() == before
-
-
-def test_a_manifest_on_a_former_field_is_held_to_the_same_schema(tmp_path):
-    # Found when the schema began to be enforced on every machine (K4): the former field was
-    # refused as undeclared -- a host on the old names would have failed validate.
-    from lib.schema_check import validate
-
-    host = _legacy_host(tmp_path)
-    manifest = json.loads((host / identity.LEGACY_MANIFEST_FILENAMES[0]).read_text(encoding="utf-8"))
-    assert identity._dig(manifest, FIELD_OLD) is not None
-    schema = json.loads((PKG / "manifest.schema.json").read_text(encoding="utf-8"))
-    assert validate(manifest, schema), "the specimen no longer carries a former field"
-    assert not validate(identity.with_current_fields(manifest), schema)

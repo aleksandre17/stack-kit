@@ -10,6 +10,11 @@
       "description": "Relative path from project root to stack-kit package"
     },
     "secrets": { "type": "string" },
+    "project": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "description": "The project's one name (ADR-001 amendment 13): its directory on a target ({root}/{project}), its compose projects ({project}-{environment}), containers, networks, volumes and local services. Default: the repository folder, slugified"
+    },
     "compose": {
       "type": "object",
       "description": "Consumer compose catalog and generated artifact paths",
@@ -37,10 +42,6 @@
           "type": "string",
           "description": "Consumer infra compose root (docker-compose.base.yml + services/*.yml)"
         },
-        "networkName": {
-          "type": "string",
-          "description": "Default Docker network for stack + infra (overridable via DOCKER_NETWORK in deploy.env)"
-        },
         "primaryApiModule": {
           "type": "string",
           "description": "The module id the stack's API is (default: the first module whose role is api)"
@@ -50,9 +51,10 @@
           "items": { "type": "string" },
           "description": "Module ids for stack compose-gen and stack-deploy auto-steps (default: all modules)"
         },
-        "deployBaseSecretsModule": {
-          "type": "string",
-          "description": "Secrets module id for shared DEPLOY_PATH/DEPLOY_LAYOUT (structured java-boot runtime base). Worker modules (retrieval, ingestion) inherit when their .env.deploy omits DEPLOY_PATH."
+        "services": {
+          "type": "object",
+          "description": "Services the environment's stack runs that no module builds (an object store, a cache): each an image with its settings and its `tier`, started by the same health flow",
+          "additionalProperties": { "type": "object", "required": ["image", "tier"] }
         },
         "modules": {
           "type": "array",
@@ -375,14 +377,15 @@
           },
           "runtimeConfig": {
             "type": "array",
-            "description": "Files the application itself reads at run time (appsettings.Production.json, an SPA's env.js, an nginx conf): `from` a host path, `to` a path inside the unit's runtime/ (relative, no ..), for the `environments` listed. Never a secret: values that are arrive through the env files or the store (ADR-001 amendment 9). Their upload and read-only mount are pending",
+            "description": "Files the application itself reads at run time (appsettings.Production.json, an SPA's env.js, an nginx conf): `from` a host path, `to` a path inside the unit's runtime/ (relative, no ..), for the `environments` listed. Never a secret: values that are arrive through the env files or the store (ADR-001 amendment 9). Uploaded to the unit's runtime/ and mounted read-only",
             "items": {
               "type": "object",
               "required": ["from", "to", "environments"],
               "properties": {
                 "from": { "type": "string", "minLength": 1 },
                 "to": { "type": "string", "pattern": "^(?!/)(?![A-Za-z]:)(?!(.*/)?[.][.](/|$)).+$" },
-                "environments": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+                "environments": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+                "mount": { "type": "string", "pattern": "^/", "description": "Where the container reads it (read-only; default /run/stack-kit/config/<to>)" }
               },
               "additionalProperties": false
             }
@@ -396,7 +399,11 @@
           "extensions": {
             "type": "object",
             "description": "This module's own configuration, by name, for the host's tools: the kit validates its shape as an object and reads nothing in it"
-          }
+          },
+          "container": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, static {image, root, config, configMount}, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns" },
+          "services": { "type": "object", "description": "Several services from one module, by id, each over `container` (its `context`: the subdirectory of the artifacts it is built from)", "additionalProperties": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, static {image, root, config, configMount}, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns" } },
+          "dev": { "type": "object", "description": "Remote dev over the driver's `dev`: image, command, build, port, debugPort, caches {name: mount}, excludes, reactions [{globs, do: hot-reload|restart|rebuild}], environment, debounceMs" },
+          "credentialPatterns": { "type": "array", "items": { "type": "string" }, "description": "Which files of the secrets folder are credentials (default config/delivery.json)" }
         },
         "additionalProperties": false
       }
@@ -582,7 +589,8 @@
         "roles": { "type": "array", "items": { "type": "object", "required": ["id"] } },
         "environments": { "type": "array", "items": { "type": "object", "required": ["id"] } },
         "lifecycle": { "type": "array", "items": { "type": "object", "required": ["id"] } },
-        "targetRuntimes": { "type": "array", "items": { "type": "object", "required": ["id"] } }
+        "targetRuntimes": { "type": "array", "items": { "type": "object", "required": ["id"] } },
+        "tiers": { "type": "array", "items": { "type": "object", "required": ["id"] } }
       },
       "additionalProperties": false
     },

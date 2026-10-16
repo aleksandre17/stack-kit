@@ -111,10 +111,10 @@ def _checkout(pins: dict[str, dict[str, str]], submodules: bool) -> list[str]:
 
 
 def delivery_plan(ctx: ProjectContext) -> tuple[dict[str, str], list[str], list[str]]:
-    """({environment: target}, modules CD promotes, reasons) -- CD is generated only where both
-    environments have a reachable declared target and a module's driver packages once and its release
-    promotes those bytes; every other case is CI only, and the reasons say why."""
-    from lib import targets as deploy_targets
+    """({environment: target}, modules CD deploys, reasons) -- CD is generated where every environment
+    has a reachable declared target and a module packages once (its driver's `package`) and releases
+    through the kit (`release` rung `via: release`); every other case is CI only, and the reasons say why."""
+    from lib import catalogs, targets as deploy_targets
     from lib.modules import driver_delivery
 
     reasons: list[str] = []
@@ -126,15 +126,16 @@ def delivery_plan(ctx: ProjectContext) -> tuple[dict[str, str], list[str], list[
     if data is None:
         reasons.append("no deploy targets are declared (manifest `deploy.targets`)")
     else:
-        from lib import catalogs
-
         for env in catalogs.ids("environments", ctx.manifest):
             name = (data.get("defaults") or {}).get(env)
             target = (data.get("targets") or {}).get(name or "", {})
+            pending = (catalogs.entry("targetRuntimes", str(target.get("runtime") or ""), ctx.manifest) or {}).get("pending")
             if not name:
                 reasons.append(f"no `defaults.{env}` target")
             elif target.get("pending"):
                 reasons.append(f"target {name} ({env}) is pending: {target['pending']}")
+            elif pending:
+                reasons.append(f"target {name} ({env}): runtime {target.get('runtime')} is pending: {pending}")
             else:
                 chosen[env] = name
     promoted = []
@@ -146,27 +147,26 @@ def delivery_plan(ctx: ProjectContext) -> tuple[dict[str, str], list[str], list[
             reasons.append(f"{mid} ({typ}): packaging is pending -- {spec['pending']}")
         elif not spec.get("command"):
             reasons.append(f"{mid} ({typ}): its driver declares no package step")
-        elif release.get("pending") or not release:
-            reasons.append(f"{mid} ({typ}): its release is pending -- {release.get('pending', 'none declared')}")
-        elif not release.get("promotes"):
-            reasons.append(f"{mid} ({typ}): its release does not deploy a packaged artifact (no `promotes`)")
+        elif release.get("pending") or release.get("via") != "release":
+            reasons.append(f"{mid} ({typ}): its release is {'pending -- ' + release['pending'] if release.get('pending') else 'not the kit release'}")
         else:
             promoted.append(mid)
-    from lib import catalogs
-
     if len(chosen) < len(catalogs.ids("environments", ctx.manifest)):
         return chosen, [], reasons
     return chosen, promoted, reasons
+
+
+RELEASE_EVENT = f"({DEFAULT_BRANCH_PUSH}) || github.event_name == 'workflow_dispatch'"
 
 
 def _package_steps(mid: str, module: dict[str, Any], cli: str, pins: dict[str, dict[str, str]]) -> list[str]:
     archive = f".stack-kit/artifacts/{mid}-*.tgz"
     return [
         "      - name: package (build once: one archive per commit)",
-        f"        if: ${{{{ {DEFAULT_BRANCH_PUSH} }}}}",
+        f"        if: ${{{{ {RELEASE_EVENT} }}}}",
         f"        run: {_q(f'pwsh {cli} package {mid}')}",
         "      - name: sbom",
-        f"        if: ${{{{ {DEFAULT_BRANCH_PUSH} }}}}",
+        f"        if: ${{{{ {RELEASE_EVENT} }}}}",
         f"        uses: {_uses('anchore/sbom-action', pins)}",
         "        with:",
         f"          path: {_q(module['path'])}",
@@ -174,11 +174,11 @@ def _package_steps(mid: str, module: dict[str, Any], cli: str, pins: dict[str, d
         f"          output-file: {_q(f'.stack-kit/artifacts/{mid}.spdx.json')}",
         "          upload-artifact: false",
         "      - name: build provenance",
-        f"        if: ${{{{ {DEFAULT_BRANCH_PUSH} }}}}",
+        f"        if: ${{{{ {RELEASE_EVENT} }}}}",
         f"        uses: {_uses('actions/attest-build-provenance', pins)}",
         "        with:",
         f"          subject-path: {_q(archive)}",
-        f"      - if: ${{{{ {DEFAULT_BRANCH_PUSH} }}}}",
+        f"      - if: ${{{{ {RELEASE_EVENT} }}}}",
         f"        uses: {_uses('actions/upload-artifact', pins)}",
         "        with:",
         f"          name: package-{mid}",
@@ -230,6 +230,7 @@ def render(ctx: ProjectContext) -> str:
         "on:",
         "  push:",
         "  pull_request:",
+        *_dispatch(manifest, bool(promoted)),
         "permissions:",
         "  contents: read",
         "concurrency:",
@@ -253,43 +254,34 @@ def render(ctx: ProjectContext) -> str:
         if mid in packaged:
             out += _package_steps(mid, module, cli, pins) + _runs_upload(f"package-{job}", pins)
     if promoted:
-        from lib import targets as deploy_targets
+        from lib import catalogs, targets as deploy_targets
 
         data = deploy_targets.load(ctx.root, manifest) or {}
         secrets_root = str(manifest.get("secrets") or "ops/config").rstrip("/")
         previous: list[str] = [re.sub(r"[^A-Za-z0-9_-]", "-", m) for m in promoted]
-        from lib import catalogs
-
-        chain = catalogs.ids("environments", manifest)
-        for env in chain:
+        for env in catalogs.ids("environments", manifest):
             name = chosen[env]
             target = data["targets"][name]
             job = f"deploy-{env}"
+            gate = (f"!failure() && !cancelled() && (({DEFAULT_BRANCH_PUSH}) || "
+                    f"(github.event_name == 'workflow_dispatch' && inputs.environment == '{env}'))")
             out += [
                 f"  {job}:",
                 f"    name: {_q(f'deploy {env} -> {name}')}",
                 f"    needs: [{', '.join(previous)}]",
-                f"    if: ${{{{ {DEFAULT_BRANCH_PUSH} }}}}",
+                f"    if: ${{{{ {gate} }}}}",
                 f"    runs-on: {target.get('runner') or 'ubuntu-latest'}",
                 "    timeout-minutes: 45",
-                f"    environment: {_q(name)}",
+                f"    environment: {_q(env)}",
                 "    concurrency:",
                 f"      group: {_q(f'deploy-{name}-{env}')}",
                 "      cancel-in-progress: false",
                 "    steps:",
                 *_checkout(pins, submodules),
             ]
-            seen_setup: set[str] = set()
-            for mid in promoted:
-                for line in _setup_steps(str(modules[mid].get("type")), modules[mid], pins):
-                    if line not in seen_setup:
-                        seen_setup.add(line)
-                        out.append(line)
             for mid in promoted:
                 out += [f"      - uses: {_uses('actions/download-artifact', pins)}", "        with:",
-                        f"          name: package-{mid}", "          path: .stack-kit/artifacts",
-                        f"      - name: unpack {mid} (the bytes packaged above; nothing is rebuilt)",
-                        f"        run: pwsh {cli} unpack {mid} .stack-kit/artifacts/{mid}-*.tgz"]
+                        f"          name: package-{mid}", "          path: .stack-kit/artifacts"]
             identity_ref = str((target.get("ssh") or {}).get("identity") or "agent")
             key_secret = _secret_name("STACK_KIT_SSH_KEY", name)
             out += [
@@ -317,26 +309,32 @@ def render(ctx: ProjectContext) -> str:
                     f"          if [ -n \"$VALUES\" ]; then printf '%s\\n' \"$VALUES\" > {_q(dest)}; fi",
                 ]
             for mid in promoted:
-                promotes = " ".join((driver_delivery_of(modules[mid]).get("release") or {}).get("promotes") or [])
-                out += [f"      - name: deliver {mid} ({env})",
-                        f"        run: {_q(f'pwsh {cli} mod {mid} deliver release --env {env} --target {name} {promotes}'.rstrip())}"]
+                archive = f".stack-kit/artifacts/{mid}-*.tgz"
+                out += [f"      - name: deploy {mid} ({env}) -- the bytes packaged above; nothing is rebuilt",
+                        f"        run: {_q(f'pwsh {cli} deploy {mid} --env {env} --target {name} --yes --artifact $(ls {archive})')}"]
             out += [
                 "      - name: verify -- the declared health endpoints",
                 f"        run: {_q(f'pwsh {cli} targets --health --target {name} --env {env}')}",
                 "      - name: verify -- the server holds the declared tree",
                 f"        run: {_q(f'pwsh {cli} targets --verify --target {name} --env {env}')}",
-                "      # Rollback on a failed verify (re-pointing `current`) is pending with the release delivery",
-                "      # (ADR-001 amendment 9); a release's own health gate rolls back to the previous artifact.",
+                "      # A release whose health fails is rolled back by the deploy itself where the environment",
+                "      # declares rollbackOnFailure; `release rollback` moves `current` back by hand.",
                 *_runs_upload(f"deploy-{env}", pins),
             ]
             previous = [job]
     return "\n".join(out) + "\n"
 
 
-def driver_delivery_of(module: dict[str, Any]) -> dict[str, Any]:
-    from lib.modules import driver_delivery
+def _dispatch(manifest: dict[str, Any], cd: bool) -> list[str]:
+    """A manual run that deploys to one chosen environment (the GitHub Environment of the same name
+    gates it; give production required reviewers there)."""
+    if not cd:
+        return []
+    from lib import catalogs
 
-    return driver_delivery(str(module.get("type") or ""))
+    envs = catalogs.ids("environments", manifest)
+    return ["  workflow_dispatch:", "    inputs:", "      environment:", "        description: 'the environment to deploy'",
+            "        type: choice", f"        default: {_q(envs[0])}", "        options:", *(f"          - {_q(e)}" for e in envs)]
 
 
 def target(ctx: ProjectContext) -> Path:

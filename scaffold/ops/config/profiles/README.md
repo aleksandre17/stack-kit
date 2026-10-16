@@ -1,8 +1,8 @@
-# Environment profiles (copy into `ops/config/deploy.env`)
+# Environment profiles
 
 | Profile | File |
 |---------|------|
-| Legacy server names | [legacy-server.env.example](legacy-server.env.example) |
 | Worker disabled | [worker-disabled.md](worker-disabled.md) |
+| GCP credentials | [gcp-credentials.md](gcp-credentials.md) |
 
 Then: `.\tools\stack-kit.ps1 compose-gen`

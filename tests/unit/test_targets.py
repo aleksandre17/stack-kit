@@ -10,7 +10,7 @@ import pytest
 
 from conftest import WORKING_ROOT
 from lib import identity, targets
-from lib.migrate_manifest import carry_deploy_targets
+from lib.migrate_legacy import carry
 
 PROD = {"runtime": "docker-compose", "host": "deploy.example.test", "user": "svc", "port": 2222,
         "root": "/srv/apps", "ssh": {"identity": "agent", "knownHosts": "ops/deploy/known_hosts"}}
@@ -92,13 +92,6 @@ def test_an_unknown_layout_placeholder_is_refused(tmp_path):
 
 # ── selection and answers ────────────────────────────────────────────────────
 
-def test_the_target_answers_the_server_and_its_base_over_deploy_env(resolver):
-    r = resolver(_doc(prod=PROD))
-    assert r.deploy_env_value("DEPLOY_SERVER") == "svc@deploy.example.test"
-    assert r.server_base() == "/srv/apps"
-    assert r.env_value("api", "DEPLOY_PATH") == "/srv/apps/golden-consumer/prod"  # not deploy.env's /home/deploy/...
-
-
 def test_selection_by_flag_then_environment_default(resolver):
     stage = {**PROD, "host": "stage.example.test"}
     assert resolver(_doc(prod=PROD, stage=stage), ENVIRONMENT="dev").target()[0] == "stage"
@@ -108,28 +101,37 @@ def test_selection_by_flag_then_environment_default(resolver):
         resolver(_doc(prod=PROD), TARGET="qa").target()
 
 
-def test_the_default_layout_is_one_project_tree_split_by_environment(resolver):
+def _places(target: dict, env: str = "prod") -> "targets.Places":
+    return targets.Places(target, project="golden-consumer", environment=env, environments=["dev", "prod"])
+
+
+class _Svc:
+    def __init__(self, sid: str, tier: str) -> None:
+        self.id, self.tier = sid, tier
+
+
+def test_the_default_layout_is_one_project_tree_split_by_environment_and_tier(resolver):
     r = resolver(_doc(prod=PROD))
-    assert r.remote_path("api", "runtime", "golden-consumer-api") == "/srv/apps/golden-consumer/prod/modules/golden-consumer-api"
-    assert r.remote_path("web", "compose-dev", "golden-consumer-web") == "/srv/apps/golden-consumer/dev/modules/golden-consumer-web"
-    assert r.remote_path("api", "workspace", "c", "dev", "api") == "/srv/apps/golden-consumer/dev/modules/api/workspace"
+    assert _places(PROD).of("unit", _Svc("api", "backend")) == "/srv/apps/golden-consumer/prod/backend/api"
+    assert _places(PROD, "dev").of("workspace", _Svc("app", "frontend")) == "/srv/apps/golden-consumer/dev/frontend/app/workspace"
+    assert _places(PROD).of("backups") == "/srv/apps/golden-consumer/prod/backups"
     assert r.compose_project("dev") == "golden-consumer-dev"
 
 
-def test_a_target_layout_overrides_the_default_inside_the_project(resolver):
-    r = resolver(_doc(prod={**PROD, "layout": {"unit": "{@environment}/svc/{service}"}}))
-    assert r.remote_path("api", "runtime", "c", "prod", "api") == "/srv/apps/golden-consumer/prod/svc/api"
+def test_a_target_layout_overrides_the_default_inside_the_project():
+    t = {**PROD, "layout": {"unit": "{@environment}/svc/{service}"}}
+    assert _places(t).of("unit", _Svc("api", "backend")) == "/srv/apps/golden-consumer/prod/svc/api"
 
 
 @pytest.mark.parametrize("layout", [{"unit": "{root}/shared/{service}"}, {"unit": "{@environment}/../../other/{service}"},
                                     {"project": "{root}"}, {"project": "/etc/{project}"}])
-def test_a_path_outside_the_projects_own_directory_is_refused_everywhere(tmp_path, resolver, layout):
+def test_a_path_outside_the_projects_own_directory_is_refused_everywhere(tmp_path, layout):
     escaping = {**PROD, "layout": layout}
     root = _host(tmp_path / "v", _doc(prod=escaping))
-    assert any("outside the project's directory" in p or "not inside the target's root" in p
+    assert any("outside the project's directory" in p or "not strictly inside the target's root" in p
                for p in targets.problems(root, _manifest(root))), targets.problems(root, _manifest(root))
     with pytest.raises(ValueError):
-        resolver(_doc(prod=escaping)).remote_path("api", "runtime", "c", "prod", "api")
+        _places(escaping).of("unit", _Svc("api", "backend"))
 
 
 def test_a_host_port_is_one_services_on_its_host_across_targets_and_environments(tmp_path):
@@ -144,20 +146,17 @@ def test_a_host_port_is_one_services_on_its_host_across_targets_and_environments
 
 def test_a_per_machine_override_is_merged_over_the_tracked_file(resolver):
     r = resolver(_doc(prod=PROD), local={"targets": {"prod": {"host": "10.0.0.5"}}})
-    assert r.deploy_env_value("DEPLOY_SERVER") == "svc@10.0.0.5"
-    assert r.server_base() == "/srv/apps"
+    assert targets.server(*r.target()) == "svc@10.0.0.5" and r.target()[1]["root"] == "/srv/apps"
 
 
 def test_a_pending_target_refuses_every_deploy_with_its_reason_and_nothing_else(resolver):
-    # A deploy key asked of it answers empty (a local step reading settings never fails on it); the
-    # acts a deploy needs it for refuse, naming why.
     r = resolver(_doc(prod={"runtime": "iis", "pending": "IIS delivery is not built"}))
-    assert r.deploy_env_value("DEPLOY_SERVER") == "" and r.env_value("api", "DEPLOY_PATH") == ""
     assert r.ssh_args() == [] and r.compose_project("prod") == "golden-consumer-prod"
-    with pytest.raises(ValueError, match="pending: IIS delivery is not built"):
-        r.remote_path("api", "runtime", "c")
-    with pytest.raises(ValueError, match="pending: IIS delivery is not built"):
-        r.remote_preflight([])
+    from lib.delivery.context import DeliveryError, open_delivery
+
+    with pytest.raises(DeliveryError, match="pending: IIS delivery is not built") as e:
+        open_delivery(r.root, r.manifest, environment="prod")
+    assert e.value.code == 2
 
 
 def test_ssh_is_strict_against_the_pinned_file_and_trusts_first_use_only_when_declared(resolver, monkeypatch):
@@ -175,50 +174,48 @@ def test_ssh_is_strict_against_the_pinned_file_and_trusts_first_use_only_when_de
         resolver(_doc(prod=tofu)).ssh_args()
 
 
-def test_without_a_declared_target_a_worker_still_inherits_the_base_folders_path(tmp_path, monkeypatch):
-    # The deprecated deploy.env path keeps working (until 2.0.0), including bash's inheritance rule.
-    from lib.resolution import Resolver
-
-    root = tmp_path / "legacy"
-    shutil.copytree(WORKING_ROOT, root, symlinks=True)
-    monkeypatch.setenv(identity.env_name("PROJECT_ROOT"), str(root))
-    r = Resolver(root)
-    worker_folder = next(f for f in r.folders() if f not in ("api", "web")
-                         and not r.env_value(f, "DEPLOY_PATH"))
-    base = r.env_value(r.ctx["deployBaseSecretsFolder"], "DEPLOY_PATH")
-    assert base and r.remote_path(worker_folder, "runtime", "w").startswith(base)
-
-
-# ── migration ────────────────────────────────────────────────────────────────
+# ── migration: the former homes, carried once, then gone ─────────────────────
 
 def test_migrate_declares_deploy_env_as_a_target_and_invents_nothing(tmp_path):
     root = tmp_path / "m"
     secrets = root / "ops" / "config"
-    secrets.mkdir(parents=True)
+    (secrets / "api").mkdir(parents=True)
     (secrets / "deploy.env").write_text(
         "DEPLOY_SERVER=ops@203.0.113.7\nDEPLOY_SSH_OPTIONS=-o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30\n"
-        "DEPLOY_SSH_IDENTITY_FILE=ops/config/ssh/id_ed25519\nDEPLOY_SSH_PASSWORD=hunter2\n", encoding="utf-8")
-    manifest = {"modules": {}}
-    changes, document = carry_deploy_targets(root, secrets, manifest, apply=False)
+        "DEPLOY_SSH_IDENTITY_FILE=ops/config/ssh/id_ed25519\nDEPLOY_PROJECT=Shop_Front\nCOMPOSE_API_SERVICE=x-api\n",
+        encoding="utf-8")
+    (secrets / "api" / ".env.deploy").write_text("DEPLOY_PATH=/home/ops/backend/shop-api\nDEPLOY_HOST_PORT=8090\n", encoding="utf-8")
+    (secrets / "api" / ".env.prod").write_text("DB=postgres\nDOCKER_NETWORK=old-net\n", encoding="utf-8")
+    manifest = {"modules": {"api": {"type": "dotnet-aspnet", "role": "api", "path": "api", "secretsModule": "api"}}}
+    changes = carry(root, secrets, manifest, apply=False)
     assert not (root / "ops" / "deploy" / "targets.json").exists() and "deploy" not in manifest
-    t = document["targets"]["prod"]
-    assert (t["host"], t["user"], t["root"]) == ("203.0.113.7", "ops", "/home/ops")
     assert any("INFERRED" in c for c in changes), "an inferred root was written silently"
+    assert any("COMPOSE_API_SERVICE: dropped" in c for c in changes)
+    carry(root, secrets, manifest, apply=True)
+    assert manifest["project"] == "shop_front" and manifest["deploy"]["targets"] == "ops/deploy/targets.json"
+    t = json.loads((root / "ops" / "deploy" / "targets.json").read_text(encoding="utf-8"))["targets"]["prod"]
+    assert (t["host"], t["user"], t["root"]) == ("203.0.113.7", "ops", "/home/ops")
     assert t["ssh"] == {"identity": "file:ops/config/ssh/id_ed25519", "hostKeys": "accept-new",
                         "options": ["ServerAliveInterval=30"]}
-    assert "hunter2" not in json.dumps(document) and any("DEPLOY_SSH_PASSWORD" in c for c in changes)
-    carry_deploy_targets(root, secrets, manifest, apply=True)
-    assert manifest["deploy"]["targets"] == "ops/deploy/targets.json"
-    assert json.loads((root / "ops" / "deploy" / "targets.json").read_text(encoding="utf-8")) == document
+    assert t["ports"] == {"prod": {"api": [8090]}}
+    assert t["legacyLayout"] == {"environment": "prod", "units": {"api": "{root}/backend/shop-api"}}
+    assert not (secrets / "deploy.env").exists() and not (secrets / "api" / ".env.deploy").exists()
+    assert (secrets / "api" / ".env.prod").read_text(encoding="utf-8") == "DB=postgres\n"
+    from lib import legacy
+
+    assert legacy.found(secrets, manifest) == {}
 
 
-def test_a_host_on_deploy_env_is_told_its_deprecation_by_key_name(tmp_path):
+def test_a_former_home_is_a_validate_error_naming_migrate_by_key_name(tmp_path):
+    from lib import legacy
+
     secrets = tmp_path / "ops" / "config"
     secrets.mkdir(parents=True)
     (secrets / "deploy.env").write_text("DEPLOY_SERVER=a@b\nDEPLOY_PROJECT=x\n", encoding="utf-8")
-    notes = targets.legacy_notices(secrets, {"modules": {}})
-    assert len(notes) == 1 and "DEPLOY_SERVER" in notes[0] and "migrate --apply" in notes[0]
-    assert "a@b" not in notes[0]
+    found = legacy.problems(tmp_path, secrets, {"modules": {}, "stack": {"networkName": "n"}})
+    assert any("deploy.env: the file itself, DEPLOY_PROJECT, DEPLOY_SERVER" in p and "migrate --apply" in p for p in found)
+    assert any("stack.networkName" in p for p in found)
+    assert not any("a@b" in p for p in found)
 
 
 # ── runtime config: what the application reads, never a secret ───────────────
