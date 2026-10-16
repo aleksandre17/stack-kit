@@ -1,5 +1,35 @@
 # Changelog — stack-kit
 
+## 2.1.0 — 2026-10-16
+
+What the earlier platforms proved, carried as mechanisms (ADR-001 amendment 14), and one extension
+grammar (amendment 15). No host change is required; each mechanism is a declaration a host opts into.
+
+### Added
+
+- Release images: unprivileged USER and a HEALTHCHECK in every recipe (`healthPath`, else the port);
+  a hardened static server (same-origin `container.proxy`, nosniff, Referrer-Policy, gzip, cache
+  rules, `/healthz`); built-bundle checks (no plain-http URL, no IP); floating images refused
+  (`requireDigests` for digests); `security.imageScan` (digest-pinned scanner, failOn, observeOnly,
+  maxDbAgeHours, OpenVEX).
+- Configuration: the env-value `policy` of a catalogued key, run before every release and by
+  `config check`; `policy.generate` (made on the server once, `<NAME>_FILE`); the injection
+  contract `STACK_KIT_ENV_FILE_<FOLDER>_<ENV>` (ci-gen writes secrets outside the checkout).
+- Data: `backup <store>`, `backup verify` (a throwaway restore against declared anchors),
+  `backup list`; `stack.migrate` before the apps; `migrations lock|check` (a checksum ledger).
+- CI: `ci.database` (a healthy, migrated database, DATABASE_URL); a secrets job; the `audit`,
+  `e2e`, `visual` step kinds.
+- Security: `scan secrets [--history]` (structural, fingerprints of known leaks, no value printed).
+- Infra templates: SQL Server, MinIO, Redis with auth, OTel collector, Prometheus, Grafana, Tempo,
+  Keycloak, Flyway, the edge; `tls ca|leaf|truststore`.
+- Operate: OIDC readiness in `targets --health`; `ops restart-check`; `ops prune [--schedule]`;
+  log rotation; environment isolation in validate.
+- `extend` (extension points), `config/conformance.json` (machine-checked).
+
+### Removed
+
+- `scaffold/apply-scaffold.*` (init is `extend --init`).
+
 ## 2.0.0 — 2026-10-16
 
 One generic pipeline, one operator CLI, one home per value (ADR-001 amendment 13). Breaking.

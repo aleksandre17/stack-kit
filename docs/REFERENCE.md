@@ -104,6 +104,22 @@ registry), give it a `container` recipe and a `dev`; nothing else changes. Per-d
 [node-api](../drivers/node-api/README.md), [node-spa](../drivers/node-spa/README.md),
 [node-vite](../drivers/node-vite/README.md), [drivers/README.md](../drivers/README.md).
 
+## Security, data and extension
+
+| Declared in | Does | Verb |
+|---|---|---|
+| `config.keys` rows' `policy` | the env values a release must hold (required, minLength, format, forbid, requires); `generate` makes a value on the server once, given as `<NAME>_FILE` | `config check`, every `deploy` |
+| `security` | `allow`, `knownLeaks` (sha256 fingerprints) for the secret scan; `imageScan` (a digest-pinned scanner, failOn, observeOnly, maxDbAgeHours, vex) | `scan secrets [--history]`, every `deploy` |
+| `stack.infra.backup.<store>` | `keep`, `anchors` a throwaway restore must hold | `backup`, `backup verify`, `backup list` |
+| `stack.migrate` | the one-shot migration service a release runs before the apps; `migrations lock` keeps the checksum ledger | `deploy`, `migrations` |
+| `ci.database` | the test database a module's CI job runs beside | `ci-gen` |
+| `targets.<t>.oidc` | the OIDC provider `targets --health` checks (discovery, JWKS) | `targets --health` |
+| `config/extension-points.json` | every place a host extends the kit; pending answers, 3-way upgrades | `extend` |
+| `config/conformance.json` | each standard clause, its mechanism, evidence and status (machine-checked) | -- |
+
+TLS on a private network: `tls ca`, `tls leaf <host>`, `tls truststore` (the CA on the target, the
+edge template reads the leaves). A shared host's disk: `ops prune [--schedule]`.
+
 ## Resolver
 
 One resolver (ADR-001 decision 2): `lib/resolution/` answers what the manifest says (one flat

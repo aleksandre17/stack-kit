@@ -1,0 +1,489 @@
+{
+  "$comment": "The standards conformance map, machine-checked (tests/unit/test_conformance.py): a `conformant` row's evidence exists -- a test node id, or a CLI verb -- and the suite runs it; `partial` and `gap` say why; `non-goal` is a decided cut (cost exceeds benefit).",
+  "schema": 1,
+  "rows": [
+    {
+      "standard": "12-Factor",
+      "clause": "III config",
+      "mechanism": "env files per environment; the injection contract STACK_KIT_ENV_FILE_<FOLDER>_<ENV>; one home per value",
+      "evidence": [
+        "tests/unit/test_targets.py::test_an_env_file_is_injected_from_outside_the_repository",
+        "tests/unit/test_one_home.py::test_a_former_homes_key_is_spelled_only_where_it_is_named_or_carried"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "12-Factor",
+      "clause": "V build, release, run",
+      "mechanism": "one archive per commit; a release is that archive plus the environment's config; run is compose up",
+      "evidence": [
+        "tests/unit/test_cd.py::test_a_package_is_one_archive_per_commit_with_its_provenance_and_recipe",
+        "tests/unit/test_delivery_engine.py::test_a_release_lands_in_the_layout_and_a_second_one_changes_nothing"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "12-Factor",
+      "clause": "IX disposability",
+      "mechanism": "health from the engine's status; rollback on a failed health; a restart is idempotent",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_an_unhealthy_release_rolls_back_where_the_environment_declares_it",
+        "tests/unit/test_delivery_engine.py::test_a_restart_is_idempotent_healthy_on_the_same_image_and_without_drift"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "12-Factor",
+      "clause": "X dev/prod parity",
+      "mechanism": "one layout and one compose per environment; remote dev runs the driver's dev image, not the release image",
+      "evidence": [
+        "tests/unit/test_remote_dev.py::test_dev_up_runs_the_workspace_and_down_returns_to_nothing"
+      ],
+      "status": "partial",
+      "why": "the dev container is the toolchain's image with the source mounted, by design (hot reload); the release image is prod's"
+    },
+    {
+      "standard": "12-Factor",
+      "clause": "XI logs",
+      "mechanism": "container logs, rotated (compose logging); `ops logs`",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_every_stack_service_rotates_its_logs"
+      ],
+      "status": "partial",
+      "why": "logs go to the engine and rotate; no event-stream shipping is declared (the OTel collector template is the host's choice)"
+    },
+    {
+      "standard": "OpenGitOps",
+      "clause": "1 declarative",
+      "mechanism": "the manifest, the targets file and the catalogs declare the whole desired state",
+      "evidence": [
+        "tests/unit/test_one_home.py::test_each_declaration_file_is_read_by_its_one_home"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "OpenGitOps",
+      "clause": "2 versioned and immutable",
+      "mechanism": "a release is an archive of a commit; releases/<commit> is never rewritten",
+      "evidence": [
+        "tests/unit/test_cd.py::test_a_package_is_one_archive_per_commit_with_its_provenance_and_recipe"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "OpenGitOps",
+      "clause": "3 pulled automatically",
+      "mechanism": "deploy pushes from the CLI or CI",
+      "evidence": [
+        "deploy"
+      ],
+      "status": "gap",
+      "why": "no agent on the host pulls: the shared host runs no controller of ours; push with the same CLI is the decision"
+    },
+    {
+      "standard": "OpenGitOps",
+      "clause": "4 continuously reconciled",
+      "mechanism": "targets --verify reports drift read-only; the owning verb undoes it",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_verify_names_each_drift_read_only_and_a_deploy_undoes_it"
+      ],
+      "status": "partial",
+      "why": "reconcile is cut by the owner: drift is reported, never auto-applied"
+    },
+    {
+      "standard": "SLSA",
+      "clause": "Build L1 provenance",
+      "mechanism": "release.json (commit, describe, dirty) in every archive; a provenance-less archive is refused",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_an_archive_without_provenance_is_refused"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "SLSA",
+      "clause": "Build L2 hosted, signed provenance",
+      "mechanism": "ci-gen attests each package with actions/attest-build-provenance",
+      "evidence": [
+        "tests/unit/test_cd.py::test_every_package_carries_an_sbom_and_a_provenance_attestation"
+      ],
+      "status": "partial",
+      "why": "signed only when built in CI; a local package carries unsigned provenance"
+    },
+    {
+      "standard": "SBOM",
+      "clause": "SPDX per package",
+      "mechanism": "anchore/sbom-action in the package job (spdx-json)",
+      "evidence": [
+        "tests/unit/test_cd.py::test_every_package_carries_an_sbom_and_a_provenance_attestation"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "OpenSSF Scorecard",
+      "clause": "Pinned-Dependencies (actions)",
+      "mechanism": "every action pinned by a full commit SHA",
+      "evidence": [
+        "tests/unit/test_ci_gen.py::test_every_action_is_pinned_by_a_full_commit_sha"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "OpenSSF Scorecard",
+      "clause": "Token-Permissions",
+      "mechanism": "contents: read at the top; id-token/attestations only on package jobs",
+      "evidence": [
+        "tests/unit/test_ci_gen.py::test_the_workflow_token_is_read_only_but_where_a_package_is_attested"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "OpenSSF Scorecard",
+      "clause": "Pinned-Dependencies (images)",
+      "mechanism": "a release refuses `latest` or no tag; digests where requireDigests",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_a_floating_image_is_refused_and_a_digest_where_declared"
+      ],
+      "status": "partial",
+      "why": "the kit's own driver images carry version tags; digests are the host's opt-in"
+    },
+    {
+      "standard": "SemVer 2.0.0",
+      "clause": "version",
+      "mechanism": "VERSION is SemVer, the changelog names it",
+      "evidence": [
+        "tests/unit/test_release.py::test_version_file_semver"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "Keep a Changelog",
+      "clause": "format",
+      "mechanism": "CHANGELOG.md, one section per release",
+      "evidence": [
+        "tests/unit/test_release.py::test_changelog_mentions_version"
+      ],
+      "status": "partial",
+      "why": "sections are by theme (Added, Removed, Migration), not every Keep-a-Changelog heading"
+    },
+    {
+      "standard": "Conventional Commits",
+      "clause": "commit messages",
+      "mechanism": "type(scope): subject",
+      "evidence": [],
+      "status": "partial",
+      "why": "followed, not machine-checked: a commit hook is the host's"
+    },
+    {
+      "standard": "JSON Schema",
+      "clause": "2020-12",
+      "mechanism": "the kit's schemas",
+      "evidence": [],
+      "status": "gap",
+      "why": "they are draft-07, which the kit's own validator implements; moving costs a validator rewrite for no host benefit today"
+    },
+    {
+      "standard": "MADR",
+      "clause": "ADR format",
+      "mechanism": "ADR-001 with numbered amendments",
+      "evidence": [],
+      "status": "partial",
+      "why": "context, decision, rejected alternatives -- not the MADR template headings"
+    },
+    {
+      "standard": "SSH hardening",
+      "clause": "pinned host keys",
+      "mechanism": "StrictHostKeyChecking=yes against the target's known_hosts; accept-new only when declared",
+      "evidence": [
+        "tests/unit/test_targets.py::test_ssh_is_strict_against_the_pinned_file_and_trusts_first_use_only_when_declared"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "SSH hardening",
+      "clause": "no password auth, BatchMode",
+      "mechanism": "the target template declares BatchMode=yes; an identity is a key reference",
+      "evidence": [
+        "tests/unit/test_extend.py::test_the_registry_has_the_shared_shape"
+      ],
+      "status": "partial",
+      "why": "BatchMode is in the template a host makes, not enforced on every target"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "hardened SPA nginx",
+      "mechanism": "hardened SPA nginx",
+      "evidence": [
+        "tests/unit/test_cd.py::test_a_static_release_is_hardened_and_proxies_its_api_same_origin"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "non-root USER + HEALTHCHECK (multi-stage where a stage does work)",
+      "mechanism": "non-root USER + HEALTHCHECK (multi-stage where a stage does work)",
+      "evidence": [
+        "tests/unit/test_cd.py::test_a_built_recipe_runs_unprivileged_and_probes_its_port_or_its_declared_path"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "backup + verified restore",
+      "mechanism": "backup + verified restore",
+      "evidence": [
+        "tests/unit/test_backup.py::test_a_restore_is_checked_against_its_anchors_and_the_throwaway_database_always_dropped"
+      ],
+      "status": "partial",
+      "why": "Postgres restores into a throwaway database; SQL Server is checked with RESTORE VERIFYONLY"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "migrate step + checksum ledger",
+      "mechanism": "migrate step + checksum ledger",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_the_migration_step_runs_before_the_apps_and_a_failure_starts_none",
+        "tests/unit/test_delivery_engine.py::test_a_recorded_migration_that_changed_or_is_gone_is_refused"
+      ],
+      "status": "partial",
+      "why": "fresh-chain replay into a throwaway database is not built"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "generated CI with a database",
+      "mechanism": "generated CI with a database",
+      "evidence": [
+        "tests/unit/test_cd.py::test_ci_runs_the_db_tests_beside_a_healthy_database_after_migrating_it"
+      ],
+      "status": "partial",
+      "why": "the separate live-parity job is not built"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "secret scan (structural, history, known leaks)",
+      "mechanism": "secret scan (structural, history, known leaks)",
+      "evidence": [
+        "tests/unit/test_secret_scan.py::test_history_finds_what_the_tree_no_longer_holds"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "dependency audit",
+      "mechanism": "dependency audit",
+      "evidence": [
+        "tests/unit/test_cd.py::test_ci_audits_the_dependencies_of_every_driver_that_declares_how"
+      ],
+      "status": "partial",
+      "why": "java-boot declares no audit yet"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "image vulnerability scan with policy and VEX",
+      "mechanism": "image vulnerability scan with policy and VEX",
+      "evidence": [
+        "tests/unit/test_image_scan.py::test_a_release_with_a_high_finding_is_refused_before_it_runs"
+      ],
+      "status": "partial",
+      "why": "the mechanism and policy are built; the host pins the scanner's digest"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "refuse floating image tags",
+      "mechanism": "refuse floating image tags",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_a_floating_image_is_refused_and_a_digest_where_declared"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "env-value policy preflight",
+      "mechanism": "env-value policy preflight",
+      "evidence": [
+        "tests/unit/test_config_policy.py::test_each_rule_refuses_its_failure_and_never_prints_a_value"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "server-side secret generation",
+      "mechanism": "server-side secret generation",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_a_generated_secret_is_made_on_the_server_once_and_never_read_back"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "edge TLS 1.2+, HSTS, headers, /healthz; internal CA, leaves, public truststore",
+      "mechanism": "edge TLS 1.2+, HSTS, headers, /healthz; internal CA, leaves, public truststore",
+      "evidence": [
+        "tests/unit/test_tls.py::test_a_leaf_carries_its_names_and_lands_where_the_edge_reads_it"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "built-SPA checks (no http://, no IP)",
+      "mechanism": "built-SPA checks (no http://, no IP)",
+      "evidence": [
+        "tests/unit/test_cd.py::test_a_static_release_is_hardened_and_proxies_its_api_same_origin"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "default log rotation",
+      "mechanism": "default log rotation",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_every_stack_service_rotates_its_logs"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "single secret-injection contract (*_ENV_FILE)",
+      "mechanism": "single secret-injection contract (*_ENV_FILE)",
+      "evidence": [
+        "tests/unit/test_targets.py::test_an_env_file_is_injected_from_outside_the_repository"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "environment isolation, checked",
+      "mechanism": "environment isolation, checked",
+      "evidence": [
+        "tests/unit/test_targets.py::test_a_layout_that_lets_two_environments_share_a_place_is_refused"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "scheduled safe prune",
+      "mechanism": "scheduled safe prune",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_the_safe_prune_touches_only_cache_and_dangling_images_and_schedules_once"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "OIDC readiness (discovery, JWKS) and restart idempotency",
+      "mechanism": "OIDC readiness (discovery, JWKS) and restart idempotency",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_an_oidc_provider_is_ready_only_when_discovery_names_it_and_the_jwks_has_a_key"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "infra templates (SQL Server, Postgres, Redis auth, MinIO, OTel, Prometheus, Grafana, Tempo, Keycloak, Flyway)",
+      "mechanism": "infra templates (SQL Server, Postgres, Redis auth, MinIO, OTel, Prometheus, Grafana, Tempo, Keycloak, Flyway)",
+      "evidence": [
+        "tests/unit/test_extend.py::test_init_lays_down_its_points_and_the_selected_infra_only"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "e2e / visual-regression as declared step kinds",
+      "mechanism": "e2e / visual-regression as declared step kinds",
+      "evidence": [
+        "tests/unit/test_extension.py::test_a_lifecycle_step_declared_by_the_host_is_a_step_and_a_ci_step"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "the `config` verb",
+      "mechanism": "the `config` verb",
+      "evidence": [
+        "config"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "docs derived or drift-tested",
+      "mechanism": "docs derived or drift-tested",
+      "evidence": [
+        "tests/unit/test_docs_drift.py::test_every_kit_path_a_guide_names_exists",
+        "tests/unit/test_operations_doc.py::test_the_operations_doc_is_what_the_registry_renders"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "secure compose overlay",
+      "mechanism": "not built",
+      "evidence": [],
+      "status": "non-goal",
+      "why": "cost exceeds benefit"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "evidence bundle sidecars",
+      "mechanism": "not built",
+      "evidence": [],
+      "status": "non-goal",
+      "why": "cost exceeds benefit"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "changesets",
+      "mechanism": "not built",
+      "evidence": [],
+      "status": "non-goal",
+      "why": "cost exceeds benefit"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "named log sources and a reload verb",
+      "mechanism": "not built",
+      "evidence": [],
+      "status": "non-goal",
+      "why": "cost exceeds benefit"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "deploy watch",
+      "mechanism": "not built",
+      "evidence": [],
+      "status": "non-goal",
+      "why": "cost exceeds benefit"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "drift --reconcile",
+      "mechanism": "not built",
+      "evidence": [],
+      "status": "non-goal",
+      "why": "cost exceeds benefit"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "load / watchdog probes",
+      "mechanism": "not built",
+      "evidence": [],
+      "status": "non-goal",
+      "why": "cost exceeds benefit"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "MATURITY and DEV-MODES docs",
+      "mechanism": "not built",
+      "evidence": [],
+      "status": "non-goal",
+      "why": "cost exceeds benefit"
+    },
+    {
+      "standard": "harvested (round 8)",
+      "clause": "post-ship flips and deferred doors in the runbook",
+      "mechanism": "not built",
+      "evidence": [],
+      "status": "non-goal",
+      "why": "cost exceeds benefit"
+    }
+  ]
+}

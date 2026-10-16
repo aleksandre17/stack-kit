@@ -740,3 +740,48 @@ none; a release builds its image once on the host from the shipped bytes, skippe
 `--reconcile` (drift is undone by the verb that owns it); keeping deploy.env as a read fallback (two
 homes drift; the error plus `migrate` costs one command once); a PowerShell CLI with Python helpers
 (two languages for one dispatch).
+
+## Amendment 14 — what the earlier efforts proved, carried as mechanisms (2026-10-16, owner-delegated)
+
+**Context.** The two earlier platforms solved real failures the kit did not yet prevent: images run
+as root with no health probe, SPAs that bake addresses in and need CORS, backups nobody restored,
+migrations edited after they ran, CI that skips its database tests, secrets in history, floating
+images, unvalidated env values, TLS on a network without a public CA, logs that fill a shared disk.
+The owner's gate: build only what prevents a real failure, saves measured time or raises measured
+quality for our hosts; record every cut.
+
+**Decision (each a declaration, each tested).** Recipes run unprivileged with a HEALTHCHECK that asks
+the declared `healthPath`, else only that the port answers; a static app runs on an unprivileged
+nginx (same-origin proxy for declared paths, nosniff, Referrer-Policy, gzip, immutable hashed assets,
+no-cache HTML, `/healthz`) and a built bundle with a plain-http URL or an IP is refused; a release
+refuses `latest` or untagged images (digests where `requireDigests`), images its scan policy refuses
+(`security.imageScan`: a digest-pinned scanner, failOn, observeOnly, maxDbAgeHours, OpenVEX
+waivers), and env values its policy refuses (`config.keys` `policy`: required, minLength, format,
+forbid, requires; `stack-kit config check`); secrets marked `generate` are made on the server once
+and given as `<NAME>_FILE`; one injection contract `STACK_KIT_ENV_FILE_<FOLDER>_<ENV>`; logs rotate;
+a layout that lets two environments share a place is refused. `backup` / `backup verify` (a
+throwaway restore checked against the host's anchors, always dropped); `stack.migrate` runs before
+the apps, `migrations lock` keeps a checksum ledger validate holds; `ci.database` gives CI a healthy,
+migrated database; `scan secrets [--history]`; the `audit`, `e2e`, `visual` step kinds; infra
+templates (SQL Server, Postgres, Redis auth, MinIO, OTel, Prometheus, Grafana, Tempo, Keycloak,
+Flyway, the edge); `tls ca|leaf|truststore`; OIDC readiness in `targets --health`; `ops
+restart-check`; `ops prune [--schedule]` (cache and dangling only). `config/conformance.json` maps
+each standard clause to its mechanism, its evidence and its status, machine-checked.
+
+*Cut, recorded as non-goals (cost exceeds benefit):* a secure compose overlay (the env-value policy
+covers it), evidence sidecars (attestation covers it), changesets, named log sources and a reload
+verb, `deploy watch` (dev watch covers it), `--reconcile`, load and watchdog probes, the MATURITY and
+DEV-MODES pages. *Partial, with why:* SQL Server's restore check is VERIFYONLY; no fresh-chain replay;
+no live-parity CI job; java-boot declares no audit; the scanner's digest is the host's to pin.
+
+## Amendment 15 — every host extension through a declared point (2026-10-16, owner-delegated)
+
+**Decision.** `config/extension-points.json` (the shape agent-kit shares: id, purpose, host_path,
+template, schema, cardinality, required_by, merges_into) declares every place a host extends the
+kit. `extend --list`, `extend <point> [<name>] [--plan]` (on demand, idempotent, never overwriting),
+`<<pending: ...>>` markers validate shows (an error where `extend.profile` requires the point),
+`extend --upgrade` (a 3-way merge of a changed template, a conflict reported and the host's file
+kept), and an undeclared file where a point lives is reported. Folded in, not kept beside it: init is
+`extend --init` (the scaffold is the template store; infra services on demand), `init --plan` is
+`extend module`, the catalogs overlays are points. *Rejected:* a tree of empty extension files
+(they rot and look complete); copier/cookiecutter as a dependency (the kit needs one merge, git has it).

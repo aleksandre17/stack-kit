@@ -59,3 +59,17 @@ def test_check_fails_on_drift_and_passes_when_current(tmp_path, monkeypatch):
     wf = root / ci_gen.DEFAULT_WORKFLOW
     wf.write_text(wf.read_text(encoding="utf-8") + "# edited\n", encoding="utf-8")
     assert ci_gen.main(["--check"]) == 1
+
+
+def test_the_workflow_token_is_read_only_but_where_a_package_is_attested():
+    from lib.ci_gen import render
+    from lib.project_context import ProjectContext
+
+    text = render(ProjectContext.discover())
+    head = text.split("jobs:")[0]
+    assert "permissions:\n  contents: read" in head
+    import re
+
+    jobs = re.split(r"\n  (?=[A-Za-z0-9_-]+:\n)", text.split("jobs:\n", 1)[1])
+    widened = [j for j in jobs if "id-token: write" in j]
+    assert widened and all("attestations: write" in j and "name: package" in j for j in widened)
