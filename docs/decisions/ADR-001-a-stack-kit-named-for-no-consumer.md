@@ -785,3 +785,12 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
 `extend --init` (the scaffold is the template store; infra services on demand), `init --plan` is
 `extend module`, the catalogs overlays are points. *Rejected:* a tree of empty extension files
 (they rot and look complete); copier/cookiecutter as a dependency (the kit needs one merge, git has it).
+
+**Owed after amendment 15 (one line each):**
+- The delivery against a real docker host (the layout's `unproven`); Windows/IIS delivery (`iis` pending).
+- `lib/vscode_gen.py` and two compose-gen helpers still name tools (the shrinking list in `test_one_home.py`).
+- SQL Server's restore check is VERIFYONLY, not a throwaway restore; no fresh-chain migration replay.
+- No separate live-parity CI job; java-boot declares no dependency audit.
+- The image scanner's digest is the host's to pin; the kit ships no default scanner.
+- The kit's schemas are draft-07, not JSON Schema 2020-12; commit messages are not machine-checked.
+- Extension points: agent-kit's registry is mirrored by field names only; no shared schema file yet.
