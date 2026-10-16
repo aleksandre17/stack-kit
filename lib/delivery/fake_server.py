@@ -97,6 +97,8 @@ def responses(t: RecordingTransport, record: Path):
             c = st["containers"].get(name)
             if not c:
                 return Result(1, "", f"No such container: {name}")
+            if "{{.Config.Image}}" in argv:
+                return Result(0, f"{c.get('image') or ''}\n")
             health = st["health"].get(c["service"], "healthy")
             return Result(0, ("exited " if health == "exited" else "running ") + ("" if health in ("exited", "none") else health) + "\n")
         return Result(0)

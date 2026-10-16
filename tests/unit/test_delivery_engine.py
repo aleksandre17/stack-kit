@@ -344,3 +344,26 @@ def test_the_target_compose_invocation_is_the_declared_one(project, tmp_path):
     with pytest.raises(DeliveryError, match="targets.box.compose") as e:
         preflight.runtime(ctx)
     assert e.value.code == 4
+
+
+# ── drift and reconciliation (OpenGitOps: continuously reconciled) ─────────────
+
+def test_verify_names_each_drift_read_only_and_a_deploy_undoes_it(project, tmp_path):
+    t = server(tmp_path)
+    ctx = ctx_for(project, t)
+    archive = packaged(project)
+    release.release(ctx, "edge", archive)
+    assert tree.verify(ctx) == []
+    env = f"{ROOT}/shop/staging/stack/env/edge.env"
+    t.write(env, b"WHERE=edited-on-the-host\n", "600")
+    st = fake_server._load(fake_server.state_file(tmp_path / "server.json"))
+    st["containers"] = {}
+    fake_server.state_file(tmp_path / "server.json").write_text(json.dumps(st), encoding="utf-8")
+    t.log.clear()
+    drift = tree.verify(ctx)
+    assert t.changes() == [], "verify changed the host"
+    assert any("edge: env file differs" in d for d in drift), drift
+    assert any("edge: runs nothing, its current release says shop-staging-edge:" in d for d in drift), drift
+    assert not any("edited-on-the-host" in d for d in drift), "a value is never printed"
+    release.release(ctx, "edge", archive)
+    assert tree.verify(ctx) == []

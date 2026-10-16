@@ -346,8 +346,10 @@ VERBS = [
                             Option("--attempts", "health: attempts per URL (default 12)", "n"),
                             Option("--pause", "health: seconds between attempts (default 5)", "s")],
          group="delivery", exits=(0, 1, 2, 3, 4), examples=["targets --plan", "targets --init --target linux --env dev"],
-         details="--init refuses a non-empty directory without this project's marker; --verify exits 1 on drift and 2 "
-                 "when nothing could be verified."),
+         details="--init refuses a non-empty directory without this project's marker; --verify reads the declared state "
+                 "(places, marker, compose file, env and runtime config digests, each service's running release, runtime, "
+                 "ports, disk) against the host, read-only, and exits 1 on drift, 2 when nothing could be verified; a drift is "
+                 "undone by the verb that owns it (deploy, release rollback)."),
     Verb("layout", "move this project's services out of a tree laid out before the layout",
          ["layout migrate --target <t> --env <id> [--approve] [--yes]"], _layout,
          options=[PLAN, YES, Option("--approve", "apply the planned moves (never automatic)")],

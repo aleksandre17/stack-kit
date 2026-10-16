@@ -71,7 +71,7 @@ def verify(ctx: Delivery) -> list[str]:
     for d in dirs:
         if not ctx.transport.exists(d):
             drift.append(f"missing: {d}")
-    allowed = {ctx.places.marker()}
+    allowed = {ctx.places.marker(), *(ctx.places.of("current", s) for s in running.services(ctx) if s.module is not None)}
     for d in dirs:
         while under(d, project_dir) and d != project_dir:  # every declared place and its ancestors
             allowed.add(d)
@@ -103,4 +103,8 @@ def verify(ctx: Delivery) -> list[str]:
         ctx.out(f"[verify] {preflight.disk(ctx)}")
     except DeliveryError as e:
         drift.append(str(e))
+    if have is not None and preflight.owned(ctx):
+        from lib.delivery import drift as declared_state
+
+        drift += declared_state.drift(ctx)
     return drift

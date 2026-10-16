@@ -96,6 +96,8 @@ def release(ctx: Delivery, module_id: str, archive: Path) -> int:
             f"{ctx.places.environment_dir}")
     for line in preflight.all_checks(ctx, [s.id for s in svc]):
         ctx.out(f"[preflight] {line}")
+    for kind in ("stack", "infra", "backups"):
+        ctx.transport.mkdir(ctx.places.of(kind))
     previous: dict[str, str | None] = {}
     for s in svc:
         unit = ctx.places.unit(s)
