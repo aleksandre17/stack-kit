@@ -10,6 +10,16 @@
       "description": "Relative path from project root to stack-kit package"
     },
     "secrets": { "type": "string" },
+    "security": {
+      "type": "object",
+      "description": "The secret scan's host policy: `allow` [{path (glob), rule, reason}], `knownLeaks` [sha256 of a leaked value -- never the value]; `imageScan` (the release's image vulnerability scan: scanner pinned by digest, failOn, observeOnly, maxDbAgeHours, vex)",
+      "properties": {
+        "allow": { "type": "array", "items": { "type": "object", "required": ["path", "rule", "reason"] } },
+        "knownLeaks": { "type": "array", "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" } },
+        "imageScan": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
     "extend": {
       "type": "object",
       "description": "The host's extension profile: `profile` names the profile whose points must be answered (config/extension-points.json `required_by`); a pending answer there is an error, elsewhere a notice",

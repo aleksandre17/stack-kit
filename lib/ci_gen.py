@@ -264,6 +264,9 @@ def render(ctx: ProjectContext) -> str:
         "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
         "jobs:",
     ]
+    out += ["  secrets:", "    name: 'secret scan (tree and history)'", "    runs-on: ubuntu-latest", "    timeout-minutes: 10",
+            "    steps:", f"      - uses: {_uses('actions/checkout', pins)}", "        with:", "          fetch-depth: 0",
+            f"      - run: {_q(f'pwsh {cli} scan secrets --history')}"]
     for mid, module in modules.items():
         typ = str(module.get("type") or "")
         steps = [s for s in lifecycle_steps(manifest) if s in driver_commands(typ)]

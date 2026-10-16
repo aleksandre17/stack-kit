@@ -419,6 +419,22 @@ stack-kit mod api build
 stack-kit mod api deliver release --env prod --plan
 ```
 
+### `scan`
+
+the secret boundary: credential-shaped values in the tracked tree (and, --history, every commit).
+
+```
+stack-kit scan secrets [--history]
+```
+
+| option | |
+|---|---|
+| `--history` | every line any commit added, too |
+
+JWTs, passwords in URLs, connection-string passwords, private keys, committed env files, binaries in the tooling directories, and values the operator lists as leaked (security.knownLeaks: sha256 fingerprints). Placeholders are not values; a file the configuration catalogue tracks (knownExposures) is not failed twice.
+
+Exit codes: 0, 1.
+
 ### `stack`
 
 the local development stack, run by this machine's declared compose invocation.

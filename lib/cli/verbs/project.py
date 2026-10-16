@@ -116,6 +116,23 @@ def _migrations(a: Args) -> int:
     return 1 if found else 0
 
 
+def _scan(a: Args) -> int:
+    from lib import secret_scan
+    from lib.project_context import ProjectContext
+
+    if a.positional[:1] != ["secrets"]:
+        print("  Usage: scan secrets [--history]")
+        return 2
+    ctx = ProjectContext.discover()
+    lines = secret_scan.main_lines(ctx.root, ctx.manifest, a.has("--history"))
+    for line in lines:
+        print(f"  {line}")
+    print("  [scan] " + (f"{len(lines)} finding(s) -- values are never printed; allow one by path and rule with its reason "
+                         f"(security.allow), or rotate it and list its fingerprint (security.knownLeaks)" if lines
+                         else "no credential-shaped value" + (" in the tree or its history" if a.has("--history") else " in the tree")))
+    return 1 if lines else 0
+
+
 VERBS = [
     Verb("init", "bootstrap a host, or draft its manifest from the tree", ["init", "init --plan", "init --approve <who>"],
          _init, passthrough=True, examples=["init --plan"],
@@ -138,6 +155,11 @@ VERBS = [
          ["migrations check", "migrations lock"], _migrations, exits=(0, 1),
          details="`lock` records every migration the drivers' declarations find (sha256, line endings normalised) in "
                  "ops/stack-kit/migrations.lock.json; validate then refuses a recorded migration that changed or is gone."),
+    Verb("scan", "the secret boundary: credential-shaped values in the tracked tree (and, --history, every commit)",
+         ["scan secrets [--history]"], _scan, options=[Option("--history", "every line any commit added, too")], exits=(0, 1),
+         details="JWTs, passwords in URLs, connection-string passwords, private keys, committed env files, binaries in the "
+                 "tooling directories, and values the operator lists as leaked (security.knownLeaks: sha256 fingerprints). "
+                 "Placeholders are not values; a file the configuration catalogue tracks (knownExposures) is not failed twice."),
     Verb("vscode-gen", "generate .vscode launch and tasks from the manifest", ["vscode-gen [--force]"],
          _py("lib/vscode_gen.py"), passthrough=True, group="generate"),
     Verb("config-gen", "generate module config from the manifest", ["config-gen [--all|--check|--dry-run] [module]"],
