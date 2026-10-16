@@ -220,6 +220,29 @@ stack-kit targets --plan
 stack-kit targets --init --target linux --env dev
 ```
 
+### `tls`
+
+TLS on a private network: an internal CA on the target, a leaf per host, a public password-less truststore.
+
+```
+stack-kit tls ca --env <id>
+stack-kit tls leaf <host> [--san <name,ip,...>] --env <id>
+stack-kit tls truststore [--out <dir>] --env <id>
+```
+
+| option | |
+|---|---|
+| `--plan` | print the plan -- remote paths and commands -- and stop; nothing is written |
+| `--yes` | answer the confirmation (CI); without a terminal a confirmation is otherwise refused |
+| `--san <list>` | leaf: further DNS names and IPs |
+| `--out <dir>` | truststore: where the public files go (default ops/deploy/tls) |
+| `--target <name>` | the declared deploy target (default: the environment's) |
+| `--env <id>` | the environment (catalogs.environments; --dev / --prod are short for it) |
+
+The CA's key is made on the target and never leaves it; `ca` never replaces one. A leaf (397 days) lands where the edge template reads it (infra/tls/live). The truststore holds only the CA certificate, so it needs no password.
+
+Exit codes: 0, 1, 2.
+
 ## Remote dev
 
 ### `dev`

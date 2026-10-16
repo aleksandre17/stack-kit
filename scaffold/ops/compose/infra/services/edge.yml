@@ -1,0 +1,23 @@
+# The edge -- a declared template (stack.infra.services: ["edge"]): TLS terminates here and only
+# here (the images behind it carry no host, no IP and no certificate); certificates from the
+# internal CA (`stack-kit tls ca`, `tls leaf <host>`), mounted read-only from the infra place.
+services:
+  edge:
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    container_name: ${INFRA_PREFIX:-app}-edge
+    environment:
+      EDGE_SERVER_NAME: ${EDGE_SERVER_NAME:?the name the edge answers to}
+      EDGE_UPSTREAM: ${EDGE_UPSTREAM:?the service behind the edge, service:port on the environment's network}
+    volumes:
+      - ./edge/edge.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./tls/live:/etc/nginx/tls:ro
+    ports:
+      - "${EDGE_HTTPS_PORT:-8443}:8443"
+      - "${EDGE_HTTP_PORT:-8080}:8080"
+    networks: [infra-net]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped

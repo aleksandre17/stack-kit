@@ -162,6 +162,14 @@
         "postgres"
       ],
       "tunnel": []
+    },
+    "edge": {
+      "fragment": "services/edge.yml",
+      "description": "The edge: TLS 1.2+, HSTS, security headers, /healthz; certificates from the internal CA",
+      "tunnel": [],
+      "files": [
+        "edge/edge.conf.template"
+      ]
     }
   }
 }
