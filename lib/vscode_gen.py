@@ -258,16 +258,16 @@ def _launch_from_data(ctx: ProjectContext, module_id: str, aliases: dict[str, st
               "label": str(dbg.get("label") or module_id),
               "script": str(dbg.get("npmScript") or dbg.get("script") or driver_package_scripts(typ).get("start") or "")}
 
-    def fill(node: Any) -> Any:
-        if isinstance(node, str):
+    def fill(cur: Any) -> Any:
+        if isinstance(cur, str):
             for k, v in values.items():
-                node = node.replace("{" + k + "}", v)
-            return node
-        if isinstance(node, list):
-            return [fill(n) for n in node]
-        if isinstance(node, dict):
-            return {k: fill(v) for k, v in node.items()}
-        return node
+                cur = cur.replace("{" + k + "}", v)
+            return cur
+        if isinstance(cur, list):
+            return [fill(n) for n in cur]
+        if isinstance(cur, dict):
+            return {k: fill(v) for k, v in cur.items()}
+        return cur
 
     cfg = fill(template)
     cfg.setdefault("name", values["label"])

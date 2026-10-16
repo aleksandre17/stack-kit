@@ -247,7 +247,7 @@ def _list_targets(root: Path, manifest: dict, data: dict, *, plan: bool, env_onl
             continue
         ssh = t.get("ssh") or {}
         cmds = targets.runtime_commands(t, manifest)
-        print(f"{head}  {t.get('user')}@{t.get('host')}:{t.get('port', 22)}  root={t.get('root')}  "
+        print(f"{head}  {t.get('user')}@{t.get('host')}:{t.get('port', 22)}  root={targets.declared_root(t)}  "
               f"identity={targets.identity_kind(t)}  hostKeys={ssh.get('hostKeys', 'pinned')}"
               + (f"  compose={' '.join(cmds['compose'])}" if cmds["compose"] else ""))
         if not plan:
@@ -255,13 +255,13 @@ def _list_targets(root: Path, manifest: dict, data: dict, *, plan: bool, env_onl
         envs = catalogs.ids("environments", manifest)
         services = all_services(manifest)
         first = targets.Places(t, project=project, environment=envs[0], environments=envs)
-        print(f"  {first.project_dir}/                  the project's own directory (never the root)")
+        print(f"  {first.project_dir}                  the project's own directory (never the root)")
         print(f"    {targets.MARKER}            ownership: {{\"project\": \"{project}\", \"repository\": \"{targets.repository_identity(root)}\"}}")
         for env in envs:
             if env_only and env != env_only:
                 continue
             p = targets.Places(t, project=project, environment=env, environments=envs)
-            print(f"    {p.environment_dir}/       compose project {naming.remote_compose_project(project, env)}, "
+            print(f"    {p.environment_dir}       compose project {naming.remote_compose_project(project, env)}, "
                   f"network {naming.remote_network(project, env)}")
             print(f"      stack        {p.of('stackCompose')}")
             print(f"      state        {p.of('stackState')}")

@@ -42,6 +42,11 @@ def default_layout() -> dict[str, str]:
     return {k: v for k, v in _declaration().items() if k in KINDS}
 
 
+def declared_root(target: dict[str, Any]) -> str:
+    """The target's root as declared -- for showing it; a path under it is only ever `render`ed."""
+    return str(target.get("root") or "")
+
+
 def unproven() -> str:
     """What the layout's delivery has not yet been proven against (the one `pending` it may carry)."""
     return str(_declaration().get("unproven") or "")

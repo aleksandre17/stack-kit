@@ -37,7 +37,7 @@ def _kit(kind: str) -> tuple[dict[str, Any], ...]:
 def _current_manifest() -> dict[str, Any]:
     """The project's manifest the process is running for, or {} -- for a caller that has none."""
     try:
-        from lib.project_context import find_project_root, load_manifest
+        from lib.project_root import find_project_root, load_manifest
 
         return load_manifest(find_project_root())
     except (FileNotFoundError, ValueError, OSError):

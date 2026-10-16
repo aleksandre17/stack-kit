@@ -107,7 +107,6 @@ def module_by_type(manifest: dict[str, Any], driver_type: str) -> str | None:
 
 
 def legacy_root_discovery_enabled() -> bool:
-    from lib.identity import env
+    from lib.project_root import legacy_root_discovery_enabled as one
 
-    v = env("LEGACY_ROOT_DISCOVERY").strip().lower()
-    return v in ("1", "true", "yes", "on")
+    return one()

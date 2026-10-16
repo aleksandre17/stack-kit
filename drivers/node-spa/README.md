@@ -25,5 +25,5 @@ skipped and said; a missing `build` or `test` fails and names the remedy.
 ```
 
 For Angular in CI, give `test` a non-watching script (`"test:ci": "ng test --watch=false --browsers=ChromeHeadless"`).
-The runner is `toolkit/node/Invoke-PackageScript.ps1`, shared by every Node-family driver; proof:
+The runner is `drivers/_shared/package-scripts/Invoke-PackageScript.ps1`, shared by every Node-family driver; proof:
 `tests/acceptance/test_lifecycle.py`.

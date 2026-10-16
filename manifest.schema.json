@@ -190,7 +190,7 @@
           },
           "target": {
             "type": "string",
-            "description": "Compose service name slug (e.g. module `search` → `<slug>-search`). NOT a server filesystem path under structured layout — JAR deploy uses stack.deployBaseSecretsModule DEPLOY_PATH + runtime/<container>/."
+            "description": "Compose service name slug (e.g. module `search` → `<slug>-search`). Not a server path: a target's layout renders those ({root}/{project}/{environment}/{tier}/{service})."
           },
           "compose": {
             "type": "object",
@@ -400,8 +400,8 @@
             "type": "object",
             "description": "This module's own configuration, by name, for the host's tools: the kit validates its shape as an object and reads nothing in it"
           },
-          "container": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, static {image, root, config, configMount}, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns" },
-          "services": { "type": "object", "description": "Several services from one module, by id, each over `container` (its `context`: the subdirectory of the artifacts it is built from)", "additionalProperties": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, static {image, root, config, configMount}, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns" } },
+          "container": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, static {image, mount, config, configMount}, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns" },
+          "services": { "type": "object", "description": "Several services from one module, by id, each over `container` (its `context`: the subdirectory of the artifacts it is built from)", "additionalProperties": { "type": "object", "description": "A service declaration (the driver's `container` vocabulary): template, dockerfile, static {image, mount, config, configMount}, image, port, command, entry, healthcheck (compose form), environment, volumes {name: mount}, logs, serve, dependsOn, healthWait {retries, interval}, keep, context, artifact, artifactExclude, networks, credentialPatterns" } },
           "dev": { "type": "object", "description": "Remote dev over the driver's `dev`: image, command, build, port, debugPort, caches {name: mount}, excludes, reactions [{globs, do: hot-reload|restart|rebuild}], environment, debounceMs" },
           "credentialPatterns": { "type": "array", "items": { "type": "string" }, "description": "Which files of the secrets folder are credentials (default config/delivery.json)" }
         },

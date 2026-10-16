@@ -29,8 +29,7 @@ def _filter(value: str, name: str) -> str:
     raise ValueError(f"template filter ':{name}' is not one of :stem, :majorminor")
 
 
-def _lookup(node: Any, dotted: str) -> Any:
-    cur = node
+def _lookup(cur: Any, dotted: str) -> Any:
     for part in dotted.split("."):
         cur = cur.get(part) if isinstance(cur, dict) else None
     return cur
@@ -60,12 +59,12 @@ def render(template: str, module: dict[str, Any], extra: dict[str, str] | None =
     return _FIELD.sub(one, template)
 
 
-def render_tree(node: Any, module: dict[str, Any], extra: dict[str, str] | None = None) -> Any:
+def render_tree(cur: Any, module: dict[str, Any], extra: dict[str, str] | None = None) -> Any:
     """Every string inside a declaration, rendered."""
-    if isinstance(node, str):
-        return render(node, module, extra)
-    if isinstance(node, list):
-        return [render_tree(n, module, extra) for n in node]
-    if isinstance(node, dict):
-        return {k: render_tree(v, module, extra) for k, v in node.items()}
-    return node
+    if isinstance(cur, str):
+        return render(cur, module, extra)
+    if isinstance(cur, list):
+        return [render_tree(n, module, extra) for n in cur]
+    if isinstance(cur, dict):
+        return {k: render_tree(v, module, extra) for k, v in cur.items()}
+    return cur

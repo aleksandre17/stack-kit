@@ -3,7 +3,7 @@
 A name is never declared twice and never read from an env file: the project slug is the manifest's
 `project` (else the repository folder), and everything else is derived from it, the module, its
 role and the environment. Before 2.0.0 several of these were also overridable from deploy.env
-(`DEPLOY_PROJECT`, `COMPOSE_PROJECT_NAME`, `DOCKER_NETWORK`, `COMPOSE_*_SERVICE`); a host that still
+(the former keys lib/legacy.py names); a host that still
 carries them is refused by `validate`, naming `migrate`.
 
     project slug          manifest `project`, else the repository folder, slugified

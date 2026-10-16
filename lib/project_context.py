@@ -8,22 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from lib.credentials import global_gcp_credentials, module_credentials
-from lib.identity import (
-    LEGACY_VENDOR_DIRS,
-    MANIFEST_FILENAME,
-    VENDOR_DIRS,
-    env,
-    env_name,
-    find_manifest,
-    has_manifest,
-)
+from lib.identity import MANIFEST_FILENAME, env, env_name, find_manifest, has_manifest  # noqa: F401
 from lib.manifest_defaults import (
     default_field,
-    legacy_root_discovery_enabled,
     load_scaffold_manifest,
     read_nested,
     resolve_cli_alias,
 )
+from lib.project_root import find_project_root, load_manifest  # noqa: F401 -- the one discovery, re-exported
 from lib.modules import (
     infer_cli_aliases,
     module_by_role,
@@ -37,39 +29,6 @@ from lib.modules import (
 
 def _read_nested(data: dict[str, Any], dotted: str, default: str = "") -> str:
     return read_nested(data, dotted, default)
-
-
-def find_project_root(start: Path | None = None) -> Path:
-    """The ONE discovery every runtime uses (ADR-001 decision 2).
-
-    An explicit `start` is walked up from. Otherwise: the declared root (`<prefix>_PROJECT_ROOT`)
-    is authoritative -- an operator's explicit answer is never overridden by a guess; then the
-    working directory and its parents; then, only when asked for, pre-v2 trees. (Not the
-    directories above the running kit: a kit checked out inside some other repository would then
-    resolve that repository from anywhere -- a guess, made silently.)
-    """
-    if start is None and env("PROJECT_ROOT"):
-        return Path(env("PROJECT_ROOT")).resolve()
-    start = (start or Path.cwd()).resolve()
-    for p in [start, *start.parents]:
-        if has_manifest(p):
-            return p
-    if legacy_root_discovery_enabled():
-        for p in [start, *start.parents]:
-            if (p / "ops" / "config").is_dir() or (p / "secrets").is_dir():
-                if any((p / d).is_dir() for d in (*VENDOR_DIRS, *LEGACY_VENDOR_DIRS)):
-                    return p
-    raise FileNotFoundError(
-        f"project root not found ({MANIFEST_FILENAME} required; "
-        f"set {env_name('LEGACY_ROOT_DISCOVERY')}=1 for pre-v2 trees)"
-    )
-
-
-def load_manifest(root: Path) -> dict[str, Any]:
-    mf = find_manifest(root)
-    if mf is not None:
-        return json.loads(mf.read_text(encoding="utf-8"))
-    return {}
 
 
 @dataclass(frozen=True)

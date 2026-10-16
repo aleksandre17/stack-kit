@@ -15,7 +15,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from lib.targets import layout
+import lib.targets.layout as layout
 
 KIT = Path(__file__).resolve().parents[2]
 SCHEMA = KIT / "config" / "deploy-targets.schema.json"
@@ -126,10 +126,10 @@ def _ports(data: dict[str, Any]) -> list[tuple[str, str, str, str, int]]:
     return out
 
 
-def _fields(node: Any, path: str = "") -> list[tuple[str, str]]:
+def _fields(cur: Any, path: str = "") -> list[tuple[str, str]]:
     out = []
-    if isinstance(node, dict):
-        for k, v in node.items():
+    if isinstance(cur, dict):
+        for k, v in cur.items():
             here = f"{path}.{k}" if path else str(k)
             parent = path.rsplit(".", 1)[-1] if path else ""
             if parent not in ("targets", "paths", "defaults", "units"):  # names chosen by the host, not fields

@@ -38,14 +38,15 @@ def _deliver(module: str, typ: str, rest: list[str]) -> int:
         return 1
     extra = rest[1:]
     if how.get("via"):
-        from lib.cli import main
+        from lib.cli import registry
 
         via = str(how["via"])
         argv = {"hybrid": ["hybrid", "boot", module], "release": ["deploy", module], "dev": ["dev", "up", module]}.get(via, [via, module])
         if "--plan" in extra:
             print(f"  deliver {rung} -> {identity.KIT_NAME} {' '.join(argv)}")
             return 0
-        return main([*argv, *extra])
+        verb = registry.discover()[argv[0]]
+        return verb.run(registry.parse(verb, [*argv[1:], *extra]))
     command = str(how["command"])
     env = next((extra[i + 1] for i, a in enumerate(extra[:-1]) if a == "--env"), "prod")
     args = [str(a).replace("{environment}", env) for a in how.get("args") or []]

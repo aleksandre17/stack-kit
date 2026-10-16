@@ -36,14 +36,14 @@ def rename_fields(manifest: dict[str, Any], *, apply: bool) -> list[str]:
     changes = []
     for old, new in LEGACY_MANIFEST_FIELDS.items():
         *oparent, oleaf = old.split(".")
-        node = identity._dig(manifest, ".".join(oparent)) if oparent else manifest
-        if not isinstance(node, dict) or oleaf not in node:
+        cur = identity._dig(manifest, ".".join(oparent)) if oparent else manifest
+        if not isinstance(cur, dict) or oleaf not in cur:
             continue
         if identity._dig(manifest, new) is not None:
             raise TwoHomes(f"{MANIFEST_FILENAME} holds both {old} and {new}; keep one")
         changes.append(f"field: {old} -> {new}")
         if apply:
-            value = node.pop(oleaf)
+            value = cur.pop(oleaf)
             *nparent, nleaf = new.split(".")
             target = manifest
             for part in nparent:

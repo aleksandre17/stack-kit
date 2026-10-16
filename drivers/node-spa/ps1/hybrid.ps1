@@ -3,5 +3,5 @@
 # node.scripts.start), through the kit's package-script runner.
 # In scope from the caller: $ModuleId, $modPath, $root, $PackageRoot.
 
-& (Join-Path $PackageRoot "toolkit\node\Invoke-PackageScript.ps1") -ModuleId $ModuleId -Step "start"
+& (Join-Path $PackageRoot "drivers\_shared\package-scripts\Invoke-PackageScript.ps1") -ModuleId $ModuleId -Step "start"
 exit $LASTEXITCODE

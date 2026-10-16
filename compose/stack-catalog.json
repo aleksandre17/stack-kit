@@ -2,7 +2,7 @@
   "description": "Stack local URL hints — port env keys by module role (manifest modules + ops/config secrets).",
   "roles": {
     "ui": {
-      "portEnv": ["DEPLOY_HOST_PORT", "APP_DEV_CONTAINER_PORT"],
+      "portEnv": ["APP_HOST_PORT", "APP_DEV_CONTAINER_PORT"],
       "defaultPort": "5177",
       "urlPath": "/",
       "ciHealth": false,

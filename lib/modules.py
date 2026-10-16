@@ -18,9 +18,9 @@ KIT_DRIVERS = Path(__file__).resolve().parent.parent / "drivers"
 #: The host run is the KIT's: one runner for every driver that declares its launch step
 #: (`hybrid.script`), given to it as its `run` command (ADR-001 amendment 7).
 HOST_RUNNER = Path(__file__).resolve().parent.parent / "toolkit" / "hybrid" / "Invoke-HybridRun.ps1"
-#: A Node package's lifecycle step is the KIT's too: one runner of package.json scripts for every
-#: driver that declares `packageScripts` (step -> script name), given as those commands (amendment 8).
-PACKAGE_SCRIPT = Path(__file__).resolve().parent.parent / "toolkit" / "node" / "Invoke-PackageScript.ps1"
+#: A package-script step is a driver family's, kept with the drivers: one runner for every driver
+#: that declares `packageScripts` (step -> script name), given as those commands (amendment 8).
+PACKAGE_SCRIPT = Path(__file__).resolve().parent.parent / "drivers" / "_shared" / "package-scripts" / "Invoke-PackageScript.ps1"
 
 
 def lifecycle_steps(manifest: dict[str, Any] | None = None) -> list[str]:
@@ -90,7 +90,7 @@ def compose_registry(root: Path | None, manifest: dict[str, Any] | None) -> tupl
 def _composed_for(root_key: str) -> tuple[dict[str, Any], dict[str, Path]]:
     if not root_key:
         return compose_registry(None, None)
-    from lib.project_context import load_manifest
+    from lib.project_root import load_manifest
 
     root = Path(root_key)
     return compose_registry(root, load_manifest(root))
@@ -98,7 +98,7 @@ def _composed_for(root_key: str) -> tuple[dict[str, Any], dict[str, Path]]:
 
 def _current_root() -> str:
     try:
-        from lib.project_context import find_project_root
+        from lib.project_root import find_project_root
 
         return str(find_project_root())
     except FileNotFoundError:
@@ -158,7 +158,7 @@ def script_runtimes(manifest: dict[str, Any] | None = None) -> dict[str, dict[st
 
 
 def driver_package_scripts(driver_id: str) -> dict[str, str]:
-    """step -> package.json script name, as a Node-family driver declares them (`packageScripts`)."""
+    """step -> package script name, as a driver declares them (`packageScripts`)."""
     value = driver_capability(driver_id, "packageScripts", {})
     return {str(k): str(v) for k, v in value.items() if v} if isinstance(value, dict) else {}
 

@@ -1,7 +1,7 @@
 """The local stack's compose names (compose-gen), each from lib/naming.py -- its one home.
 
-Before 2.0.0 deploy.env could rename any of them (`COMPOSE_PROJECT_NAME`, `COMPOSE_*_SERVICE`,
-`DOCKER_NETWORK`); those keys are now a validate error naming `migrate` (ADR-001 amendment 13).
+Before 2.0.0 deploy.env could rename any of them (the former keys lib/legacy.py names); those keys
+are now a validate error naming `migrate` (ADR-001 amendment 13).
 """
 from __future__ import annotations
 

@@ -260,9 +260,9 @@
     "container": {
       "static": {
         "image": "nginx:1.27-alpine",
-        "root": "/usr/share/nginx/html",
         "config": "container/static.conf",
-        "configMount": "/etc/nginx/conf.d/default.conf"
+        "configMount": "/etc/nginx/conf.d/default.conf",
+        "mount": "/usr/share/nginx/html"
       },
       "serve": "dist",
       "port": 80
@@ -595,9 +595,9 @@
     "container": {
       "static": {
         "image": "nginx:1.27-alpine",
-        "root": "/usr/share/nginx/html",
         "config": "container/static.conf",
-        "configMount": "/etc/nginx/conf.d/default.conf"
+        "configMount": "/etc/nginx/conf.d/default.conf",
+        "mount": "/usr/share/nginx/html"
       },
       "serve": "dist",
       "port": 80
