@@ -898,3 +898,12 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    committed secret and refused. *Rejected:* `env` as a registry point (an ignored, machine-local
    file is no host extension of the kit: nothing to commit or upgrade 3-way); keeping hand-written
    examples beside the catalogue (two homes drift).
+9. **A module keeps files out of its images** (a real host must keep secret-bearing settings files out
+   of a deployed image until their rotation). `modules.<id>.package.exclude` -- gitignore-style
+   patterns, the remote-dev sync's own matcher -- is applied by `pack`, the one package step every
+   driver goes through, from the artifacts' root (the module, or the staged `{out}`), so an excluded
+   file is in no archive and no image of the module whatever its driver. The archive's `release.json`
+   -- the provenance CI attests -- records the patterns and the files they kept out. *Not changed:*
+   the SBOM is still of the module's source tree (it lists dependencies, not files); a remote-dev
+   workspace keeps files out by the module's `dev.excludes`. *Rejected:* a per-driver exclude (every
+   driver would carry the same rule; one step holds it).

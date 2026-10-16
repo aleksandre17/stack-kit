@@ -262,6 +262,12 @@
             },
             "additionalProperties": false
           },
+          "package": {
+            "type": "object",
+            "description": "The module's package over its driver's: `exclude` -- gitignore-style patterns kept out of every archive (and so every image) of it, whatever its driver; release.json records them and the files they kept out",
+            "properties": { "exclude": { "type": "array", "items": { "type": "string", "minLength": 1 } } },
+            "additionalProperties": false
+          },
           "audit": {
             "type": "object",
             "description": "The module's dependency audit over its driver's declaration (drivers/registry.json `audit`): scanner, image (pin a digest here), args, lockfiles, unlocked",

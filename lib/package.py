@@ -7,7 +7,8 @@ directory, or `{out}` itself) and how a release of it runs (`container`: a recip
 static image serving it). `pack` turns what the package step left into ONE archive per commit,
 `.stack-kit/artifacts/<module>-<release>.tgz`, sha256 beside it:
 
-    release.json          the provenance: module, release id, commit, `git describe`, dirty, services
+    release.json          the provenance: module, release id, commit, `git describe`, dirty, services,
+                          and what the module's `package.exclude` kept out (`excluded`)
     <service>/...         each service's tree: its artifacts (under its `context`) and its recipe --
                           the module's own Dockerfile, or the driver's template rendered for it
 
@@ -61,6 +62,30 @@ def declared(manifest: dict, module_id: str) -> dict:
     if not isinstance(spec, dict) or not spec.get("command"):
         raise PackageError(f"driver '{cfg.get('type')}' declares no package step")
     return spec
+
+
+def exclusions(manifest: dict, module_id: str) -> list[str]:
+    """The module's `package.exclude`: files kept out of every archive -- and so every image -- of it,
+    whatever its driver (gitignore-style patterns, from the artifact's root: the module, or `{out}`)."""
+    cfg = (manifest.get("modules") or {}).get(module_id) or {}
+    return [str(g) for g in ((cfg.get("package") or {}).get("exclude") or []) if str(g).strip()]
+
+
+def _kept(files: list[tuple[Path, str]], patterns: list[str]) -> tuple[list[tuple[Path, str]], list[str]]:
+    """(the files a package keeps, the ones its exclusions keep out -- named as the archive would)."""
+    from lib.delivery.sync import excluded
+
+    if not patterns:
+        return files, []
+    kept: list[tuple[Path, str]] = []
+    out: list[str] = []
+    for path, rel in files:
+        inner = rel[len(OUT) + 1:] if rel.startswith(OUT + "/") else rel
+        if excluded(inner, patterns):
+            out.append(inner)
+        else:
+            kept.append((path, rel))
+    return kept, sorted(out)
 
 
 def staging(root: Path, module_id: str) -> Path:
@@ -212,6 +237,8 @@ def pack(root: Path, manifest: dict, module_id: str) -> Path:
     spec = declared(manifest, module_id)
     module_dir = root / manifest["modules"][module_id]["path"]
     files = _files(module_dir, staging(root, module_id), list(spec.get("artifacts") or []))
+    patterns = exclusions(manifest, module_id)
+    files, kept_out = _kept(files, patterns)
     if not files:
         raise PackageError(f"{module_id}: the package step left none of {spec.get('artifacts')} -- run it first "
                            f"(`{identity.KIT_NAME} package {module_id}`)")
@@ -238,6 +265,8 @@ def pack(root: Path, manifest: dict, module_id: str) -> Path:
         services[service.id] = {"kind": service.kind, "files": len(tree) + len(added)}
     meta = {"schema": 1, "module": module_id, **prov, "services": services,
             "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    if patterns:  # the provenance says what the module kept out, and by which rule
+        meta["excluded"] = {"patterns": patterns, "files": kept_out}
     archive = artifacts_dir(root) / f"{module_id}-{prov['id']}.tgz"
     archive.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive, "w:gz") as tar:
