@@ -100,6 +100,9 @@ def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
     missing = [s.id for s in svc if s.id not in trees]
     if missing:
         raise DeliveryError(f"{archive.name} carries no tree for {', '.join(missing)}")
+    floating = images_floating(ctx, svc, trees)
+    if floating:
+        raise DeliveryError("refused: " + "; ".join(floating), 5)
     ctx.out(f"[release] {module_id} {rid} ({meta.get('revision')}) -> {ctx.target_name} {ctx.environment}: "
             f"{ctx.places.environment_dir}")
     for line in preflight.all_checks(ctx, [s.id for s in svc]):
@@ -136,6 +139,31 @@ def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
             ctx.out(f"[release] {s.id}: pruned {', '.join(gone)} (keep {keep_of(s, ctx.target)})")
     ctx.out(f"[release] {module_id} {rid} is current in {ctx.environment}")
     return 0
+
+
+def images_floating(ctx: Delivery, svc: list[Service], trees: dict[str, dict[str, bytes]]) -> list[str]:
+    """Every image the release runs or builds from, held to a version (a digest where the environment
+    declares `requireDigests`)."""
+    import re as _re
+
+    from lib.delivery.checks import image_tag
+
+    digest = ctx.flag("requireDigests")
+    images: list[str] = []
+    for s in [*svc, *(x for x in running.services(ctx) if x.module is None)]:
+        if s.kind == "static":
+            images.append(str((s.spec.get("static") or {}).get("image") or ""))
+        elif s.kind == "image":
+            images.append(str(s.spec.get("image") or ""))
+        recipe = (trees.get(s.id) or {}).get("Dockerfile")
+        if recipe:
+            stages = set()
+            for m in _re.finditer(r"^FROM\s+(\S+)(?:\s+AS\s+(\S+))?", recipe.decode("utf-8", "replace"), _re.M | _re.I):
+                if m.group(1) not in stages:
+                    images.append(m.group(1))
+                if m.group(2):
+                    stages.add(m.group(2))
+    return [why for why in (image_tag(i, require_digest=digest) for i in images if i) if why]
 
 
 def rollback(ctx: Delivery, wanted: list[str], to: str = "") -> int:

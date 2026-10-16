@@ -59,7 +59,7 @@ A service's declaration has one vocabulary at every level (driver `container`, m
 module `services.<id>`, `stack.services.<id>`), a later level winning: `template`, `dockerfile`,
 `static` {`image`, `mount`, `config`, `configMount`}, `image`, `port`, `command`, `entry`,
 `healthcheck` (compose form), `environment`, `volumes` {name: mount}, `logs`, `serve`, `dependsOn`,
-`healthWait`, `keep`, `context`, `artifact`, `artifactExclude`, `networks`. Remote dev: `image`,
+`healthWait`, `keep`, `context`, `artifact`, `artifactExclude`, `networks`, `healthPath` (the recipe's HEALTHCHECK asks it; without one, the port answering), `proxy` {path: service} (a static app's same-origin reverse proxy), `builtChecks` / `allowBaked` (a built app carries no `http://` URL or IP literal). Every image a release runs names a version (never `latest`), and a digest where the environment declares `requireDigests`. Remote dev: `image`,
 `command`, `build`, `port`, `debugPort`, `caches` {name: mount}, `excludes`, `reactions`
 [{`globs`, `do`: hot-reload | restart | rebuild}], `environment`, `debounceMs`.
 

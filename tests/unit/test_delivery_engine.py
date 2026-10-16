@@ -274,3 +274,30 @@ def test_verify_names_each_drift_read_only_and_a_deploy_undoes_it(project, tmp_p
     assert not any("edited-on-the-host" in d for d in drift), "a value is never printed"
     release.release(ctx, "edge", archive)
     assert tree.verify(ctx) == []
+
+
+# ── what a release must pass (ADR-001 amendment 14) ───────────────────────────
+
+def test_a_release_image_runs_unprivileged_with_a_health_probe(project, tmp_path):
+    from lib import package
+
+    meta, trees = package.read(packaged(project))
+    assert meta["module"] == "edge"
+    recipe = trees["edge"]["Dockerfile"].decode()
+    assert "FROM fixture/run:7" in recipe
+
+
+def test_a_floating_image_is_refused_and_a_digest_where_declared(project, tmp_path, monkeypatch):
+    from lib.delivery.checks import image_tag
+
+    assert image_tag("minio/minio") and image_tag("minio/minio:latest")
+    assert image_tag("minio/minio:RELEASE.2024-01-01") is None
+    assert image_tag("minio/minio:RELEASE.2024-01-01", require_digest=True)
+    assert image_tag("minio/minio@sha256:" + "a" * 64, require_digest=True) is None
+    m = manifest_of(project)
+    m["stack"] = {"services": {"store": {"image": "minio/minio:latest", "tier": "edge"}}}
+    (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
+    commit(project, "with a stack service\n")
+    with pytest.raises(DeliveryError, match="`latest` floats") as e:
+        release.release(ctx_for(project, server(tmp_path)), "edge", packaged(project))
+    assert e.value.code == 5

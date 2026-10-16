@@ -28,7 +28,8 @@ DEFAULTS = KIT / "config" / "delivery.json"
 #: `services.<id>`, a stack service -- one vocabulary at every level, a later level winning.
 SERVICE_FIELDS = ("template", "dockerfile", "static", "image", "port", "command", "entry", "healthcheck",
                   "environment", "volumes", "logs", "serve", "dependsOn", "healthWait", "keep", "context",
-                  "artifact", "artifactExclude", "networks", "tier")
+                  "artifact", "artifactExclude", "networks", "tier", "healthPath", "probe", "proxy", "builtChecks",
+                  "allowBaked")
 #: The fields a remote-dev declaration may carry -- driver `dev`, module `dev` -- a later level winning.
 DEV_FIELDS = ("image", "command", "build", "port", "debugPort", "caches", "excludes", "reactions", "watch",
               "environment", "debounceMs")
@@ -97,6 +98,8 @@ def module_services(manifest: dict[str, Any], module_id: str) -> list[Service]:
     out = []
     for sid in naming.module_service_ids(manifest, module_id):
         spec = {**base, **(declared.get(sid) or {})}
+        port = {"port": str(spec.get("port") or "")}  # a probe keeps its {path} for the recipe to fill
+        spec = {k: v if k == "probe" else templating.render_tree(v, cfg, port) for k, v in spec.items()}
         kind = "static" if spec.get("static") else ("image" if spec.get("image") and not spec.get("template")
                                                      and not spec.get("dockerfile") else "build")
         if kind == "build" and not (spec.get("template") or spec.get("dockerfile")):

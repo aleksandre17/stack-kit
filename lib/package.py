@@ -156,12 +156,53 @@ def recipe(root: Path, manifest: dict, service: Any, tree: dict[str, Any]) -> di
         if not template.is_file():
             raise PackageError(f"{where}: driver template {spec['template']} is not there")
         extra = {"artifact": _artifact(tree, spec, where), "port": str(spec.get("port") or ""),
-                 "entry": templating.render(str(spec.get("entry") or ""), cfg)}
+                 "entry": templating.render(str(spec.get("entry") or ""), cfg),
+                 "healthcheck": _probe(spec, where)}
         return {"Dockerfile": templating.render(template.read_text(encoding="utf-8"), cfg, extra).encode("utf-8")}
     if service.kind == "static" and (spec.get("static") or {}).get("config"):
         conf = driver_home(service.driver) / str(spec["static"]["config"])
-        return {".stack-kit/static.conf": conf.read_bytes()}
+        extra = {"port": str(spec.get("port") or ""), "mount": str(spec["static"].get("mount") or ""),
+                 "proxy": _proxy_blocks(manifest, spec, where)}
+        return {".stack-kit/static.conf": templating.render(conf.read_text(encoding="utf-8"), cfg, extra).encode("utf-8")}
     return {}
+
+
+def _probe(spec: dict, where: str) -> str:
+    """The recipe's health probe: the driver's `probe.http` when the service declares its
+    `healthPath`, else `probe.tcp` (the port answers) -- never a path the application may not serve."""
+    probe = spec.get("probe") or {}
+    if not probe:
+        return ""
+    if spec.get("healthPath"):
+        if not probe.get("http"):
+            raise PackageError(f"{where}: healthPath is declared but the driver declares no probe.http")
+        return str(probe["http"]).replace("{path}", str(spec["healthPath"])).replace("{port}", str(spec.get("port") or ""))
+    return str(probe.get("tcp") or "").replace("{port}", str(spec.get("port") or ""))
+
+
+def _proxy_blocks(manifest: dict, spec: dict, where: str) -> str:
+    """Same-origin reverse proxy locations: each declared path to its service on the environment's
+    network, by the service id and its declared internal port (no CORS, no address baked in)."""
+    from lib.delivery.model import all_services
+
+    proxy = spec.get("proxy") or {}
+    if not proxy:
+        return ""
+    by_id = {s.id: s for s in all_services(manifest)}
+    blocks = []
+    for path, sid in sorted(proxy.items()):
+        target = by_id.get(str(sid))
+        if target is None or not target.spec.get("port"):
+            raise PackageError(f"{where}: container.proxy {path} names '{sid}', which is no service with a declared port")
+        loc = "/" + str(path).strip("/") + "/"
+        blocks.append(f"    location {loc} {{\n"
+                      f"        proxy_pass http://{sid}:{int(target.spec['port'])};\n"
+                      "        proxy_set_header Host $host;\n"
+                      "        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n"
+                      "        proxy_set_header X-Forwarded-Proto $scheme;\n"
+                      "        proxy_http_version 1.1;\n"
+                      "    }")
+    return "\n".join(blocks)
 
 
 def pack(root: Path, manifest: dict, module_id: str) -> Path:
@@ -181,6 +222,13 @@ def pack(root: Path, manifest: dict, module_id: str) -> Path:
         if not tree:
             raise PackageError(f"{module_id}: service {service.id} has no artifact under its context "
                                f"'{service.context or '.'}'")
+        if service.kind == "static" and service.spec.get("builtChecks"):
+            from lib.delivery.checks import built_static
+
+            baked = built_static({rel: p.read_bytes() for rel, p in tree.items()}, service.spec.get("allowBaked"))
+            if baked:
+                raise PackageError(f"{module_id}: the built app carries addresses -- they are runtime config, "
+                                   f"not the bundle's (container.allowBaked lists any that must stay):\n  " + "\n  ".join(baked))
         added = recipe(root, manifest, service, tree)
         for rel, path in tree.items():
             members[f"{service.id}/{rel}"] = path.read_bytes()

@@ -122,7 +122,11 @@
       "artifact": "build/libs/*.jar",
       "artifactExclude": [
         "*-plain.jar"
-      ]
+      ],
+      "probe": {
+        "tcp": "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{port}' || exit 1",
+        "http": "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{port} && printf \"GET {path} HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && head -n1 <&3 | grep -q \" [23][0-9][0-9] \"' || exit 1"
+      }
     },
     "dev": {
       "image": "eclipse-temurin:{toolchain.version|17}-jdk",
@@ -259,13 +263,23 @@
     },
     "container": {
       "static": {
-        "image": "nginx:1.27-alpine",
-        "config": "container/static.conf",
-        "configMount": "/etc/nginx/conf.d/default.conf",
-        "mount": "/usr/share/nginx/html"
+        "image": "nginxinc/nginx-unprivileged:1.27-alpine",
+        "mount": "/usr/share/nginx/html",
+        "config": "../_shared/static/spa.conf",
+        "configMount": "/etc/nginx/conf.d/default.conf"
       },
       "serve": "dist",
-      "port": 80
+      "port": 8080,
+      "builtChecks": true,
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:{port}/healthz || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "3s",
+        "retries": 3
+      }
     },
     "dev": {
       "image": "node:{toolchain.version|22}-alpine",
@@ -370,7 +384,11 @@
     },
     "container": {
       "template": "container/Dockerfile",
-      "port": 3000
+      "port": 3000,
+      "probe": {
+        "tcp": "nc -z 127.0.0.1 {port} || exit 1",
+        "http": "wget -q -O /dev/null http://127.0.0.1:{port}{path} || exit 1"
+      }
     },
     "dev": {
       "image": "node:{toolchain.version|22}-alpine",
@@ -492,7 +510,11 @@
     "container": {
       "template": "container/Dockerfile",
       "port": 8080,
-      "entry": "{dotnet.project|app.csproj|:stem}.dll"
+      "entry": "{dotnet.project|app.csproj|:stem}.dll",
+      "probe": {
+        "tcp": "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{port}' || exit 1",
+        "http": "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{port} && printf \"GET {path} HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && head -n1 <&3 | grep -q \" [23][0-9][0-9] \"' || exit 1"
+      }
     },
     "dev": {
       "image": "mcr.microsoft.com/dotnet/sdk:{toolchain.version|8.0|:majorminor}",
@@ -594,13 +616,23 @@
     },
     "container": {
       "static": {
-        "image": "nginx:1.27-alpine",
-        "config": "container/static.conf",
-        "configMount": "/etc/nginx/conf.d/default.conf",
-        "mount": "/usr/share/nginx/html"
+        "image": "nginxinc/nginx-unprivileged:1.27-alpine",
+        "mount": "/usr/share/nginx/html",
+        "config": "../_shared/static/spa.conf",
+        "configMount": "/etc/nginx/conf.d/default.conf"
       },
       "serve": "dist",
-      "port": 80
+      "port": 8080,
+      "builtChecks": true,
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:{port}/healthz || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "3s",
+        "retries": 3
+      }
     },
     "dev": {
       "image": "node:{toolchain.version|22}-alpine",

@@ -124,7 +124,7 @@ def test_a_package_is_one_archive_per_commit_with_its_provenance_and_recipe(tmp_
     (svc,) = trees
     assert trees[svc]["build/libs/app-1.0-boot.jar"] == b"JAR-BYTES"
     recipe = trees[svc]["Dockerfile"].decode()
-    assert "COPY build/libs/app-1.0-boot.jar /app/app.jar" in recipe and "eclipse-temurin:17-jre" in recipe
+    assert "COPY --chown=10001:10001 build/libs/app-1.0-boot.jar /app/app.jar" in recipe and "eclipse-temurin:17-jre" in recipe
     archive.write_bytes(archive.read_bytes() + b"x")
     with pytest.raises(package.PackageError, match="sha256 differs"):
         package.read(archive)
@@ -188,3 +188,38 @@ def test_a_module_whose_driver_does_not_release_through_the_kit_gets_its_package
     assert "edge (own-pack): its release is pending -- by hand" in text
     assert "pwsh tools/stack-kit.ps1 package edge" in _job(text, "edge")
     assert " deploy edge " not in text
+
+
+def test_a_static_release_is_hardened_and_proxies_its_api_same_origin(tmp_path, monkeypatch):
+    root, manifest = _committed(tmp_path, "spa")
+    monkeypatch.setenv(identity.env_name("PROJECT_ROOT"), str(root))
+    web = next(m for m, c in manifest["modules"].items() if c["type"] == "node-vite")
+    manifest["modules"][web]["container"] = {"proxy": {"api": "api"}}
+    dist = root / manifest["modules"][web]["path"] / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text('<svg xmlns="http://www.w3.org/2000/svg"></svg>', encoding="utf-8")
+    (dist / "assets" / "app-1a2b3c4d.js").write_text("fetch('/api/x')", encoding="utf-8")
+    _, trees = package.read(package.pack(root, manifest, web))
+    (svc,) = trees
+    conf = trees[svc][".stack-kit/static.conf"].decode()
+    assert "location /api/ {" in conf and "proxy_pass http://api:8080;" in conf
+    assert 'X-Content-Type-Options "nosniff"' in conf and "Referrer-Policy" in conf and "gzip on;" in conf
+    assert "immutable" in conf and 'Cache-Control "no-cache"' in conf and "listen 8080;" in conf
+    (dist / "assets" / "app-1a2b3c4d.js").write_text("fetch('http://10.20.30.40:8080/api')", encoding="utf-8")
+    with pytest.raises(package.PackageError, match="10.20.30.40"):
+        package.pack(root, manifest, web)
+
+
+def test_a_built_recipe_runs_unprivileged_and_probes_its_port_or_its_declared_path(tmp_path, monkeypatch):
+    root, manifest = _committed(tmp_path, "img")
+    monkeypatch.setenv(identity.env_name("PROJECT_ROOT"), str(root))
+    mid = next(m for m, c in manifest["modules"].items() if c["type"] == "java-boot")
+    libs = root / manifest["modules"][mid]["path"] / "build" / "libs"
+    libs.mkdir(parents=True)
+    (libs / "app.jar").write_bytes(b"J")
+    _, trees = package.read(package.pack(root, manifest, mid))
+    recipe = next(iter(trees.values()))["Dockerfile"].decode()
+    assert "USER 10001" in recipe and "HEALTHCHECK" in recipe and "/dev/tcp/127.0.0.1/8080" in recipe
+    manifest["modules"][mid]["container"] = {"healthPath": "/actuator/health"}
+    _, trees = package.read(package.pack(root, manifest, mid))
+    assert "GET /actuator/health HTTP/1.0" in next(iter(trees.values()))["Dockerfile"].decode()
