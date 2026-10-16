@@ -804,7 +804,7 @@
       "command": [
         "sh",
         "-c",
-        "corepack enable >/dev/null 2>&1; if [ -f pnpm-lock.yaml ]; then pnpm install && exec pnpm run start --host 0.0.0.0; elif [ -f yarn.lock ]; then yarn install && exec yarn start --host 0.0.0.0; else npm install && exec npm run start -- --host 0.0.0.0; fi"
+        "corepack enable >/dev/null 2>&1; if [ -f pnpm-lock.yaml ]; then pnpm install && exec pnpm run {node.scripts.dev|start} --host 0.0.0.0; elif [ -f yarn.lock ]; then yarn install && exec yarn {node.scripts.dev|start} --host 0.0.0.0; else npm install && exec npm run {node.scripts.dev|start} -- --host 0.0.0.0; fi"
       ],
       "port": 4200,
       "caches": {

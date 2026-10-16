@@ -141,3 +141,16 @@ def test_tunnel_forwards_the_declared_dev_ports(project, tmp_path):
     t = server(tmp_path)
     assert dev.tunnel(ctx_for(project, t, "dev"), ["edge"]) == 0
     assert ("tunnel", ((18081, 18081),)) in t.log
+
+
+def test_a_node_spa_dev_server_runs_the_script_its_module_names():
+    # A host whose `start` script does what a container cannot (a local HTTPS certificate) names the
+    # script remote dev runs; the default stays `start`.
+    from lib.delivery.model import module_services
+
+    def command(node):
+        manifest = {"modules": {"web": {"type": "node-spa", "role": "ui", "path": "web", **({"node": node} if node else {})}}}
+        return " ".join(module_services(manifest, "web")[0].dev["command"])
+
+    assert "npm run start -- --host" in command(None)
+    assert "npm run start:container -- --host" in command({"scripts": {"dev": "start:container"}})
