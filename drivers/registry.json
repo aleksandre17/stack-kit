@@ -205,7 +205,8 @@
     "packageScripts": {
       "lint": "lint",
       "build": "build",
-      "test": "test"
+      "test": "test",
+      "audit": "audit"
     },
     "ci": {
       "setup": [
@@ -343,7 +344,8 @@
     "packageScripts": {
       "lint": "lint",
       "build": "build",
-      "test": "test"
+      "test": "test",
+      "audit": "audit"
     },
     "ci": {
       "setup": [
@@ -432,7 +434,8 @@
       "check": "ps1/check.ps1",
       "build": "ps1/build.ps1",
       "test": "ps1/test.ps1",
-      "lint": "ps1/lint.ps1"
+      "lint": "ps1/lint.ps1",
+      "audit": "ps1/audit.ps1"
     },
     "hybrid": {
       "script": "ps1/hybrid.ps1"
@@ -562,7 +565,8 @@
       "lint": "lint",
       "build": "build",
       "test": "test",
-      "start": "start"
+      "start": "start",
+      "audit": "audit"
     },
     "hybrid": {
       "script": "ps1/hybrid.ps1"

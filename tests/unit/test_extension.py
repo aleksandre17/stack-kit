@@ -81,7 +81,7 @@ def test_a_lifecycle_step_declared_by_the_host_is_a_step_and_a_ci_step(tmp_path,
     (root / "apps" / "typed").mkdir(parents=True)
     (root / identity.MANIFEST_FILENAME).write_text(json.dumps(manifest), encoding="utf-8")
     monkeypatch.setenv(identity.env_name("PROJECT_ROOT"), str(root))
-    assert lifecycle_steps(manifest) == ["lint", "typecheck", "build", "test"]
+    assert lifecycle_steps(manifest)[:4] == ["lint", "typecheck", "build", "test"]
     assert "typecheck" in optional_steps(manifest)
     job = ci_gen.render(ProjectContext.discover(root)).split("\n  typed:\n")[1]
     assert job.index("mod typed typecheck") < job.index("mod typed build")

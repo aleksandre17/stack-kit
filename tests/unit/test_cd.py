@@ -240,3 +240,9 @@ def test_ci_runs_the_db_tests_beside_a_healthy_database_after_migrating_it(tmp_p
     assert "DATABASE_URL: 'postgres://postgres:ci@localhost:5432/postgres'" in api
     assert api.index("name: migrate") < api.index("name: build")
     assert "services:" not in web and "DATABASE_URL" not in web
+
+
+def test_ci_audits_the_dependencies_of_every_driver_that_declares_how():
+    text = _render(_host(Path(__import__("tempfile").mkdtemp()), None))
+    assert "pwsh tools/stack-kit.ps1 mod web audit" in _job(text, "web")
+    assert " mod api audit" not in _job(text, "api"), "a driver that declares no audit has none (an optional step)"

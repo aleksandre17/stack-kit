@@ -8,6 +8,7 @@
 # above the module (pnpm-lock.yaml, yarn.lock, package-lock.json), else npm. Dependencies are
 # installed first when node_modules is absent, from the lockfile (a fresh clone builds as-is).
 # A `lint` the package does not have is skipped and said; a missing `build` or `test` fails.
+# `audit` is the package manager's own (no script): production dependencies, failing at high severity.
 param(
     [string]$ModuleId = $env:STACK_KIT_MODULE_ID,
     [string]$Step = $env:STACK_KIT_COMMAND
@@ -43,16 +44,17 @@ if ($entry.node -and $entry.node.scripts -and $entry.node.scripts.PSObject.Prope
     $own = [string]$entry.node.scripts.$Step
 }
 $script = if ($null -ne $own) { $own } else { Get-KitContextValue "driver:$($typ):packageScript:$Step" }
+$builtin = $Step -eq "audit"  # the package manager's own audit: no package.json script
 if ($null -ne $own -and $own -eq "") {
     Write-Host "  [$ModuleId $Step] declared none (modules.$ModuleId.node.scripts.$Step = `"`")" -ForegroundColor DarkGray
     exit 0
 }
-if (-not $script) {
+if (-not $script -and -not $builtin) {
     Write-Host "  [$ModuleId $Step] driver '$typ' declares no package script for '$Step'" -ForegroundColor Red
     exit 1
 }
 $scripts = (Get-Content $packageJson -Raw -Encoding UTF8 | ConvertFrom-Json).scripts
-if (-not ($scripts -and $scripts.PSObject.Properties[$script])) {
+if (-not $builtin -and -not ($scripts -and $scripts.PSObject.Properties[$script])) {
     if ($OptionalSteps -contains $Step) {
         Write-Host "  [$ModuleId $Step] skipped: package.json has no '$script' script" -ForegroundColor DarkGray
         exit 0
@@ -90,6 +92,15 @@ function Invoke-Native {
     Push-Location $Where
     # The tool speaks to the console as it runs; only its exit code is this function's answer.
     try { & $pm @Argv | Out-Host; return $LASTEXITCODE } finally { Pop-Location }
+}
+
+if ($builtin) {
+    $audit = @{
+        "npm"  = @("audit", "--omit=dev", "--audit-level=high")
+        "pnpm" = @("audit", "--prod", "--audit-level", "high")
+        "yarn" = @("npm", "audit", "--environment", "production", "--severity", "high")
+    }
+    exit (Invoke-Native $workspace $audit[$pm])
 }
 
 if (-not (Test-Path (Join-Path $workspace "node_modules")) -and -not (Test-Path (Join-Path $modPath "node_modules"))) {
