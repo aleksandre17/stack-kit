@@ -1,0 +1,11 @@
+# nginx for the UI module: rendered to nginx.conf by `stack-kit nginx-gen`
+# (__NGINX_FRAME_ANCESTORS__ <- NGINX_FRAME_ANCESTORS in ops/config/frontend/nginx.env).
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+    add_header Content-Security-Policy "frame-ancestors __NGINX_FRAME_ANCESTORS__" always;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

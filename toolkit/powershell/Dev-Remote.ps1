@@ -1,4 +1,4 @@
-# Remote dev workspace — stack-agnostic (Vite, Angular CLI, Nx SPA, …)
+﻿# Remote dev workspace — stack-agnostic (Vite, Angular CLI, Nx SPA, …)
 # Dot-source after Deploy-Path.ps1. Module overrides via ops.config.ps1:
 #   $OpsDevSyncExcludes, $OpsDevSyncExtraPaths, $OpsDevComposeDevFiles
 

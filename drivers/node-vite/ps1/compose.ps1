@@ -1,4 +1,4 @@
-# Docker Compose — secrets/<module> (.env.dev | .env.prod)
+﻿# Docker Compose — secrets/<module> (.env.dev | .env.prod)
 param([switch]$Prod)
 
 . (Join-Path $PSScriptRoot "..\_init.ps1")

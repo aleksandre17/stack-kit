@@ -1,4 +1,4 @@
-﻿# Module drivers
+# Module drivers
 
 **Driver type** = stack toolchain (`java-boot`, `node-vite`, `node-api`, …).  
 **Module id** = project key in `stack-kit.json` (`backend`, `frontend`, `bff`, …).  
@@ -8,8 +8,10 @@
 drivers/
   registry.json          # type → runtime + commands (see registry.schema.json)
   java-boot/             # JVM / Spring — typical API
-  node-vite/             # Vite UI — typical frontend
-  node-api/              # placeholder for future Node HTTP API (see README there)
+  node-vite/             # Vite UI with remote dev and static deploy
+  node-spa/              # any SPA by its package.json scripts (Angular CLI, Vite, React, Vue)
+  node-api/              # Node HTTP service (pnpm build, image deploy)
+  dotnet-aspnet/         # ASP.NET Core (dotnet run, publish artifact)
   _template/             # copy when adding a new type
 ```
 

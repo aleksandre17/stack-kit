@@ -43,21 +43,21 @@ echo ""
 
 if [[ $RUN_BACKEND -eq 1 ]]; then
   mid="$(stack_kit_module_id_for_role api 2>/dev/null || true)"
-  [[ -n "$mid" ]] || mid="$(stack_kit_module_id_for_type java-boot 2>/dev/null || true)"
+  [[ -n "$mid" ]] || mid="$(stack_kit_module_id_for_deploy_kind runtime 2>/dev/null || true)"
   if [[ -n "$mid" ]]; then
     bash "$SCRIPT_DIR/migrate-backend-layout.sh" "${PASS_ARGS[@]}"
   else
-    echo "  [skip] backend — no api/java-boot module"
+    echo "  [skip] runtime layout — no api module, and no driver that deploys as runtime"
   fi
 fi
 
 if [[ $RUN_FRONTEND -eq 1 ]]; then
   mid="$(stack_kit_module_id_for_role ui 2>/dev/null || true)"
-  [[ -n "$mid" ]] || mid="$(stack_kit_module_id_for_type node-vite 2>/dev/null || true)"
+  [[ -n "$mid" ]] || mid="$(stack_kit_module_id_for_deploy_kind static 2>/dev/null || true)"
   if [[ -n "$mid" ]]; then
     bash "$SCRIPT_DIR/migrate-frontend-layout.sh" "${PASS_ARGS[@]}"
   else
-    echo "  [skip] frontend — no ui/node-vite module"
+    echo "  [skip] static layout — no ui module, and no driver that deploys as static"
   fi
 fi
 

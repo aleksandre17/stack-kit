@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Backend remote dev — rsync Gradle tree to workspace/ + bootRun in container
 # Requires: deploy-path.sh, modules.sh, Git rsync (Windows: Git for Windows)
 
@@ -257,7 +257,7 @@ dev_write_workspace_manifest() {
   local ts
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)"
   ssh -n "$SERVER" "cat > '$rp/.stack-kit-deploy.json'" <<JSON
-{"version":1,"module":"backend","service":"${cname}","deployMode":"dev-bootstrap","kind":"workspace","environment":"dev","deployPath":"${rp}","updatedAt":"${ts}"}
+{"version":1,"module":"${STACK_KIT_MODULE_ID:-}","service":"${cname}","deployMode":"dev-bootstrap","kind":"workspace","environment":"dev","deployPath":"${rp}","updatedAt":"${ts}"}
 JSON
 }
 

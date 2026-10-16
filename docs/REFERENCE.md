@@ -71,7 +71,8 @@ Required: `version` (integer ≥ 2), `package`, `secrets`, `modules`.
 | `adapters` | `gcp.{credentialsFile,containerMount,envVar}`, `nginx.{template,output,envExample,env}`, `embed.envExample` |
 | `validate.stages` | the real-stack proof `validate --stages` runs: stages `{id, kind, run, cwd, env, timeout, expect}`, kind `setup`, `migrate`, `build`, `test`, `health`, `ingest`, `anchor`, `teardown`; fail-fast, teardown always runs; an `anchor` compares stripped stdout (`expect.equals` \| `matches` \| `atLeast`); a list without an anchor, or whose last working stage is not one, is refused (`lib/pipeline.py`) |
 | `layout` | the host tree as a declared layout held by `validate` as a floor (`lib/layout_floor.py`): `entries[]` `{path, kind, holds, writer, read_when, lifecycle, pending}` add rows to the places the manifest already declares; `closed` names directories where an undeclared child fails; a `pending` row is printed, not failed |
-| `ci` | `integration`, `prepareEnv`, `waitHealth`, `waitStackHealth`, `healthModules` (subset of health targets), `scripts` (the host's further CI scripts by its own names; each must exist and is a layout-floor row) |
+| `commands` | the host's literal command lines for every tool (the agent kit's detector reads them): `test` (required), `build`, `lint`, `run`. `init` writes them through the launcher (`pwsh ops/cli/stack-kit.ps1 test`); `validate` refuses a line naming a missing script |
+| `ci` | `workflow` (where `ci-gen` writes; default `.github/workflows/ci.yml`), `integration`, `prepareEnv`, `waitHealth`, `waitStackHealth`, `healthModules` (subset of health targets), `scripts` (the host's further CI scripts by its own names; each must exist and is a layout-floor row) |
 
 `modules.<id>` — required `type`, `role`, `path`, `secretsModule`:
 
@@ -88,8 +89,10 @@ Required: `version` (integer ≥ 2), `package`, `secrets`, `modules`.
 | `debug` | VS Code: `label`, `npmScript`, `envFile`, `mainClass`, `projectName`, `java.{mainClass,projectName}` |
 | `hybrid` | `springProfiles`, `gradleWrapper`, `gradleProject`, `npmScript`, `preferJar`, `bootJar` |
 | `spring`, `datastores` | `config-gen` inputs (profiles, `managementEndpoints` default `health,info`, postgres schema …) |
-| `node.prebuildScripts` | pnpm build ordering (default `[]`; a declared script the workspace lacks fails) |
-| `dotnet` | `project`, `launchProfile`, `configuration` (default `Release`), `publishExpect` |
+| `node.prebuildScripts` | workspace scripts run before the module's `build`, in order (default `[]`) |
+| `node.scripts.<step>` | the package.json script for `build`, `test`, `lint`, `start` where it differs from the driver's (`""` = none); `node.packageManager` `npm`\|`pnpm`\|`yarn` (default: the nearest lockfile's) |
+| `dotnet` | `project`, `solution` (what `build`/`lint` act on; default the project), `test` (test project or solution; default the solution, else the project; `""` = none), `launchProfile`, `configuration` (default `Release`), `publishExpect` |
+| `toolchain.version` | the toolchain CI sets up for the module (dotnet SDK, Node, Java); default the driver's |
 | `migrations` | `paths` (migration dirs outside the module tree), `allowData[]` `{path, reason}` (reference-data files allowed); migrations are structure-only and `validate` names any that carries data (`lib/migrations_gate.py`, driver `migrations` patterns) |
 | `scripts` | deprecated |
 | `extensions` | the module's own configuration for the host's tools, by name; the kit reads none of it. Any other field is refused (`migrate` carries a former `catalog`/`derivation` here) |
@@ -130,7 +133,7 @@ Derived rules:
 |---|---|---|
 | `help` | verbs, driver types, project modules with role/type/capabilities, aliases | `cli/stack-kit.ps1` |
 | `init [flags]` | bootstrap ([ADOPT.md#bootstrap-with-init](ADOPT.md#bootstrap-with-init)) | `toolkit/init/` |
-| `validate [--stages]` | schema (enforced by `lib/schema_check.py`, no `jsonschema` needed) + project checks + layout floor + migrations gate; `--stages` runs `validate.stages` | `lib/validate_manifest.py` |
+| `validate [--stages]` | schema (enforced by `lib/schema_check.py`, no `jsonschema` needed) + project checks + layout floor + migrations gate + every script a `commands` line names; warns per secrets folder what a development run no longer reads from `.env.prod`; `--stages` runs `validate.stages` | `lib/validate_manifest.py` |
 | `migrate [--apply]` | dry run / apply manifest + identity migration | `lib/migrate_manifest.py` |
 | `vscode-gen [--force]` | `.vscode/launch.json` + `tasks.json`; missing files only unless `--force` | `lib/vscode_gen.py` |
 | `config-gen [<moduleId>] [--all] [--check] [--dry-run]` | Spring `application*.yml` boilerplate; `validate` reports drift; never touches `application-custom.yml` (PowerShell only) | `lib/config_gen.py`, `config/config-catalog.json` |
@@ -142,7 +145,9 @@ Derived rules:
 | `infra prereqs \| local up\|down\|status \| remote sync\|up\|down\|status\|purge \| tunnel` `[-Prod] [-Confirm]` | infra compose locally or on the server; `remote sync` rsyncs `stack.infraComposeDir` to `{infra deploy path}/compose/`, `remote up` syncs then starts; `purge -Confirm` = `down -v` for this `INFRA_SLUG` only; `tunnel` = `ssh -L` for `stack.infra.services` | `toolkit/infra/Invoke-Infra.ps1` ([README](../toolkit/infra/README.md)) |
 | `layout [--all] [--role <r>] [--module <id>] [--no-server] [-Markdown -OutFile <f>]` | dry-run server layout per module + server overview (`--frontend`/`--backend` deprecated → `--role ui`/`--role api`) | `toolkit/layout/` |
 | `layout migrate\|cleanup [--dry-run] [--dev\|--prod] [--backend\|--frontend\|--all]` | flat → structured on the server / remove this host's old dirs (`cleanup --legacy-segments`) | `toolkit/deploy/migrate-layout.sh`, `cleanup-scoped-layout.sh` |
-| `hybrid boot <alias\|moduleId>` | host run with the module's `.env.dev` over its `.env.prod` (same as `<alias> run`) | `toolkit/hybrid/Invoke-HybridRun.ps1`, then the driver's declared `hybrid.script` |
+| `hybrid boot <alias\|moduleId> [--env dev\|prod]` | host run with ONE environment's configuration: the module's `.env`, then `.env.dev` (default) or, only when asked, `.env.prod` (same as `<alias> run`; `deliver hybrid --env prod`) | `toolkit/hybrid/Invoke-HybridRun.ps1`, then the driver's declared `hybrid.script` |
+| `build \| test \| lint [module\|alias ...]` | the lifecycle step for every module (or the named ones), manifest order, fail-fast, each in its own process; exit code = the failing step's. A module whose driver lacks `build`/`test` fails; one without `lint` is skipped. Each step appends a run record | `cli/stack-kit.ps1` `Invoke-LifecycleStep` |
+| `ci-gen [--force\|--check]` | `.github/workflows/ci.yml` (or `ci.workflow`) from the modules: a job each, the driver's `ci.setup`, then `lint`/`build`/`test` through the launcher; actions pinned by SHA (`lib/ci-actions.json`); `--check` fails on drift | `lib/ci_gen.py` |
 | `dev up <alias\|moduleId\|all> [--mode hybrid\|local\|docker\|remote] [--no-infra] [--no-tunnel]` | dev orchestration ([GOLDEN-PATHS.md#dev-modes](GOLDEN-PATHS.md#dev-modes)) | `toolkit/dev/Invoke-DevUp.ps1` |
 | `mod <moduleId> <command> [args]` | a module's driver command (canonical form; default command `deploy`) | the driver |
 | `<alias> <command> [args]` | same, through `cli.aliases` or a role shortcut | the driver |
@@ -184,16 +189,20 @@ Former-prefix variables (`lib/identity.json` `legacyEnvPrefix`) are adopted inwa
 
 | Type | Roles | Runtime | Commands | Watch tasks | Launch | Deploy kind / args |
 |---|---|---|---|---|---|---|
-| `java-boot` | api, worker | bash | deploy, dev, run, manage, compose, check, modules | `devWatch` | java | runtime / `all --{environment}`, forwards `--no-build`, `--skip-checks` |
-| `node-vite` | ui | powershell | deploy, dev, run, manage, compose, check | `devWatch`, `deployWatch` | node-terminal | static / `dist -Environment {environment}` |
-| `node-api` | api | bash | deploy, dev, run, manage, compose, check, modules | `devWatch` | node-terminal | runtime / `--{environment}`, forwards `--no-build`, `--skip-checks` |
-| `dotnet-aspnet` | api | powershell | deploy, run, check | — | dotnet | artifact / `artifact` (`deploy remote` refused: delivery not declared) |
+| `node-spa` | ui | powershell | build, test, lint (package.json scripts), run (`start`) | — | node-terminal | release pending (the output directory is the framework's) |
+| `java-boot` | api, worker | bash | deploy, dev, run, build, test, manage, compose, check, modules | `devWatch` | java | runtime / `all --{environment}`, forwards `--no-build`, `--skip-checks` |
+| `node-vite` | ui | powershell | deploy, dev, run, build, test, lint, manage, compose, check | `devWatch`, `deployWatch` | node-terminal | static / `dist -Environment {environment}` |
+| `node-api` | api | bash | deploy, dev, run, build, test, lint, manage, compose, check, modules | `devWatch` | node-terminal | runtime / `--{environment}`, forwards `--no-build`, `--skip-checks` |
+| `dotnet-aspnet` | api | powershell | deploy, run, build, test, lint (`dotnet format --verify-no-changes`), check | — | dotnet | artifact / `artifact` (`deploy remote` refused: delivery not declared) |
 
-Per-driver detail: [java-boot](../drivers/java-boot/README.md), [node-vite](../drivers/node-vite/README.md), [node-api](../drivers/node-api/README.md), [dotnet-aspnet](../drivers/dotnet-aspnet/README.md), [drivers/README.md](../drivers/README.md).
+Per-driver detail: [java-boot](../drivers/java-boot/README.md), [node-vite](../drivers/node-vite/README.md), [node-api](../drivers/node-api/README.md), [dotnet-aspnet](../drivers/dotnet-aspnet/README.md), [node-spa](../drivers/node-spa/README.md), [drivers/README.md](../drivers/README.md).
 
 Entry fields: `label`, `roles` (first = default role), `runtime` (`bash` | `powershell`), `commands`
 (name → script; a driver that declares `hybrid.script` is given `run` = the kit's host runner,
-`toolkit/hybrid/Invoke-HybridRun.ps1`, and ships no run script of its own), `tasks` (`devWatch`, `deployWatch` argv; `dev up --mode remote` and `vscode-gen` read them),
+`toolkit/hybrid/Invoke-HybridRun.ps1`, and ships no run script of its own; one that declares
+`packageScripts` (step → package.json script) is given `build`, `test`, `lint` = the kit's
+`toolkit/node/Invoke-PackageScript.ps1`, which installs from the lockfile when `node_modules` is
+absent), `ci.setup` (the actions and `run` lines CI sets the toolchain up with; `{toolchain.version|default}`), `tasks` (`devWatch`, `deployWatch` argv; `dev up --mode remote` and `vscode-gen` read them),
 `vscode.launch`, `deployKind`, `delivery` (rung → `{command, args, forwards}` | `{via}` | `{pending}`; `forwards` names the `stack-deploy` flags a `release` step passes on), `layoutSimulator`, `hybrid.script` (the launch step the hybrid
 runner dot-sources; a `hybrid` rung requires it), `migrations` (`globs`, `exclude`, `data` patterns; java-boot Flyway SQL, dotnet-aspnet EF Core), `configGen`, `acceptsGlobalCredentials`. A driver that declares no watch task gets none — a declared absence.
 
@@ -223,6 +232,8 @@ their public functions and hold no rule (`tests/acceptance/test_resolver_parity.
 | Missing field | its convention default ([Manifest](#manifest)) |
 | Module role | declared, else the driver's first role |
 | Env value of a secrets folder | last non-empty across `.env.dev`, `.env.prod`, `deploy.env`, `.env.deploy` (compose semantics) |
+| A run's environment (`run-env <folder> [dev\|prod]`) | the folder's shared, non-secret `.env`, then `.env.<environment>` over it; default `dev`; a development run never reads `.env.prod` (`lib/envfile.py` `run_files`) |
+| Module of a deploy kind | `deployKind:<kind>` (runtime, static, artifact): the modules whose driver declares it — how a layout migration finds its module without naming a driver |
 | Shared deploy value | process environment, then `deploy.env` |
 | Server base | `DEPLOY_SERVER_BASE`, else `/home/<user>` from `DEPLOY_SERVER` (`deploy.env`, then every module folder) |
 | Remote deploy base of a folder | its `DEPLOY_PATH`, else `{server base}/{DEPLOY_PROJECT slug}/{folder}`; neither → refused |

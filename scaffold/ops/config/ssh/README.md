@@ -1,4 +1,4 @@
-﻿# SSH — სად ჩასვა გასაღები (clone-ის შემდეგ)
+# SSH — სად ჩასვა გასაღები (clone-ის შემდეგ)
 
 Deploy (`stack-kit fe/be deploy`, `manage`, `dev`) იყენებს **OpenSSH**-ს (`ssh` / `scp`).  
 პრივატული გასაღები **არასოდეს** არ უნდა იყოს git-ში.

@@ -34,10 +34,14 @@ from lib import envfile, identity
 from lib.credentials import module_credentials
 from lib.manifest_defaults import flatten_defaults
 from lib.modules import (
+    LIFECYCLE_STEPS,
+    OPTIONAL_STEPS,
     driver_commands,
     driver_default_role,
     driver_delivery,
+    driver_deploy_kind,
     driver_home,
+    driver_package_scripts,
     driver_registry,
     infer_cli_aliases,
     layout_simulator_for_type,
@@ -131,6 +135,7 @@ def context(start: Path | None = None) -> dict[str, str]:
     modules = {str(k): v for k, v in (manifest.get("modules") or {}).items() if isinstance(v, dict)}
     roles: dict[str, list[str]] = {}
     types: dict[str, list[str]] = {}
+    kinds: dict[str, list[str]] = {}
     folders: list[str] = []
     for mid, cfg in modules.items():
         typ = str(cfg.get("type") or "")
@@ -149,11 +154,14 @@ def context(start: Path | None = None) -> dict[str, str]:
             roles.setdefault(role, []).append(mid)
         if typ:
             types.setdefault(typ, []).append(mid)
+            if driver_deploy_kind(typ):
+                kinds.setdefault(driver_deploy_kind(typ), []).append(mid)
         if folder not in folders:
             folders.append(folder)
     out["modules"] = _lines(modules)
     out.update({f"role:{r}": _lines(ids) for r, ids in roles.items()})
     out.update({f"type:{t}": _lines(ids) for t, ids in types.items()})
+    out.update({f"deployKind:{k}": _lines(ids) for k, ids in kinds.items()})
     out["secretsFolders"] = _lines(folders)
     out["deployBaseSecretsFolder"] = deploy_base_secrets_folder(manifest)
     out.update({f"alias:{a}": mid for a, mid in infer_cli_aliases(manifest).items()})
@@ -180,6 +188,8 @@ def _drivers() -> dict[str, str]:
     out: dict[str, str] = {}
     registry = {k: v for k, v in driver_registry().items() if isinstance(v, dict)}
     out["drivers"] = _lines(sorted(registry))
+    out["lifecycle:steps"] = _lines(LIFECYCLE_STEPS)
+    out["lifecycle:optional"] = _lines(sorted(OPTIONAL_STEPS))
     for typ, entry in registry.items():
         home = driver_home(typ)
         commands = driver_commands(typ)
@@ -190,6 +200,8 @@ def _drivers() -> dict[str, str]:
         for name, argv in (entry.get("tasks") or {}).items():
             if isinstance(argv, list):
                 out[f"driver:{typ}:task:{name}"] = _lines(argv)
+        for step, name in driver_package_scripts(typ).items():
+            out[f"driver:{typ}:packageScript:{step}"] = name
         script = (entry.get("hybrid") or {}).get("script")
         if script:
             out[f"driver:{typ}:hybridScript"] = str(home / script)
@@ -238,9 +250,9 @@ class Resolver:
         """The last non-empty value of `key` across the folder's env files, as compose would apply it."""
         return envfile.merged(self.env_files(folder)).get(key, default)
 
-    def run_env(self, folder: str) -> dict[str, str]:
-        """The variables a host run of the folder's module sets (envfile.HOST_RUN)."""
-        return envfile.merged(envfile.host_run_files(self.secrets_root, folder))
+    def run_env(self, folder: str, environment: str = "dev") -> dict[str, str]:
+        """The variables a run of the folder's module sets, for one environment (envfile.run_files)."""
+        return envfile.merged(envfile.run_files(self.secrets_root, folder, environment))
 
     def deploy_env_value(self, key: str, default: str = "") -> str:
         """An operator's process environment first, then the shared deploy.env."""

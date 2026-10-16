@@ -1,4 +1,4 @@
-﻿# stack-kit architecture
+# stack-kit architecture
 
 ## Boundaries
 

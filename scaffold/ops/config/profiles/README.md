@@ -1,4 +1,4 @@
-﻿# Environment profiles (copy into `ops/config/deploy.env`)
+# Environment profiles (copy into `ops/config/deploy.env`)
 
 | Profile | File |
 |---------|------|

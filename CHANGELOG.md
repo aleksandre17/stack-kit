@@ -2,6 +2,31 @@
 
 ## 1.2.0-dev — unreleased
 
+### A new project works with no setup of its own (ADR-001 amendment 8)
+
+- **Breaking: a run on this machine reads one environment.** `run` / `hybrid boot` read the
+  module's shared `.env`, then `.env.dev`; `.env.prod` only with `--env prod`. A development run no
+  longer fills from `.env.prod`. `validate` / `migrate` name, per secrets folder, the keys it lost.
+- Lifecycle steps per driver: `build`, `test`, `lint` (`dotnet-aspnet`: dotnet build/test/format;
+  `java-boot`: Gradle build/test; Node family: package.json scripts through
+  `toolkit/node/Invoke-PackageScript.ps1`). `stack-kit build|test|lint [module ...]`: every module,
+  fail-fast, the step's exit code.
+- New driver `node-spa`: any SPA by its own package.json scripts (Angular CLI, Vite, React, Vue).
+- Manifest `commands` {`test` (required), `build`, `lint`, `run`}: literal command lines for every
+  tool; the scaffold writes them through the launcher; `validate` checks the scripts they name.
+  New fields: `dotnet.solution`, `dotnet.test`, `node.scripts`, `node.packageManager`,
+  `toolchain.version`, `ci.workflow`.
+- `stack-kit ci-gen [--force|--check]`: `.github/workflows/ci.yml` from the modules, actions pinned
+  by verified SHA (`lib/ci-actions.json`); `init` writes it.
+- `init` works again (it failed at its first Python call) and its result validates; module env
+  examples moved to `ops/config/<module>/.env.example`; the scaffold ships an nginx template.
+- Run record: one JSON line per `deliver` rung and lifecycle step in `.stack-kit/runs/runs.jsonl`
+  (self-ignoring).
+- Layout migrations find their module by `deployKind`, not by driver name; deploy markers name the
+  module that wrote them.
+- Hygiene: no BOM outside PowerShell; every non-ASCII `.ps1` carries one (Windows PowerShell 5.1);
+  README quick start; license pending; `vendorDirs` + `platform/kits/stack-kit`.
+
 ### The owed list, closed (ADR-001 amendment 7)
 
 - **Breaking for a host on the former keys, carried by `migrate --apply`:** `ci.<name>` script paths

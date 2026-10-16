@@ -70,6 +70,22 @@ def _validate_required(instance: dict[str, Any]) -> list[str]:
     return errs
 
 
+#: A token of a command line that names a script of the host: it has to be there.
+_SCRIPT_TOKEN = (".ps1", ".sh", ".py", ".cmd")
+
+
+def command_line_problems(root: Path, manifest: dict[str, Any]) -> list[str]:
+    """`commands.*` are literal lines other tools run; a line naming a host script that is not there
+    is broken for every one of them. The shape is the schema's; this is what a schema cannot see."""
+    out = []
+    for name, line in ((manifest.get("commands") or {}).items() if isinstance(manifest.get("commands"), dict) else []):
+        for token in str(line).split():
+            token = token.strip("'\"")
+            if token.endswith(_SCRIPT_TOKEN) and not Path(token).is_absolute() and not (root / token).is_file():
+                out.append(f"commands.{name}: names {token}, which is not there")
+    return out
+
+
 def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str]:
     errs: list[str] = []
     warnings: list[str] = []
@@ -187,6 +203,7 @@ def validate_manifest(
     errs.extend(f"{c} -- run `migrate --apply`" for c in carry_host_shapes(ctx.manifest))
     proj_errs, warnings = _validate_project(ctx, registry)
     errs.extend(proj_errs)
+    errs.extend(command_line_problems(ctx.root, ctx.manifest))
     # The declared tree, held as a floor (ADR-001 decision 3).
     from lib.layout_floor import evaluate
 
@@ -203,6 +220,10 @@ def validate_manifest(
     keys = config_keys(ctx.root, ctx.manifest)
     errs.extend(f"config: {f}" for f in keys.failures)
     warnings.extend(f"config: {k}" for k in keys.known)
+    # A development run reads development configuration only (amendment 8): what it lost is named.
+    from lib.migrate_manifest import run_env_notices
+
+    warnings.extend(f"env: {n}" for n in run_env_notices(ctx.secrets_root, ctx.manifest))
     # A declared pipeline must be a proof before it is ever run (ADR-001 decision 4).
     stages = (ctx.manifest.get("validate") or {}).get("stages")
     if stages is not None:

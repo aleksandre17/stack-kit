@@ -24,8 +24,8 @@ STACK_KIT_PROJECT_ROOT="$(stack_kit_find_project_root "$(pwd)" 2>/dev/null || ec
 export STACK_KIT_PROJECT_ROOT
 
 OPS_MODULE_ID="$(stack_kit_module_id_for_role api)"
-[[ -n "$OPS_MODULE_ID" ]] || OPS_MODULE_ID="$(stack_kit_module_id_for_type java-boot)"
-[[ -n "$OPS_MODULE_ID" ]] || { echo "  ERROR: no api/java-boot module in stack-kit.json" >&2; exit 1; }
+[[ -n "$OPS_MODULE_ID" ]] || OPS_MODULE_ID="$(stack_kit_module_id_for_deploy_kind runtime)"
+[[ -n "$OPS_MODULE_ID" ]] || { echo "  ERROR: no api module, and no module whose driver deploys as runtime" >&2; exit 1; }
 OPS_SECRETS_MODULE="$(stack_kit_secrets_module_name "$OPS_MODULE_ID")"
 SECRETS_DIR="$(stack_kit_secrets_dir_for_module "$OPS_MODULE_ID")"
 SERVER="$(stack_kit_env_value "$OPS_SECRETS_MODULE" DEPLOY_SERVER "$(stack_kit_deploy_env_value DEPLOY_SERVER "")")"

@@ -1,4 +1,4 @@
-﻿# Optional: GCP credentials in compose (project-specific)
+# Optional: GCP credentials in compose (project-specific)
 
 Default `catalog.full.json` in scaffold **does not** mount `google-credentials.json`.
 

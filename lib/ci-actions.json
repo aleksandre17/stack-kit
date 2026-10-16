@@ -1,0 +1,10 @@
+{
+  "$comment": "The CI actions a generated workflow uses, each pinned by its full commit SHA (a tag can be moved; a SHA cannot). Every SHA was read with `git ls-remote https://github.com/<action>.git refs/tags/<version> refs/tags/<version>^{}` on 2026-10-16: all four tags are lightweight, so the SHA shown is the commit. A bump is a change to this file and its re-verification, never an edit of a generated workflow (ADR-001 amendment 8).",
+  "verifiedAt": "2026-10-16",
+  "actions": {
+    "actions/checkout": { "version": "v7.0.1", "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1" },
+    "actions/setup-dotnet": { "version": "v6.0.0", "sha": "a98b56852c35b8e3190ac28c8c2271da59106c68" },
+    "actions/setup-node": { "version": "v7.1.0", "sha": "949feb2413d6458794dcd2491c4babbbce0c15c1" },
+    "actions/setup-java": { "version": "v6.1.0", "sha": "b843ebf9b913146b38da2eaa7aeddf76074ae1ad" }
+  }
+}

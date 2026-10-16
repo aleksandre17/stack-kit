@@ -6,7 +6,7 @@
     resolve_cli.py [--shell bash|pwsh] notice <former> <current>
     resolve_cli.py [--shell bash] env-files <folder> [dev|prod|deploy|all]
     resolve_cli.py env-value <folder> <KEY> [default]
-    resolve_cli.py run-env <folder>          (one JSON object: what a host run sets; for the process, never a console)
+    resolve_cli.py run-env <folder> [dev|prod]   (one JSON object: what a run sets; for the process, never a console)
     resolve_cli.py deploy-env-value <KEY> [default]
     resolve_cli.py project-slug | compose-slug | docker-network | server-base | infra-slug
     resolve_cli.py [--shell bash] infra-deploy-path | deploy-base <folder>
@@ -149,8 +149,8 @@ def _answer(r, verb: str, args: list[str]) -> list[str] | None:
         return [str(p) for p in r.env_files(args[0], args[1] if len(args) == 2 else "all")]
     if verb == "env-value" and 2 <= len(args) <= 3:
         return [r.env_value(args[0], args[1], args[2] if len(args) == 3 else "")]
-    if verb == "run-env" and len(args) == 1:
-        return [json.dumps(r.run_env(args[0]), ensure_ascii=False)]
+    if verb == "run-env" and 1 <= len(args) <= 2:
+        return [json.dumps(r.run_env(args[0], args[1] if len(args) == 2 else "dev"), ensure_ascii=False)]
     if verb == "deploy-env-value" and 1 <= len(args) <= 2:
         return [r.deploy_env_value(args[0], args[1] if len(args) == 2 else "")]
     if verb == "deploy-base" and len(args) == 1:

@@ -1,4 +1,4 @@
-# node-vite driver init — set $env:STACK_KIT_MODULE_ID before dot-sourcing
+﻿# node-vite driver init — set $env:STACK_KIT_MODULE_ID before dot-sourcing
 if (-not $env:STACK_KIT_MODULE_ID) {
     throw "STACK_KIT_MODULE_ID required - run: stack-kit mod <moduleId> <command> (see stack-kit help)"
 }

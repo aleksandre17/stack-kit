@@ -1,4 +1,4 @@
-# stack-kit — smart dev startup orchestrator.
+﻿# stack-kit — smart dev startup orchestrator.
 #
 # Usage: stack-kit dev up [alias|moduleId|all] [--mode hybrid|local|docker|remote] [--no-infra] [--no-tunnel]
 #

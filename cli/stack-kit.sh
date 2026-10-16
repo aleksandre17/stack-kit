@@ -36,7 +36,7 @@ case "$CMD" in
     # Every other verb is the PowerShell CLI's: pwsh on any platform, Windows PowerShell where only it
     # exists. (`exec` does not return, so a `|| fallback` after it could never run.)
     ps="$(command -v pwsh || command -v powershell.exe || command -v powershell || true)"
-    [[ -n "$ps" ]] || { echo "ERROR: pwsh (PowerShell 7) is required for: stack-kit $CMD" >&2; exit 1; }
+    [[ -n "$ps" ]] || { echo "ERROR: PowerShell is required for: stack-kit $CMD (pwsh 7+ on any OS; Windows PowerShell 5.1 on Windows)" >&2; exit 1; }
     exec "$ps" -NoProfile -ExecutionPolicy Bypass -File "$PKG/cli/stack-kit.ps1" "$CMD" "$@"
     ;;
 esac

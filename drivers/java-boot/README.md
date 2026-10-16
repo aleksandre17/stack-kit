@@ -1,4 +1,4 @@
-﻿# java-boot driver
+# java-boot driver
 
 Gradle / Spring Boot multi-module deploy and remote dev for `stack-kit.json` modules with `"type": "java-boot"`.
 

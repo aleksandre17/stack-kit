@@ -1,4 +1,4 @@
-﻿# New driver template
+# New driver template
 
 Copy this folder to `drivers/<your-type>/` (e.g. `node-api`, `go-fiber`).
 

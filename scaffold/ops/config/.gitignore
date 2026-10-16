@@ -1,5 +1,7 @@
 # Ignore all real secrets; keep README and *.example
 *
+# Directories are walked (a module folder holds its .env.example); their files stay ignored below.
+!*/
 !.gitignore
 !README.md
 !**/.gitignore

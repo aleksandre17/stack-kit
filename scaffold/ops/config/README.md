@@ -1,4 +1,4 @@
-﻿# ops/config/ — project configuration (consumer repo, not in stack-kit package)
+# ops/config/ — project configuration (consumer repo, not in stack-kit package)
 
 All runtime values live here. Application folders (`frontend/`, `backend/`) hold code only.
 

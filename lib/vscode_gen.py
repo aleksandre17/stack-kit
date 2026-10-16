@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.manifest_defaults import default_field, read_nested
-from lib.modules import driver_registry, infer_cli_aliases, modules_by_role
+from lib.modules import driver_package_scripts, driver_registry, infer_cli_aliases, modules_by_role
 from lib.project_context import ProjectContext
 
 
@@ -57,7 +57,10 @@ def _launch_node_terminal(
 ) -> dict[str, Any]:
     rel = _posix_rel(ctx.root, ctx.module_path(module_id))
     dbg = _module_debug_cfg(ctx.manifest, module_id)
-    script = str(dbg.get("npmScript") or dbg.get("script") or "dev")
+    # The module's debug script, else the start script its driver declares, else `dev`.
+    typ = str(((ctx.manifest.get("modules") or {}).get(module_id) or {}).get("type") or "")
+    declared = driver_package_scripts(typ).get("start")
+    script = str(dbg.get("npmScript") or dbg.get("script") or declared or "dev")
     label = str(dbg.get("label") or f"{module_id}: npm run {script}")
     return {
         "name": label,

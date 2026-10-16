@@ -16,7 +16,9 @@
       "manage": "sh/manage.sh",
       "compose": "sh/compose.sh",
       "check": "sh/check.sh",
-      "modules": "sh/modules.sh"
+      "modules": "sh/modules.sh",
+      "build": "ps1/build.ps1",
+      "test": "ps1/test.ps1"
     },
     "hybrid": {
       "script": "ps1/hybrid.ps1"
@@ -71,6 +73,17 @@
         ],
         "hint": "<alias> watch is <alias> dev watch (rsync + bootRun in workspace/); <alias> deploy watch is the bootJar publish loop"
       }
+    },
+    "ci": {
+      "setup": [
+        {
+          "uses": "actions/setup-java",
+          "with": {
+            "distribution": "temurin",
+            "java-version": "{toolchain.version|17}"
+          }
+        }
+      ]
     }
   },
   "node-vite": {
@@ -131,6 +144,24 @@
         ],
         "hint": "<alias> watch is <alias> deploy watch (static dist on the server); <alias> dev watch syncs source to the remote dev container"
       }
+    },
+    "packageScripts": {
+      "lint": "lint",
+      "build": "build",
+      "test": "test"
+    },
+    "ci": {
+      "setup": [
+        {
+          "uses": "actions/setup-node",
+          "with": {
+            "node-version": "{toolchain.version|22}"
+          }
+        },
+        {
+          "run": "corepack enable"
+        }
+      ]
     }
   },
   "node-api": {
@@ -180,6 +211,24 @@
           "--skip-checks"
         ]
       }
+    },
+    "packageScripts": {
+      "lint": "lint",
+      "build": "build",
+      "test": "test"
+    },
+    "ci": {
+      "setup": [
+        {
+          "uses": "actions/setup-node",
+          "with": {
+            "node-version": "{toolchain.version|22}"
+          }
+        },
+        {
+          "run": "corepack enable"
+        }
+      ]
     }
   },
   "dotnet-aspnet": {
@@ -191,7 +240,10 @@
     "runtime": "powershell",
     "commands": {
       "deploy": "ps1/deploy.ps1",
-      "check": "ps1/check.ps1"
+      "check": "ps1/check.ps1",
+      "build": "ps1/build.ps1",
+      "test": "ps1/test.ps1",
+      "lint": "ps1/lint.ps1"
     },
     "hybrid": {
       "script": "ps1/hybrid.ps1"
@@ -229,6 +281,61 @@
       "container": {
         "pending": "an image built by `dotnet publish` in a multi-stage Dockerfile and run by the stack compose; declared, not built -- it has to be proven against a docker host first"
       }
+    },
+    "ci": {
+      "setup": [
+        {
+          "uses": "actions/setup-dotnet",
+          "with": {
+            "dotnet-version": "{toolchain.version|8.0.x}"
+          }
+        }
+      ]
+    }
+  },
+  "node-spa": {
+    "label": "Node - single-page app run by its own package.json scripts (Angular CLI, Vite, React, Vue, Svelte)",
+    "roles": [
+      "ui"
+    ],
+    "runtime": "powershell",
+    "commands": {},
+    "packageScripts": {
+      "lint": "lint",
+      "build": "build",
+      "test": "test",
+      "start": "start"
+    },
+    "hybrid": {
+      "script": "ps1/hybrid.ps1"
+    },
+    "tasks": {},
+    "vscode": {
+      "launch": "node-terminal"
+    },
+    "delivery": {
+      "local": {
+        "command": "run"
+      },
+      "hybrid": {
+        "via": "hybrid"
+      },
+      "release": {
+        "pending": "a static deploy of the build output: where the output lands is the framework's (angular.json outputPath, vite outDir), so it must be declared by the module and proven against a server first"
+      }
+    },
+    "ci": {
+      "setup": [
+        {
+          "uses": "actions/setup-node",
+          "with": {
+            "node-version": "{toolchain.version|22}"
+          }
+        },
+        {
+          "run": "corepack enable"
+        }
+      ]
     }
   }
 }

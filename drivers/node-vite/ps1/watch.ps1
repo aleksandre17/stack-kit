@@ -1,4 +1,4 @@
-# DEPRECATED top-level command — use: stack-kit fe deploy watch
+﻿# DEPRECATED top-level command — use: stack-kit fe deploy watch
 # Kept so old scripts/docs get a clear redirect (registry may omit "watch").
 
 param(

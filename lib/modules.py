@@ -12,7 +12,14 @@ MODULE_ROLES = frozenset({"ui", "api", "worker", "gateway", "data", "other"})
 KIT_DRIVERS = Path(__file__).resolve().parent.parent / "drivers"
 #: The host run is the KIT's: one runner for every driver that declares its launch step
 #: (`hybrid.script`), given to it as its `run` command (ADR-001 amendment 7).
-HOST_RUN = Path(__file__).resolve().parent.parent / "toolkit" / "hybrid" / "Invoke-HybridRun.ps1"
+HOST_RUNNER = Path(__file__).resolve().parent.parent / "toolkit" / "hybrid" / "Invoke-HybridRun.ps1"
+#: A Node package's lifecycle step is the KIT's too: one runner of package.json scripts for every
+#: driver that declares `packageScripts` (step -> script name), given as those commands (amendment 8).
+PACKAGE_SCRIPT = Path(__file__).resolve().parent.parent / "toolkit" / "node" / "Invoke-PackageScript.ps1"
+#: The lifecycle steps every module may be asked for, in the order a pipeline runs them; `stack-kit
+#: build|test|lint` runs one across the modules. `lint` is optional: a module without it is skipped.
+LIFECYCLE_STEPS = ("lint", "build", "test")
+OPTIONAL_STEPS = frozenset({"lint"})
 
 
 class DriverCollision(ValueError):
@@ -85,16 +92,27 @@ def driver_home(driver_id: str) -> Path:
 
 
 def driver_commands(driver_id: str) -> dict[str, Path]:
-    """command -> script, for one driver: what it declares under `commands`, and `run` -- the kit's
-    host run -- when it declares a launch step and no `run` of its own. The one home of the rule."""
+    """command -> script, for one driver: what it declares under `commands`; `run` -- the kit's
+    host run -- when it declares a launch step and no `run` of its own; and each step it declares
+    under `packageScripts` -- the kit's package-script runner -- that it does not script itself.
+    The one home of the rule."""
     entry = driver_registry().get(str(driver_id))
     if not isinstance(entry, dict):
         return {}
     home = driver_home(driver_id)
     out = {str(name): home / str(rel) for name, rel in (entry.get("commands") or {}).items()}
     if (entry.get("hybrid") or {}).get("script") and "run" not in out:
-        out["run"] = HOST_RUN
+        out["run"] = HOST_RUNNER
+    for step in driver_package_scripts(driver_id):
+        if step in LIFECYCLE_STEPS:
+            out.setdefault(step, PACKAGE_SCRIPT)
     return out
+
+
+def driver_package_scripts(driver_id: str) -> dict[str, str]:
+    """step -> package.json script name, as a Node-family driver declares them (`packageScripts`)."""
+    value = driver_capability(driver_id, "packageScripts", {})
+    return {str(k): str(v) for k, v in value.items() if v} if isinstance(value, dict) else {}
 
 
 def driver_capability(driver_id: str, key: str, default: Any = None) -> Any:

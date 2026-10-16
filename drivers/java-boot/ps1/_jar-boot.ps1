@@ -1,4 +1,4 @@
-# java-boot - the boot JAR: resolves it and runs java -jar (Windows-safe: avoids the Gradle
+﻿# java-boot - the boot JAR: resolves it and runs java -jar (Windows-safe: avoids the Gradle
 # includeBuild file-lock). Dot-sourced by this driver's launch step (ps1/hybrid.ps1), with the
 # runner's lib in scope; the fields read are this driver's own (modules.<id>.hybrid.*, datastores.*).
 
@@ -24,7 +24,8 @@ function Test-StackKitPreferHybridJar {
     $pref = Get-ModuleField $ModuleId 'hybrid.preferJar'
     if ($pref -eq 'true') { return $true }
     if ($pref -eq 'false') { return $false }
-    return $IsWindows
+    # Windows PowerShell 5.1 has no $IsWindows; the platform is asked directly.
+    return [System.Environment]::OSVersion.Platform -eq 'Win32NT'
 }
 
 function Invoke-StackKitHybridJarBoot {

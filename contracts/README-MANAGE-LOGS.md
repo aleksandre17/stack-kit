@@ -1,4 +1,4 @@
-﻿# Manage logs — shared contract
+# Manage logs — shared contract
 
 Single contract for backend (`manage.sh`) and frontend (`manage.ps1`).
 

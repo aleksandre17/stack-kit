@@ -16,8 +16,12 @@ _LINE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
 #: are handed to compose with repeated --env-file.
 PROFILES = ("dev", "prod", "deploy")
 
-#: A host run (`hybrid boot`) is a development run: .env.dev wins, .env.prod fills what it leaves unset.
-HOST_RUN = ("prod", "dev")
+#: A run on this machine (`run`, `hybrid boot`) reads ONE environment's configuration (12-factor III):
+#: the folder's shared, non-secret `.env`, then that environment's file over it. A development run
+#: never reads a production value; production's file is read only when it is asked for (`--env prod`).
+#: (ADR-001 amendment 8; until then a host run filled from `.env.prod`.)
+SHARED = ".env"
+RUN_ENVIRONMENTS = ("dev", "prod")
 
 
 def parse(path: Path) -> dict[str, str]:
@@ -45,10 +49,20 @@ def merged(paths: list[Path]) -> dict[str, str]:
     return out
 
 
-def host_run_files(secrets_root: Path, folder: str) -> list[Path]:
-    """The env files a host run reads, in the order they are applied (HOST_RUN)."""
-    files = [secrets_root / folder / f".env.{p}" for p in HOST_RUN]
+def run_files(secrets_root: Path, folder: str, environment: str = "dev") -> list[Path]:
+    """The env files a run of one environment reads, in the order they are applied."""
+    if environment not in RUN_ENVIRONMENTS:
+        raise ValueError(f"a run's environment is one of {', '.join(RUN_ENVIRONMENTS)}, not {environment!r}")
+    files = [secrets_root / folder / SHARED, secrets_root / folder / f".env.{environment}"]
     return [f for f in files if f.is_file()]
+
+
+def dev_run_loses(secrets_root: Path, folder: str) -> list[str]:
+    """The keys a development run filled from `.env.prod` before amendment 8 and no longer gets:
+    set in `.env.prod`, in neither `.env` nor `.env.dev`. Names only -- a value is never read out."""
+    prod = parse(secrets_root / folder / ".env.prod")
+    dev = merged(run_files(secrets_root, folder, "dev"))
+    return sorted(k for k in prod if k not in dev)
 
 
 def folder_files(secrets_root: Path, folder: str, profile: str = "all") -> list[Path]:

@@ -64,5 +64,10 @@
   "vscode": {
     "folder": ".vscode",
     "cliScript": "tools/stack-kit.ps1"
+  },
+  "commands": {
+    "build": "pwsh ops/cli/stack-kit.ps1 build",
+    "test": "pwsh ops/cli/stack-kit.ps1 test",
+    "lint": "pwsh ops/cli/stack-kit.ps1 lint"
   }
 }

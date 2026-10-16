@@ -225,6 +225,8 @@
             "description": "dotnet-aspnet driver options (all optional)",
             "properties": {
               "project": { "type": "string", "description": "Project file relative to the module path; default: the single *.csproj there" },
+              "solution": { "type": "string", "description": "Solution relative to the module path: what build and lint act on (default: the project)" },
+              "test": { "type": "string", "description": "Test project or solution relative to the module path: what `test` runs (default: the solution, else the project); \"\" = the module has no tests" },
               "launchProfile": { "type": "string", "description": "Properties/launchSettings.json profile for dotnet run" },
               "configuration": { "type": "string", "default": "Release", "description": "dotnet publish configuration for deploy artifact" },
               "publishExpect": {
@@ -350,8 +352,18 @@
           },
           "node": {
             "type": "object",
-            "description": "Node-stack build declarations (node-api / node-vite drivers)",
+            "description": "Node-stack declarations (node-api / node-vite / node-spa drivers)",
             "properties": {
+              "scripts": {
+                "type": "object",
+                "description": "The module's package.json script per step (build, test, lint, start) where it differs from the driver's; \"\" = the module has none",
+                "additionalProperties": { "type": "string" }
+              },
+              "packageManager": {
+                "type": "string",
+                "enum": ["npm", "pnpm", "yarn"],
+                "description": "Default: the one whose lockfile is nearest above the module, else npm"
+              },
               "prebuildScripts": {
                 "type": "array",
                 "description": "Workspace pnpm/npm scripts that must build before this module's package, in order. Absent or empty = nothing runs.",
@@ -359,6 +371,12 @@
                 "default": []
               }
             },
+            "additionalProperties": false
+          },
+          "toolchain": {
+            "type": "object",
+            "description": "The module's toolchain as CI sets it up (its driver's `ci.setup`): `version` (dotnet SDK e.g. 8.0.x, Node e.g. 22, Java e.g. 17; default: the driver's)",
+            "properties": { "version": { "type": "string", "minLength": 1 } },
             "additionalProperties": false
           },
           "extensions": {
@@ -538,6 +556,18 @@
       },
       "additionalProperties": false
     },
+    "commands": {
+      "type": "object",
+      "description": "The host's own command lines, as literal strings any tool runs verbatim from the host root (the agent kit's detector reads `commands.test`, required, and `commands.build`). `stack-kit init` writes them through the host launcher.",
+      "required": ["test"],
+      "properties": {
+        "build": { "type": "string", "minLength": 1 },
+        "test": { "type": "string", "minLength": 1 },
+        "lint": { "type": "string", "minLength": 1 },
+        "run": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "ci": {
       "type": "object",
       "properties": {
@@ -545,6 +575,10 @@
         "prepareEnv": { "type": "string" },
         "waitHealth": { "type": "string" },
         "waitStackHealth": { "type": "string" },
+        "workflow": {
+          "type": "string",
+          "description": "Where `ci-gen` writes the generated CI workflow (default .github/workflows/ci.yml)"
+        },
         "scripts": {
           "type": "object",
           "description": "The host's further CI scripts, by its own names: each a path the kit checks exists (validate) and holds as a layout-floor row; the kit names none of them",

@@ -1,4 +1,4 @@
-# stack-kit — Postgres, Redis, Qdrant (local / remote / tunnel)
+﻿# stack-kit — Postgres, Redis, Qdrant (local / remote / tunnel)
 # Usage: stack-kit infra [prereqs|local|remote|tunnel] [up|down|sync|status|purge] [-Prod] [-Confirm]
 
 param(

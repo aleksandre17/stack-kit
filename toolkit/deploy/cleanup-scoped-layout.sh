@@ -56,10 +56,11 @@ run_cleanup() {
   local role="$1" module_id kind subdir
   module_id="$(stack_kit_module_id_for_role "$role" 2>/dev/null || true)"
   if [[ -z "$module_id" ]]; then
+    # No module of the role: the one whose driver deploys as this layout's kind (deployKind).
     if [[ "$role" == "api" ]]; then
-      module_id="$(stack_kit_module_id_for_type java-boot 2>/dev/null || true)"
+      module_id="$(stack_kit_module_id_for_deploy_kind runtime 2>/dev/null || true)"
     else
-      module_id="$(stack_kit_module_id_for_type node-vite 2>/dev/null || true)"
+      module_id="$(stack_kit_module_id_for_deploy_kind static 2>/dev/null || true)"
     fi
   fi
   [[ -n "$module_id" ]] || { echo "  [skip] $role — no module"; return 0; }
@@ -74,12 +75,12 @@ run_cleanup() {
 
   if [[ "$role" == "api" ]]; then
     kind="runtime"
-    subdir="backend"
+    subdir="$role ($module_id)"
     sources="$(PYTHONPATH="${PKG_ROOT}" stack_kit_python "$PKG_ROOT/lib/migrate_layout_names.py" --sources-api 2>/dev/null || true)"
     pairs="$(PYTHONPATH="${PKG_ROOT}" stack_kit_python "$PKG_ROOT/lib/migrate_layout_names.py" --pairs-api 2>/dev/null || true)"
   else
     kind="static"
-    subdir="frontend"
+    subdir="$role ($module_id)"
     sources="$(PYTHONPATH="${PKG_ROOT}" stack_kit_python "$PKG_ROOT/lib/migrate_layout_names.py" --sources-ui 2>/dev/null || true)"
     pairs="$(PYTHONPATH="${PKG_ROOT}" stack_kit_python "$PKG_ROOT/lib/migrate_layout_names.py" --pairs-ui 2>/dev/null || true)"
   fi

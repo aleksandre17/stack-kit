@@ -1,4 +1,4 @@
-# stack-kit CLI — module drivers by stack type, as drivers/registry.json declares them
+﻿# stack-kit CLI — module drivers by stack type, as drivers/registry.json declares them
 
 # A simple param block on purpose: an advanced one (any [Parameter()]) adds PowerShell's common
 # parameters, and an operand such as `-d` then binds as -Debug and is lost (ADR-001 K3).
@@ -19,6 +19,7 @@ if ($Command -eq "init") {
 
 . (Join-Path $PackageRoot "lib\drivers.ps1")
 . (Join-Path $PackageRoot "lib\modules.ps1")
+. (Join-Path $PackageRoot "lib\runs.ps1")
 
 $Root = Get-ProjectRootFromManifest
 
@@ -47,14 +48,16 @@ function Show-Help {
 
   stack-kit — manifest-driven ops CLI (stack-kit)
 
-    init | validate | migrate | vscode-gen | config-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout | hybrid | dev
+    init | validate | migrate | vscode-gen | config-gen | ci-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout | hybrid | dev
+
+    build | test | lint [module ...]   The step for every module (or those named), fail-fast
 
     mod <moduleId> <command> ...   A command its driver declares (listed per module below)
     mod <moduleId> deliver <rung> [--env dev|prod] [--plan]   A rung of its driver's delivery ladder
 
     dev up <alias|moduleId|all> [--mode hybrid|local|docker|remote] [--no-infra] [--no-tunnel]
 
-    hybrid boot <alias|moduleId>   Host run: the module's .env.dev over its .env.prod
+    hybrid boot <alias|moduleId> [--env prod]   Host run: the module's .env + .env.dev (prod: .env + .env.prod)
 
     <alias> run                    Same as hybrid boot; aliases from stack-kit.json cli.aliases
 
@@ -180,7 +183,7 @@ function Invoke-ModuleDriver {
             Write-Host "  Rung '$rung' of driver '$modType' is declared but not built: $($how.pending)" -ForegroundColor Red
             exit 1
         }
-        $environment = "prod"; $plan = $false; $extra = [System.Collections.ArrayList]@()
+        $environment = ""; $plan = $false; $extra = [System.Collections.ArrayList]@()
         for ($i = 1; $i -lt $rest.Count; $i++) {
             switch ([string]$rest[$i]) {
                 "--plan" { $plan = $true }
@@ -189,11 +192,16 @@ function Invoke-ModuleDriver {
             }
         }
         if ($how.via) {
-            $line = "stack-kit $($how.via) boot $ModuleId"
-            if ($plan) { Write-Host "  deliver $rung -> $line"; exit 0 }
-            & (Join-Path $PSScriptRoot "stack-kit.ps1") $how.via boot $ModuleId @extra
-            exit $LASTEXITCODE
+            # A kit verb keeps its own default environment (a host run's is dev); only an asked one is passed.
+            $viaArgs = @($how.via, "boot", $ModuleId) + $(if ($environment) { @("--env", $environment) } else { @() }) + @($extra)
+            if ($plan) { Write-Host "  deliver $rung -> stack-kit $($viaArgs -join ' ')"; exit 0 }
+            $self = Join-Path $PSScriptRoot "stack-kit.ps1"
+            exit (Invoke-RecordedStep -Kind "deliver" -Step $rung -ModuleId $ModuleId -Environment $environment -Action {
+                & $self @viaArgs
+            })
         }
+        if (-not $environment) { $environment = "prod" }
+        $deliverRung = $rung
         $sub = [string]$how.command
         $rest = @(@($how.args) | Where-Object { $null -ne $_ } | ForEach-Object { ([string]$_).Replace("{environment}", $environment) }) + @($extra)
         if ($plan) {
@@ -210,6 +218,13 @@ function Invoke-ModuleDriver {
     }
     $script = Get-DriverCommandPath -ModuleId $ModuleId -Command $sub
     $env:STACK_KIT_MODULE_ID = $ModuleId
+    # The command by name, for a script that is several drivers' (the kit's runners).
+    $env:STACK_KIT_COMMAND = $sub
+    if ($deliverRung) {
+        exit (Invoke-RecordedStep -Kind "deliver" -Step $deliverRung -ModuleId $ModuleId -Environment $environment -Action {
+            Invoke-DriverScript -Script $script -Operands $rest
+        })
+    }
     try {
         Invoke-DriverScript -Script $script -Operands $rest
     } catch {
@@ -217,6 +232,46 @@ function Invoke-ModuleDriver {
         exit 1
     }
     exit $LASTEXITCODE
+}
+
+function Invoke-LifecycleStep {
+    # `stack-kit build|test|lint [module|alias ...]`: the step for every module (or the named ones),
+    # in manifest order, fail-fast, each in its own process so its exit code is the step's. A module
+    # whose driver declares no such step fails -- except for an optional step, which it skips.
+    param([Parameter(Mandatory = $true)][string]$Step, [string[]]$Only = @())
+    $optional = @(Get-KitContextLines "lifecycle:optional")
+    $modules = @(Get-ProjectModules)
+    if ($Only.Count -gt 0) {
+        $wanted = @($Only | ForEach-Object {
+            $m = Resolve-CliAlias $_
+            if (-not $m) { Write-Host "  Unknown module or alias: $_" -ForegroundColor Red; exit 1 }
+            $m
+        })
+        $modules = @($modules | Where-Object { $wanted -contains $_ })
+    }
+    $shell = (Get-Process -Id $PID).Path
+    $self = Join-Path $PSScriptRoot "stack-kit.ps1"
+    $ran = 0
+    foreach ($mid in $modules) {
+        if ($Step -notin @(Get-DriverCapabilities $mid)) {
+            if ($optional -contains $Step) {
+                Write-Host "  [$mid $Step] skipped: driver '$(Get-ModuleType $mid)' declares no $Step" -ForegroundColor DarkGray
+                continue
+            }
+            Write-Host "  [$mid $Step] driver '$(Get-ModuleType $mid)' declares no $Step step" -ForegroundColor Red
+            exit 1
+        }
+        $code = Invoke-RecordedStep -Kind "step" -Step $Step -ModuleId $mid -Action {
+            & $shell -NoProfile -ExecutionPolicy Bypass -File $self mod $mid $Step
+        }
+        if ($code -ne 0) {
+            Write-Host "  [$mid $Step] FAILED (exit $code)" -ForegroundColor Red
+            exit $code
+        }
+        $ran++
+    }
+    Write-Host "  $Step OK ($ran module(s))" -ForegroundColor Green
+    exit 0
 }
 
 
@@ -396,6 +451,11 @@ $globalCommands = @{
         if (-not $target) {
             $target = $CliRest[1]
         }
+        # A host run reads development configuration; production's only when asked (`--env prod`).
+        $runEnv = "dev"
+        for ($i = 2; $i -lt $CliRest.Count; $i++) {
+            if ([string]$CliRest[$i] -eq "--env" -and $i + 1 -lt $CliRest.Count) { $runEnv = [string]$CliRest[++$i] }
+        }
         if (-not (Get-ModuleManifestEntry $target)) {
             Write-Host "  Unknown module or alias: $($CliRest[1])" -ForegroundColor Red
             exit 1
@@ -404,8 +464,17 @@ $globalCommands = @{
         # no driver command stands between them.
         $env:STACK_KIT_MODULE_ID = $target
         $env:STACK_KIT_KIT_ROOT = $PackageRoot
-        & (Join-Path $PackageRoot "toolkit\hybrid\Invoke-HybridRun.ps1") -ModuleId $target
+        & (Join-Path $PackageRoot "toolkit\hybrid\Invoke-HybridRun.ps1") -ModuleId $target -Environment $runEnv
         exit $LASTEXITCODE
+    }
+
+    "build" = { Invoke-LifecycleStep -Step "build" -Only $CliRest }
+    "test" = { Invoke-LifecycleStep -Step "test" -Only $CliRest }
+    "lint" = { Invoke-LifecycleStep -Step "lint" -Only $CliRest }
+
+    "ci-gen" = {
+        $env:PYTHONPATH = "$PackageRoot"
+        Invoke-StackKitPython (Join-Path $PackageRoot "lib\ci_gen.py") @CliRest
     }
 
     "dev" = {

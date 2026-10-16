@@ -53,6 +53,9 @@ LEGACY_DEPLOY_MARKER: str = _DECLARATION.get("legacyDeployMarker") or ""
 VENDOR_DIRS: tuple[str, ...] = tuple(_DECLARATION.get("vendorDirs") or ())
 LEGACY_VENDOR_DIRS: tuple[str, ...] = tuple(_DECLARATION.get("legacyVendorDirs") or ())
 
+#: Where a host keeps the record of what ran (lib/runs.ps1): this machine's, ignored by itself.
+RUNS_DIR: str = _DECLARATION["runsDir"]
+
 #: Manifest fields renamed in place: {old dotted path: new dotted path}.
 LEGACY_MANIFEST_FIELDS: dict[str, str] = dict(_DECLARATION.get("legacyManifestFields") or {})
 

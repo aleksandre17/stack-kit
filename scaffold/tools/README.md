@@ -1,4 +1,4 @@
-﻿# stack-kit CLI (project entry)
+# stack-kit CLI (project entry)
 
 Delegates to `kits/stack-kit/cli/`.
 

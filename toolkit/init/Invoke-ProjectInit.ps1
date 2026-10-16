@@ -1,4 +1,4 @@
-# stack-kit init — full project bootstrap (scaffold + seed secrets + compose-gen + checklist)
+﻿# stack-kit init — full project bootstrap (scaffold + seed secrets + compose-gen + checklist)
 param(
     [string]$ProjectRoot = "",
     [string]$PackageRoot = "",
@@ -16,6 +16,8 @@ if (-not $PackageRoot) {
     $PackageRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
 $ScaffoldRoot = Join-Path $PackageRoot "scaffold"
+# One way to start the kit's Python, the CLI's own (lib/stack-kit-python.ps1).
+. (Join-Path $PackageRoot "lib\stack-kit-python.ps1")
 
 function Find-ProjectRoot {
     param([string]$Start)
@@ -139,16 +141,6 @@ function Update-DeployEnvAbstractNames {
     Set-Content -Path $path -Value $out -Encoding UTF8
 }
 
-function Get-PythonCmd {
-    if (Get-Command py -ErrorAction SilentlyContinue) {
-        $v = & py -3 -c "import sys; print(sys.executable)" 2>$null
-        if ($v) { return @("py", "-3") }
-    }
-    if (Get-Command python3 -ErrorAction SilentlyContinue) { return @("python3") }
-    if (Get-Command python -ErrorAction SilentlyContinue) { return @("python") }
-    return $null
-}
-
 function Show-Checklist {
     param([string]$Root)
     $env:STACK_KIT_PROJECT_ROOT = $Root
@@ -235,14 +227,19 @@ if ($MinimalCatalog) {
     }
 }
 
+# The manifest now exists: the kit's manifest readers answer for this project from here on.
+$env:STACK_KIT_PROJECT_ROOT = $ProjectRoot
+$env:STACK_KIT_KIT_ROOT = $PackageRoot
+. (Join-Path $PackageRoot "lib\project.ps1")
+
 # ── 3. Seed ops/config (manifest modules via ci_prepare) ─────────
 if (-not $SkipSeed) {
     Write-Step "Seed ops/config (manifest modules)"
-    $py = Get-PythonCmd
+    $py = Get-StackKitPythonArgs
     if ($py) {
         $env:PYTHONPATH = $PackageRoot
         $seedPy = Join-Path $PackageRoot "lib\ci_prepare.py"
-        & @py $seedPy
+        Invoke-StackKitPythonExe $py $seedPy
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  [warn] ci_prepare seed failed" -ForegroundColor Yellow
         }
@@ -268,12 +265,12 @@ $env:STACK_KIT_KIT_ROOT = $PackageRoot
 
 if (-not $SkipComposeGen) {
     Write-Step "Generate docker-compose files (compose-gen)"
-    $py = Get-PythonCmd
+    $py = Get-StackKitPythonArgs
     if (-not $py) {
         Write-Host "  [warn] Python not found — run later: stack-kit compose-gen" -ForegroundColor Yellow
     } else {
         $buildPy = Join-Path $PackageRoot "compose\build.py"
-        & @py $buildPy
+        Invoke-StackKitPythonExe $py $buildPy
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  [warn] compose-gen failed (fix catalog.json, then re-run)" -ForegroundColor Yellow
         } else {
@@ -284,14 +281,25 @@ if (-not $SkipComposeGen) {
 
 # ── 6. VS Code Run and Debug (.vscode) ───────────────────────────
 Write-Step "VS Code launch.json + tasks.json (vscode-gen)"
-$py = Get-PythonCmd
+$py = Get-StackKitPythonArgs
 if ($py) {
     $vscodePy = Join-Path $PackageRoot "lib\vscode_gen.py"
     $env:PYTHONPATH = $PackageRoot
-    & @py $vscodePy
+    Invoke-StackKitPythonExe $py $vscodePy
     if ($LASTEXITCODE -eq 0) { Write-Host "  [OK]   .vscode (missing files only; use stack-kit vscode-gen --force)" -ForegroundColor Green }
 } else {
     Write-Host "  [warn] Python not found — run: stack-kit vscode-gen" -ForegroundColor Yellow
+}
+
+# ── 6b. CI workflow (ci-gen) ─────────────────────────────────────
+Write-Step "CI workflow: a job per module, lint/build/test through the launcher (ci-gen)"
+$py = Get-StackKitPythonArgs
+if ($py) {
+    $env:PYTHONPATH = $PackageRoot
+    Invoke-StackKitPythonExe $py (Join-Path $PackageRoot "lib\ci_gen.py")
+    if ($LASTEXITCODE -ne 0) { Write-Host "  [warn] ci-gen failed - run: stack-kit ci-gen" -ForegroundColor Yellow }
+} else {
+    Write-Host "  [warn] Python not found - run: stack-kit ci-gen" -ForegroundColor Yellow
 }
 
 # ── 7. nginx-gen (optional) ──────────────────────────────────────
@@ -302,10 +310,10 @@ if (-not $SkipNginxGen) {
         $tpl = $manifest.adapters.nginx.template
         if ($tpl -and (Test-Path (Join-Path $ProjectRoot ($tpl -replace '/', '\')))) {
             Write-Step "Generate nginx.conf (nginx-gen)"
-            $py = Get-PythonCmd
+            $py = Get-StackKitPythonArgs
             if ($py) {
                 $render = Join-Path $PackageRoot "adapters\render_nginx.py"
-                & @py $render
+                Invoke-StackKitPythonExe $py $render
                 if ($LASTEXITCODE -eq 0) { Write-Host "  [OK]   nginx.conf" -ForegroundColor Green }
             }
         }

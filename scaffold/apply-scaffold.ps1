@@ -1,4 +1,4 @@
-# Copy stack-kit/scaffold → project root (merge; do not overwrite real secrets)
+﻿# Copy stack-kit/scaffold → project root (merge; do not overwrite real secrets)
 param(
     [string]$TargetRoot = "",
     [switch]$ForceExamples

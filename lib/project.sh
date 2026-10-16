@@ -151,6 +151,13 @@ stack_kit_module_id_for_type() {
   sed -n "$(( ${2:-0} + 1 ))p" <<<"$ids" | grep .
 }
 
+# The first (or Nth) module whose driver deploys as <kind> (`deployKind`: runtime, static, artifact).
+stack_kit_module_id_for_deploy_kind() {
+  local ids
+  ids="$(_stack_kit_ctx "deployKind:$1")" || return 1
+  sed -n "$(( ${2:-0} + 1 ))p" <<<"$ids" | grep .
+}
+
 # Secrets folder names of the manifest's modules, one per line, in declaration order.
 stack_kit_list_secrets_module_folders() {
   _stack_kit_ctx secretsFolders || true

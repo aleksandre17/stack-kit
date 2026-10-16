@@ -15,24 +15,9 @@ if (Test-StackKitPreferHybridJar -ModuleId $ModuleId) {
 $profiles = Get-ModuleField $ModuleId 'hybrid.springProfiles'
 if ($profiles) { $env:SPRING_PROFILES_ACTIVE = $profiles }
 
-$wrapperRel = Get-ModuleField $ModuleId 'hybrid.gradleWrapper'
-if (-not $wrapperRel) {
-    $modRelPath = Get-ManifestField "modules.$ModuleId.path"
-    if (Test-Path (Join-Path $modPath "gradlew.bat")) {
-        $wrapperRel = "$modRelPath/gradlew.bat"
-    } elseif (Test-Path (Join-Path $modPath "gradlew")) {
-        $wrapperRel = "$modRelPath/gradlew"
-    }
-}
-if (-not $wrapperRel) {
-    throw "No Gradle wrapper found; set modules.$ModuleId.hybrid.gradleWrapper in $((Get-KitIdentity).manifestFilename)"
-}
-
-$wrapper = Join-Path $root ($wrapperRel -replace '/', '\')
-if (-not (Test-Path $wrapper)) { throw "Gradle wrapper not found: $wrapper" }
-
-$gradleProject = Get-ModuleField $ModuleId 'hybrid.gradleProject'
-$bootTask = if ($gradleProject) { ":${gradleProject}:bootRun" } else { "bootRun" }
+. (Join-Path $PSScriptRoot "_gradle.ps1")
+$wrapper = Resolve-GradleWrapper -ModuleId $ModuleId -ModPath $modPath -Root $root
+$bootTask = Get-GradleTask -ModuleId $ModuleId -Task "bootRun"
 
 & $wrapper $bootTask -x test
 exit $LASTEXITCODE

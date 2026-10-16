@@ -1,4 +1,4 @@
-# Deploy path resolution (structured layout) — dot-source after _common.ps1 init
+﻿# Deploy path resolution (structured layout) — dot-source after _common.ps1 init
 
 function Get-DeployPathBase {
     $base = Get-EnvValue "DEPLOY_PATH"

@@ -79,3 +79,29 @@ def test_validate_refuses_a_former_consumer_shape_and_names_the_door(tmp_path: P
     errs, _ = validate_manifest(root)
     assert any("modules.api.catalog -> modules.api.extensions.catalog" in e and "migrate --apply" in e
                for e in errs), errs
+
+
+def test_the_commands_block_is_literal_lines_with_a_required_test(tmp_path: Path) -> None:
+    # The cross-tool contract (ADR-001 amendment 8): `commands.test` required, `build` optional,
+    # every value a literal string; a line naming a host script that is not there is refused.
+    from lib.schema_check import validate as schema_validate
+    from lib.validate_manifest import command_line_problems
+
+    schema = json.loads((PKG / "manifest.schema.json").read_text(encoding="utf-8"))["properties"]["commands"]
+    assert schema_validate({"test": "pwsh ops/cli/stack-kit.ps1 test"}, schema) == []
+    assert schema_validate({"build": "x"}, schema), "a commands block without test passed"
+    assert schema_validate({"test": ["pwsh", "x"]}, schema), "a non-string command passed"
+    assert schema_validate({"test": "x", "deploy": "y"}, schema), "an undeclared command passed"
+    (tmp_path / "ops" / "cli").mkdir(parents=True)
+    (tmp_path / "ops" / "cli" / "stack-kit.ps1").write_text("", encoding="utf-8")
+    ok = {"commands": {"test": "pwsh ops/cli/stack-kit.ps1 test"}}
+    assert command_line_problems(tmp_path, ok) == []
+    broken = {"commands": {"build": "pwsh tools/missing.ps1 build", "test": "dotnet test"}}
+    assert command_line_problems(tmp_path, broken) == ["commands.build: names tools/missing.ps1, which is not there"]
+
+
+def test_the_scaffold_declares_the_commands_through_the_host_launcher() -> None:
+    scaffold = json.loads((PKG / "scaffold" / "stack-kit.json").read_text(encoding="utf-8"))
+    assert scaffold["commands"]["test"].endswith("ops/cli/stack-kit.ps1 test")
+    assert scaffold["commands"]["build"].endswith("ops/cli/stack-kit.ps1 build")
+    assert (PKG / "scaffold" / "ops" / "cli" / "stack-kit.ps1").is_file()

@@ -25,7 +25,7 @@ def _infer_role(cfg: dict[str, Any]) -> str:
 #: `extensions`, under the same name, so nothing the host wrote is lost (ADR-001 amendment 7).
 MODULE_EXTENSION_FIELDS = ("catalog", "derivation")
 #: `ci` fields that are the kit's own; any other string under `ci` is a host script, by its name.
-CI_KIT_FIELDS = frozenset(CI_SCRIPT_FIELDS) | {"scripts", "healthModules"}
+CI_KIT_FIELDS = frozenset(CI_SCRIPT_FIELDS) | {"scripts", "healthModules", "workflow"}
 
 
 def carry_host_shapes(manifest: dict[str, Any], *, apply: bool = False) -> list[str]:
@@ -55,6 +55,25 @@ def carry_host_shapes(manifest: dict[str, Any], *, apply: bool = False) -> list[
             if apply:
                 cfg["extensions"] = {**ext, key: cfg.pop(key)}
     return changes
+
+
+def run_env_notices(secrets_root: Path, manifest: dict[str, Any]) -> list[str]:
+    """What a development run no longer fills from `.env.prod` (amendment 8), per secrets folder, by
+    key NAME. Not a change `migrate` can make: the development values are the owner's to write."""
+    from lib import envfile
+
+    folders: list[str] = []
+    for mid, cfg in (manifest.get("modules") or {}).items():
+        if isinstance(cfg, dict) and str(cfg.get("secretsModule") or mid) not in folders:
+            folders.append(str(cfg.get("secretsModule") or mid))
+    out = []
+    for folder in folders:
+        lost = envfile.dev_run_loses(secrets_root, folder)
+        if lost:
+            out.append(f"{folder}: a development run no longer reads {', '.join(lost)} from .env.prod -- "
+                       f"set development values in .env.dev (non-secret shared ones in .env); "
+                       f".env.prod is read only with --env prod")
+    return out
 
 
 def migrate_manifest(manifest: dict[str, Any], *, apply: bool = False) -> list[str]:
@@ -129,6 +148,8 @@ def main() -> int:
     words = host_words(root, skip={mf, root / MANIFEST_FILENAME})
     for line in words:
         print(f"  restate (yours to edit): {line}")
+    for line in run_env_notices(ProjectContext.discover(root).secrets_root, manifest):
+        print(f"  env (yours to set): {line}")
     if not changes:
         print("[migrate] manifest already v2-ready")
         return 0

@@ -1,4 +1,4 @@
-# ==================================================================
+﻿# ==================================================================
 #  dev.ps1 — Windows edit -> Linux compose/dev + Docker (no dist build)
 #
 #  bootstrap | sync | watch | restart

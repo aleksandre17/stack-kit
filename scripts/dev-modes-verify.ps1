@@ -1,4 +1,4 @@
-# Dev modes verification — package + consumer (no long-running servers)
+﻿# Dev modes verification — package + consumer (no long-running servers)
 # Usage: .\kits\stack-kit\scripts\dev-modes-verify.ps1 [-SkipDocker] [-SkipGradle] [-SkipNpm]
 param(
     [switch]$SkipDocker,

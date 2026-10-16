@@ -43,6 +43,15 @@ GENERATORS = [
     "lib/drivers.ps1",
     "toolkit/deploy/stack-remote.sh",
     "toolkit/powershell/Deploy-Path.ps1",
+    "toolkit/node/Invoke-PackageScript.ps1",
+    "toolkit/deploy/migrate-layout.sh",
+    "toolkit/deploy/migrate-backend-layout.sh",
+    "toolkit/deploy/migrate-frontend-layout.sh",
+    "toolkit/deploy/cleanup-scoped-layout.sh",
+    "toolkit/deploy/deploy-watch.sh",
+    "toolkit/deploy/dev-remote.sh",
+    "lib/ci_gen.py",
+    "lib/runs.ps1",
 ]
 
 

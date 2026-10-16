@@ -350,3 +350,72 @@ shape refused, with the door); `tests/acceptance/test_layout_floor.py` (`ci.scri
 five more generic files. Each new test was mutation-checked. **Still owed:** the container rung; the
 remote Windows/IIS delivery path; `toolkit/deploy/` layout-migration and marker scripts that still
 name `java-boot`, `node-vite` or a `backend` folder (one consumer's server history, run by hand).
+
+## Amendment 8 — a new project works with no setup of its own (2026-10-16, owner-delegated)
+
+The owner asked that the kits be judged against current international practice rather than their
+own rules: a new project must get a working system with no per-project setup. An external audit's
+findings, each verified in code first:
+
+1. **Every module builds, tests and lints through its driver.** `dotnet-aspnet` declares
+   `build`/`test`/`lint` (`dotnet build|test` of `dotnet.solution`/`dotnet.test`, else the project;
+   `dotnet format --verify-no-changes`); `java-boot` declares `build` (`-x test`) and `test` through
+   the module's Gradle wrapper (`ps1/_gradle.ps1`, shared with its launch step). A Node-family driver
+   declares `packageScripts` (step → package.json script) and is given `build`, `test`, `lint` = the
+   kit's one runner, `toolkit/node/Invoke-PackageScript.ps1` (package manager from the nearest
+   lockfile, install from it when `node_modules` is absent). `stack-kit build|test|lint [module]`
+   runs a step across the modules, fail-fast, each in its own process so its exit code is the step's.
+   `lint` is optional (`OPTIONAL_STEPS`): skipped and said where absent; a missing `build` or `test`
+   fails. *Rejected:* argv templates in the registry (a substitution grammar for every toolchain's
+   flags); a per-driver copy of the Node runner (three homes for one rule); one process for all
+   steps (a step's `exit` would end the run, and an exit code would be lost).
+2. **One cross-tool contract: `commands`.** A top-level block of literal command lines (`test`
+   required; `build`, `lint`, `run` optional; strings only); the agent kit's detector reads
+   `commands.test` and `commands.build`. The scaffold writes them through the host launcher
+   (`pwsh ops/cli/stack-kit.ps1 test`); `validate` refuses a line naming a script that is not there.
+   *Rejected:* argv arrays (the contract is a line any tool runs verbatim); deriving the lines at
+   read time (another tool cannot run the kit to find out what to run).
+3. **`node-spa`: any SPA by its own scripts.** Angular CLI, Vite, React or Vue: `build`/`test`/
+   `lint`/`start` are the package's, renamed per module in `node.scripts`; `run` is the `start`
+   script with the module's development configuration. Its release rung is pending: the output
+   directory is the framework's and has to be declared and proven. *Rejected:* generalising
+   `node-vite` (its remote dev and static deploy are Vite-shaped and serve a host already).
+4. **A run on this machine reads one environment (12-factor III).** `envfile.run_files`: the
+   folder's shared, non-secret `.env`, then `.env.dev`; `.env.prod` only with `--env prod`
+   (`hybrid boot --env prod`, `deliver hybrid --env prod`). This reverses amendment 6's "dev wins,
+   prod fills", which let a development run read production values and secrets. The old layout's
+   migration is named, never performed: `validate` and `migrate` list, per secrets folder, the keys
+   a development run no longer reads from `.env.prod`, by name and never by value. *Rejected:*
+   copying them into `.env.dev` (`migrate --apply` would itself carry production secrets into a
+   development file).
+5. **CI is generated from the manifest.** `stack-kit ci-gen [--force|--check]` writes
+   `.github/workflows/ci.yml`: a job per module, the toolchain its driver declares (`ci.setup`, the
+   version from `toolchain.version`), then its lifecycle steps through the launcher, `permissions:
+   contents: read`, one run per ref. Every action is pinned by full commit SHA in
+   `lib/ci-actions.json`; each of the four was read with `git ls-remote` on 2026-10-16 (lightweight
+   tags: the SHA is the commit). `init` generates it. *Rejected:* a hand-written template (it drifts
+   from the modules the day one is added); tag pins (a tag can be moved).
+6. **The quick start is true.** `init` failed at its first Python call (`& @py`, an array spliced as
+   one command name) and then at `Get-ManifestField`, which it never loaded; the manifest it
+   scaffolded failed its own `validate` (an nginx template it did not ship, module env examples in
+   `apps/` where the kit reads `ops/config/<module>/`). All fixed, and held by
+   `tests/acceptance/test_init.py` (empty repository → `init` → `validate` passes, `commands`
+   present, CI current, secrets ignored and examples tracked). README: a quick start, the real
+   remote, no BOM; the license is pending (the owner's choice). `vendorDirs` gains
+   `platform/kits/stack-kit`. PowerShell: 7+ on any OS, and Windows PowerShell 5.1 on Windows, now
+   true because every non-ASCII script carries a BOM (5.1 read them as ANSI); no other text file may
+   start with one (a BOM broke three shebangs).
+7. **A run record.** Every `deliver` rung and lifecycle step appends one JSON line (kind, step,
+   module, environment, start, end, duration, exit, git SHA, dirty) to `.stack-kit/runs/runs.jsonl`,
+   a directory that ignores itself: enough to compute DORA's four keys. A record that cannot be
+   written is said and never fails the step. The `toolkit/deploy/` layout migrations and markers no
+   longer name `java-boot`, `node-vite` or a `backend` folder: they find their module by the deploy
+   kind its driver declares (`deployKind:<kind>`).
+
+Proof: `tests/acceptance/test_lifecycle.py` (real `npm run`, a stand-in Gradle wrapper, a real
+`dotnet build`; fail-fast exit code; run records), `tests/acceptance/test_init.py`,
+`tests/acceptance/test_delivery.py` (one environment per run), `tests/unit/test_envfile.py`,
+`tests/unit/test_ci_gen.py`, `tests/unit/test_validate_manifest.py` (`commands`),
+`tests/unit/test_handwriting.py` (byte order marks). Each new test was mutation-checked. **Still
+owed:** the container rung; remote Windows/IIS delivery; `node-spa` release; the generated workflow
+has not yet run on GitHub's runners (pwsh on Linux reading the kit's backslash paths is unproven).

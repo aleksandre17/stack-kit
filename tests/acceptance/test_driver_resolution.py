@@ -5,7 +5,7 @@ import copy
 from pathlib import Path
 
 from conftest import run_kit_cli
-from lib.modules import HOST_RUN, driver_commands
+from lib.modules import HOST_RUNNER, driver_commands
 from lib.stack_deploy import stack_deploy_lines
 
 
@@ -29,8 +29,8 @@ class TestJavaBootDriver:
         assert (pkg_root / "drivers" / "java-boot" / "sh" / "dev.sh").is_file()
 
     def test_run_is_the_kits_host_run(self, pkg_root: Path):
-        assert driver_commands("java-boot")["run"] == HOST_RUN
-        assert HOST_RUN == pkg_root / "toolkit" / "hybrid" / "Invoke-HybridRun.ps1" and HOST_RUN.is_file()
+        assert driver_commands("java-boot")["run"] == HOST_RUNNER
+        assert HOST_RUNNER == pkg_root / "toolkit" / "hybrid" / "Invoke-HybridRun.ps1" and HOST_RUNNER.is_file()
 
     def test_dev_remote_toolkit_exists(self, pkg_root: Path):
         assert (pkg_root / "toolkit" / "deploy" / "dev-remote.sh").is_file()
@@ -52,7 +52,7 @@ class TestNodeViteDriver:
         assert (pkg_root / "drivers" / "node-vite" / "ps1" / "dev.ps1").is_file()
 
     def test_run_is_the_kits_host_run(self):
-        assert driver_commands("node-vite")["run"] == HOST_RUN
+        assert driver_commands("node-vite")["run"] == HOST_RUNNER
 
 
 class TestNodeApiDriver:
@@ -72,7 +72,7 @@ class TestNodeApiDriver:
         assert (pkg_root / "drivers" / "node-api" / "sh" / "dev.sh").is_file()
 
     def test_run_is_the_kits_host_run(self):
-        assert driver_commands("node-api")["run"] == HOST_RUN
+        assert driver_commands("node-api")["run"] == HOST_RUNNER
 
     def test_node_step_helpers_exist(self, pkg_root: Path):
         deploy = pkg_root / "toolkit" / "deploy"
@@ -126,11 +126,11 @@ class TestDriverPaths:
 
     def test_api_run_path_via_alias(self, repo_root: Path, pkg_root: Path):
         p = _run_api(repo_root, pkg_root, "driver-command", "a", "run")
-        assert Path(p) == HOST_RUN
+        assert Path(p) == HOST_RUNNER
 
     def test_ui_run_path_resolves(self, repo_root: Path, pkg_root: Path):
         p = _run_api(repo_root, pkg_root, "driver-command", "web", "run")
-        assert Path(p) == HOST_RUN
+        assert Path(p) == HOST_RUNNER
 
 
 class TestStackSteps:

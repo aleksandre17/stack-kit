@@ -1,4 +1,4 @@
-# Shim — canonical entry: ops/cli/stack-kit.ps1
+﻿# Shim — canonical entry: ops/cli/stack-kit.ps1
 # CMD.exe: use tools\stack-kit.cmd
 # A simple param block on purpose: an advanced one (any [Parameter()]) adds PowerShell's common
 # parameters, and an operand such as `-d` then binds as -Debug and is lost (ADR-001 K3).

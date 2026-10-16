@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # One-time server prerequisites — SSH from local machine
 # Usage: stack-kit infra  |  bash kits/stack-kit/toolkit/infra/ensure-prereqs.sh
 

@@ -123,3 +123,19 @@ class TestDeployBaseSecretsFolder:
         from lib.resolution import deploy_base_secrets_folder
 
         assert deploy_base_secrets_folder({"modules": {"ui": {"role": "ui"}}}) == ""
+
+
+class TestDeployKindModules:
+    """A layout migration finds its module by the deploy kind its driver declares, never by a driver
+    name (ADR-001 amendment 8): `deployKind:<kind>` in the resolver's context."""
+
+    def test_modules_by_the_kind_their_driver_deploys_as(self):
+        from conftest import WORKING_ROOT
+        from lib.resolution import context
+
+        ctx = context(WORKING_ROOT)
+        manifest_types = {k.split(":")[1]: v for k, v in ctx.items() if k.startswith("module:") and k.endswith(":type")}
+        runtime = ctx.get("deployKind:runtime", "").splitlines()
+        static = ctx.get("deployKind:static", "").splitlines()
+        assert runtime and all(manifest_types[m] in ("java-boot", "node-api") for m in runtime)
+        assert static and all(manifest_types[m] == "node-vite" for m in static)

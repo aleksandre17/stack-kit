@@ -1,11 +1,21 @@
-# Local app run: host process + manifest secrets (.env.dev over .env.prod); optional remote infra via tunnel.
+# Local app run: host process + the module's configuration for ONE environment (.env, then .env.dev;
+# production's .env.prod only with -Environment prod / --env prod); optional remote infra via tunnel.
 # Every driver DECLARES its launch step (drivers/registry.json "hybrid": {"script": ...}), dot-sourced
 # here with $ModuleId, $modPath, $root and $PackageRoot in scope; this file names no driver (ADR-001 K6).
 # It is also every such driver's `run` command (lib/modules.py driver_commands): dispatched as one, it
 # reads the module from STACK_KIT_MODULE_ID, which the dispatch sets (ADR-001 amendment 7).
+# The module is named (-ModuleId) or the dispatch's; every operand is read for `--env <dev|prod>`,
+# so a stray word is never taken for a module.
+[CmdletBinding(PositionalBinding = $false)]
 param(
-    [string]$ModuleId = $env:STACK_KIT_MODULE_ID
+    [string]$ModuleId = $env:STACK_KIT_MODULE_ID,
+    [ValidateSet("dev", "prod")][string]$Environment = "dev",
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest = @()
 )
+for ($i = 0; $i -lt $Rest.Count; $i++) {
+    if ($Rest[$i] -eq "--env" -and $i + 1 -lt $Rest.Count) { $Environment = $Rest[++$i] }
+}
+if ($Environment -notin @("dev", "prod")) { throw "--env is dev or prod, not '$Environment'" }
 
 $ErrorActionPreference = "Stop"
 if (-not $ModuleId) {
@@ -27,10 +37,10 @@ if (-not $entry) { throw "Unknown module: $ModuleId" }
 
 $modPath = Get-ModuleProjectPath $ModuleId
 $secretsModule = Get-ModuleSecretsFolder $ModuleId
-Import-ModuleRunEnv $secretsModule
+Import-ModuleRunEnv $secretsModule -Environment $Environment
 
 $driverType = Get-ModuleType $ModuleId
-Write-Host "[hybrid] boot $ModuleId ($driverType) env=$(Join-Path (Get-SecretsModuleDir $secretsModule) '.env.dev')" -ForegroundColor Cyan
+Write-Host "[hybrid] boot $ModuleId ($driverType) env=$Environment ($(Join-Path (Get-SecretsModuleDir $secretsModule) ".env.$Environment"))" -ForegroundColor Cyan
 
 $hybridScript = Get-DriverHybridScript $driverType
 if (-not $hybridScript) {

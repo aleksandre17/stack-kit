@@ -68,3 +68,28 @@ def test_no_launcher_declares_an_advanced_param_block():
         if "[Parameter" in block.group(1) or "[CmdletBinding" in text:
             advanced.append(rel)
     assert not advanced, f"advanced param blocks swallow operands like -d: {advanced}"
+
+
+def test_no_text_file_but_a_powershell_script_starts_with_a_byte_order_mark():
+    # A BOM breaks a shebang, a JSON reader, and every first heading. A `.ps1` may carry one: Windows
+    # PowerShell 5.1 reads a BOM-less non-ASCII script in the ANSI code page (ADR-001 amendment 8).
+    import subprocess
+
+    tracked = subprocess.run(["git", "-C", str(PKG), "ls-files"], capture_output=True, text=True).stdout.splitlines()
+    marked = [rel for rel in tracked
+              if not rel.startswith("tests/fixtures/") and not rel.endswith(".ps1") and (PKG / rel).is_file()
+              and (PKG / rel).read_bytes()[:3] == b"\xef\xbb\xbf"]
+    assert not marked, marked
+
+
+def test_a_powershell_script_with_non_ascii_text_carries_a_byte_order_mark():
+    # Windows PowerShell 5.1 (a supported shell on Windows) reads a BOM-less script in the ANSI code
+    # page: an em dash prints as mojibake and a quote inside one can end a string.
+    import subprocess
+
+    tracked = subprocess.run(["git", "-C", str(PKG), "ls-files", "-co", "--exclude-standard", "*.ps1"],
+                             capture_output=True, text=True).stdout.splitlines()
+    unmarked = [rel for rel in tracked
+                if not rel.startswith("tests/fixtures/") and (PKG / rel).is_file()
+                and (PKG / rel).read_bytes()[:3] != b"\xef\xbb\xbf" and any(c > 127 for c in (PKG / rel).read_bytes())]
+    assert not unmarked, unmarked
