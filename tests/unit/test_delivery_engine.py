@@ -322,3 +322,23 @@ def test_a_release_is_refused_by_the_env_value_policy_naming_the_key(project, tm
     with pytest.raises(DeliveryError, match="SIGNING_KEY is required in staging") as e:
         release.release(ctx_for(project, t), "edge", packaged(project))
     assert e.value.code == 4 and t.changes() == [], "nothing is written before the policy holds"
+
+
+def test_a_generated_secret_is_made_on_the_server_once_and_never_read_back(project, tmp_path):
+    (project / "ops" / "config" / "keys.json").write_text(json.dumps({"version": 1, "keys": [
+        {"key": "Db:Password", "env": ["DB_PASSWORD"], "sensitivity": "SECRET", "owner": "ops", "allowedSource": "server",
+         "rotation": "on restore", "policy": {"required": True, "generate": {"bytes": 24}, "modules": ["edge"]}}]}),
+        encoding="utf-8")
+    m = manifest_of(project)
+    m["config"] = {"keys": "ops/config/keys.json"}
+    (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
+    commit(project, "with a generated secret\n")
+    t = server(tmp_path)
+    assert release.release(ctx_for(project, t), "edge", packaged(project)) == 0
+    made = [e[1] for e in t.log if e[0] == "exec" and e[1][:2] == ("sh", "-c")]
+    assert len(made) == 1 and "umask 077" in made[0][2] and "[ -s " in made[0][2] and "openssl rand -base64 24" in made[0][2]
+    assert "cat " not in made[0][2], "a generated value is never read back"
+    svc = json.loads(t.read(f"{ROOT}/shop/staging/stack/compose.yml"))["services"]["edge"]
+    assert svc["environment"]["DB_PASSWORD_FILE"] == "/run/stack-kit/generated/DB_PASSWORD"
+    assert f"{ROOT}/shop/staging/edge/edge/runtime/generated:/run/stack-kit/generated:ro" in svc["volumes"]
+    assert b"DB_PASSWORD" not in t.read(f"{ROOT}/shop/staging/stack/env/edge.env")

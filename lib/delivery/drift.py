@@ -29,7 +29,8 @@ def expected_compose(ctx: Delivery, states: dict[str, stack.State]) -> bytes:
         creds = sorted(running.credential_files(ctx, s)) if s.module else []
         docs[s.id] = stack.service_document(s, project=ctx.project, environment=ctx.environment, target=ctx.target,
                                             places=ctx.places, state=state, revision=state.release or "",
-                                            credentials=creds, env_file=bool(s.secrets_folder))
+                                            credentials=creds, env_file=bool(s.secrets_folder),
+                                            generated=sorted(running.generated(ctx, s)) if s.module else [])
     return stack.render(stack.compose_document(project=ctx.project, environment=ctx.environment, services=docs))
 
 

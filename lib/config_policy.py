@@ -8,6 +8,7 @@ folder, the environment and the rule.
     policy.format        positive-int | url | https-url (https-url: also never localhost)
     policy.forbid        {environment: [glob, ...]} values refused there (CORS `*` in prod: `[*]`, a glob's literal star)
     policy.requires      keys that must be set whenever this one is ("if X then Y")
+    policy.generate      {bytes}: made on the server, once, never read back (lib/delivery/running.py)
 
 A placeholder is never a value: empty, `CHANGE_ME`, `changeme`, `TODO`, `__NAME__`, `${...}`,
 `<...>`, `xxx`.
@@ -20,6 +21,14 @@ from typing import Any
 
 PLACEHOLDER = re.compile(r"^(|change[_-]?me|todo|tbd|xxx+|__[A-Z0-9_]+__|\$\{[^}]*\}|<[^>]*>|your[_-].*)$", re.I)
 _LOCAL = re.compile(r"^https?://(localhost|127\.|0\.0\.0\.0|\[::1\])", re.I)
+
+
+def env_name(row: dict[str, Any]) -> str:
+    """The one environment spelling a key is given by: its first declared `env`, else `A__B` of `A:B`."""
+    import re as _re
+
+    declared = [str(n) for n in row.get("env") or []]
+    return declared[0] if declared else _re.sub(r"[^A-Za-z0-9_]", "_", str(row["key"]).replace(":", "__"))
 
 
 def _names(row: dict[str, Any]) -> list[str]:
@@ -57,7 +66,7 @@ def problems(catalogue: dict[str, Any], values: dict[str, str], *, folder: str, 
         key = str(row["key"])
         found = _value(values, row)
         if found is None or PLACEHOLDER.match(found[1].strip()):
-            if _required(policy, environment):
+            if _required(policy, environment) and not policy.get("generate"):
                 out.append(f"{where}: {key} is required{' in ' + environment if isinstance(policy.get('required'), list) else ''}"
                            f" and {'is a placeholder' if found else 'is not set'}")
             continue

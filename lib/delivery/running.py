@@ -94,6 +94,36 @@ def credential_files(ctx: Delivery, service: Service) -> dict[str, Path]:
         if folder.is_dir() else {}
 
 
+def generated(ctx: Delivery, service: Service) -> dict[str, int]:
+    """{env name: bytes} of the catalogue keys generated on the server for this service's folder
+    (`policy.generate`): the value is made there, once, and never leaves it."""
+    from lib import config_policy
+
+    out: dict[str, int] = {}
+    for row in (config_policy.catalogue_of(ctx.root, ctx.manifest).get("keys") or []):
+        policy = row.get("policy") if isinstance(row, dict) else None
+        if isinstance(policy, dict) and policy.get("generate") and (not policy.get("modules")
+                                                                    or service.secrets_folder in policy["modules"]):
+            out[config_policy.env_name(row)] = int((policy["generate"] or {}).get("bytes") or 32)
+    return out
+
+
+def generate_secrets(ctx: Delivery, service: Service) -> list[str]:
+    """Each generated key's file under the unit's runtime/generated, written only when absent (umask
+    077), never read, never replaced: a redeploy keeps the value the running data was made with."""
+    import shlex
+
+    made = []
+    base = posixpath.join(ctx.places.of("runtime", service), "generated")
+    for name, size in sorted(generated(ctx, service).items()):
+        f = shlex.quote(posixpath.join(base, name))
+        ctx.run(["sh", "-c", f"umask 077; mkdir -p {shlex.quote(base)}; [ -s {f} ] || "
+                             f"{{ (openssl rand -base64 {size} 2>/dev/null || head -c {size} /dev/urandom | base64 | tr -d '\\n')"
+                             f" > {f}.tmp && mv {f}.tmp {f}; }}"])
+        made.append(name)
+    return made
+
+
 def place_files(ctx: Delivery, service: Service) -> list[str]:
     """The env file (mode 600), the runtime config and the credential files of a service, each written
     only when it differs; returns the credential names the stack mounts."""
@@ -108,6 +138,7 @@ def place_files(ctx: Delivery, service: Service) -> list[str]:
     creds = credential_files(ctx, service)
     for name, path in creds.items():
         write_if_changed(ctx, posixpath.join(unit["runtime"], "credentials", name), path.read_bytes(), "600")
+    generate_secrets(ctx, service)
     return sorted(creds)
 
 
@@ -123,7 +154,8 @@ def regenerate(ctx: Delivery, override: dict[str, stack.State] | None = None, re
         creds = sorted(credential_files(ctx, s)) if s.module else []
         docs[s.id] = stack.service_document(s, project=ctx.project, environment=ctx.environment, target=ctx.target,
                                             places=ctx.places, state=state, revision=revision or (state.release or ""),
-                                            credentials=creds, env_file=bool(s.secrets_folder))
+                                            credentials=creds, env_file=bool(s.secrets_folder),
+                                            generated=sorted(generated(ctx, s)) if s.module else [])
     doc = stack.compose_document(project=ctx.project, environment=ctx.environment, services=docs)
     changed = write_if_changed(ctx, ctx.places.of("stackCompose"), stack.render(doc))
     for net in stack.networks_of(docs, ctx.project, ctx.environment):

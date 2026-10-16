@@ -48,7 +48,7 @@ def _ports(service: Service, target: dict[str, Any], environment: str, workspace
 
 def service_document(service: Service, *, project: str, environment: str, target: dict[str, Any],
                      places: Places, state: State, revision: str = "", credentials: list[str] | None = None,
-                     env_file: bool = True) -> dict[str, Any]:
+                     env_file: bool = True, generated: list[str] | None = None) -> dict[str, Any]:
     """The compose definition of one service in its current state."""
     spec = service.spec
     unit = places.unit(service) if service.module or service.kind != "image" else None
@@ -111,6 +111,10 @@ def service_document(service: Service, *, project: str, environment: str, target
             volumes.append(f"{posixpath.join(unit['runtime'], 'credentials', name)}:{cred['mount']}:ro")
             if cred.get("envVar"):
                 environment_vars[cred["envVar"]] = cred["mount"]
+    if generated:
+        volumes.append(f"{posixpath.join(unit['runtime'], 'generated')}:{d['generatedMount']}:ro")
+        for name in generated:  # the *_FILE convention: the app reads the file, the value never enters an env file
+            environment_vars[f"{name}_FILE"] = posixpath.join(d["generatedMount"], name)
     if spec.get("logs") and unit:
         volumes.append(f"{unit['logs']}:{spec['logs']}")
     for name, mount in sorted((spec.get("volumes") or {}).items()):

@@ -70,7 +70,7 @@
           },
           "policy": {
             "type": "object",
-            "description": "The env-value policy a release must pass (lib/config_policy.py): required (true, or the environments), modules (the secrets folders it belongs to), minLength, format (positive-int | url | https-url), forbid {environment: [globs]} (the literal `*` is `[*]`), requires (keys set whenever this one is)",
+            "description": "The env-value policy a release must pass (lib/config_policy.py): required (true, or the environments), modules (the secrets folders it belongs to), minLength, format (positive-int | url | https-url), forbid {environment: [globs]} (the literal `*` is `[*]`), requires (keys set whenever this one is); generate {bytes} (made on the server once, mounted read-only, given to the app as <NAME>_FILE)",
             "properties": {
               "required": {
                 "oneOf": [
@@ -116,6 +116,16 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "generate": {
+                "type": "object",
+                "properties": {
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 16
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
