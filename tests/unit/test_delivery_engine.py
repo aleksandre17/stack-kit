@@ -386,3 +386,47 @@ def test_a_recorded_migration_that_changed_or_is_gone_is_refused(tmp_path):
     assert "was edited" in migrations_gate.ledger_problems(root, manifest)[0]
     (mig / "V1__a.sql").unlink()
     assert "is gone" in migrations_gate.ledger_problems(root, manifest)[0]
+
+
+def test_a_restart_is_idempotent_healthy_on_the_same_image_and_without_drift(project, tmp_path):
+    t = server(tmp_path)
+    ctx = ctx_for(project, t)
+    release.release(ctx, "edge", packaged(project))
+    assert manage.restart_check(ctx, ["edge"]) == []
+    st = fake_server._load(fake_server.state_file(tmp_path / "server.json"))
+    st["health"] = {"edge": "unhealthy"}
+    fake_server.state_file(tmp_path / "server.json").write_text(json.dumps(st), encoding="utf-8")
+    assert "not healthy after a restart" in manage.restart_check(ctx, ["edge"])[0]
+
+
+def test_an_oidc_provider_is_ready_only_when_discovery_names_it_and_the_jwks_has_a_key():
+    import http.server
+    import threading
+
+    from lib import targets
+
+    state = {"keys": [{"kid": "k1", "kty": "RSA"}], "issuer": None}
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            base = f"http://127.0.0.1:{self.server.server_port}/realms/r"
+            body = {"issuer": state["issuer"] or base, "jwks_uri": base + "/certs"} if self.path.endswith("openid-configuration") \
+                else {"keys": state["keys"]}
+            data = json.dumps(body).encode()
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *a):
+            pass
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    issuer = f"http://127.0.0.1:{srv.server_port}/realms/r"
+    try:
+        assert targets.check_oidc(issuer) == []
+        state["keys"] = []
+        assert "no signing key" in targets.check_oidc(issuer)[0]
+        state["keys"], state["issuer"] = [{"kid": "k1", "kty": "RSA"}], "https://elsewhere/realms/r"
+        assert "names issuer" in targets.check_oidc(issuer)[0]
+    finally:
+        srv.shutdown()

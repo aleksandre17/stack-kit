@@ -115,3 +115,35 @@ def check_health_urls(urls: dict[str, str], *, attempts: int, pause: float, out=
         else:
             failed.append(f"{service} {url}: {last} after {attempts} attempt(s)")
     return failed
+
+
+def check_oidc(issuer: str, *, ca_file: str = "", timeout: float = 10.0) -> list[str]:
+    """An OIDC provider's readiness: its discovery document answers and names this issuer, its JWKS
+    answers with at least one signing key (kid, kty). The failures, named; nothing secret is read."""
+    import json as _json
+    import ssl
+    import urllib.request
+
+    ctx = ssl.create_default_context(cafile=ca_file) if ca_file else None
+
+    def get(url: str) -> dict:
+        with urllib.request.urlopen(url, timeout=timeout, context=ctx) as r:
+            return _json.loads(r.read().decode("utf-8"))
+    base = issuer.rstrip("/")
+    try:
+        disc = get(base + "/.well-known/openid-configuration")
+    except Exception as e:  # noqa: BLE001 -- the reason is the finding
+        return [f"{base}: discovery does not answer ({getattr(e, 'reason', e)})"]
+    out = []
+    if disc.get("issuer", "").rstrip("/") != base:
+        out.append(f"{base}: discovery names issuer {disc.get('issuer')!r} -- tokens would fail their issuer check")
+    jwks = disc.get("jwks_uri")
+    if not jwks:
+        return out + [f"{base}: discovery names no jwks_uri"]
+    try:
+        keys = get(jwks).get("keys") or []
+    except Exception as e:  # noqa: BLE001
+        return out + [f"{jwks}: the JWKS does not answer ({getattr(e, 'reason', e)})"]
+    if not [k for k in keys if k.get("kid") and k.get("kty")]:
+        out.append(f"{jwks}: no signing key (kid, kty) -- no token can be verified")
+    return out

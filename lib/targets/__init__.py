@@ -11,5 +11,5 @@ from lib.targets.layout import (  # noqa: F401
     KINDS, MARKER, LayoutError, Places, declared_root, default_layout, render, render_legacy, under, unproven,
 )
 from lib.targets.remote import (  # noqa: F401
-    check_health_urls, health_urls, identity_kind, local_commands, repository_identity, runs_stack, runtime_commands, ssh_args,
+    check_health_urls, check_oidc, health_urls, identity_kind, local_commands, repository_identity, runs_stack, runtime_commands, ssh_args,
 )

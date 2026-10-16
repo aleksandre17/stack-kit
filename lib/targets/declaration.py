@@ -207,7 +207,7 @@ def problems(root: Path, manifest: dict[str, Any]) -> list[str]:
         if isinstance(t, dict) and t.get("runtime") not in runtimes:
             out.append(f"{rel}: targets.{name}.runtime: '{t.get('runtime')}' is not a declared target runtime "
                        f"({', '.join(runtimes)}; a host adds one in catalogs.targetRuntimes)")
-        for field in ("ports", "health"):
+        for field in ("ports", "health", "oidc"):
             for env in (t.get(field) or {}) if isinstance(t, dict) else {}:
                 if env not in envs:
                     out.append(f"{rel}: targets.{name}.{field}.{env}: '{env}' is not a declared environment")

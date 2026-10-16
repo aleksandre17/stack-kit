@@ -269,6 +269,26 @@
           "logging": {
             "type": "object",
             "description": "Container log rotation for this target's stacks (compose `logging`; default config/delivery.json)"
+          },
+          "oidc": {
+            "type": "object",
+            "description": "Per environment: the OIDC provider the services trust, checked by `targets --health` (discovery names the issuer, JWKS has a signing key): {issuer, caFile (the internal CA's certificate, from `tls truststore`)}",
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "issuer"
+              ],
+              "properties": {
+                "issuer": {
+                  "type": "string",
+                  "pattern": "^https?://"
+                },
+                "caFile": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
           }
         },
         "additionalProperties": false

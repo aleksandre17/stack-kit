@@ -121,6 +121,7 @@ operate a deployed environment, per service, module or tier (or all).
 
 ```
 stack-kit ops status|logs|start|stop|restart|rebuild [module|service|tier ...] --env <id>
+stack-kit ops restart-check [module|service|tier ...] --env <id>   (restart is idempotent: healthy, same image, no drift)
 stack-kit ops rm <module|service|tier ...> --env <id> [--yes]
 stack-kit ops nuke --env <id> [--yes]
 ```
@@ -205,7 +206,7 @@ stack-kit targets --health --target <t> --env <id>
 | `--yes` | answer the confirmation (CI); without a terminal a confirmation is otherwise refused |
 | `--init` | create the project's tree with its ownership marker (idempotent) |
 | `--verify` | read-only: marker, tree, current, prune limit, runtime, ports, disk |
-| `--health` | the target's declared health URLs answer below 400 |
+| `--health` | the target's declared health URLs answer below 400, and its OIDC provider is ready (discovery, JWKS) |
 | `--attempts <n>` | health: attempts per URL (default 12) |
 | `--pause <s>` | health: seconds between attempts (default 5) |
 | `--target <name>` | the declared deploy target (default: the environment's) |

@@ -168,6 +168,13 @@ def _ops(a: Args) -> int:
                           plan_first=False)
     if sub in ("start", "stop", "restart"):
         return remote.run(a, f"{sub} {' '.join(rest) or 'all'}", lambda ctx: manage.lifecycle(ctx, sub, rest))
+    if sub == "restart-check":
+        def check(ctx):
+            failures = manage.restart_check(ctx, rest)
+            for f in failures:
+                print(f"  [ops] FAILED {f}")
+            return 6 if failures else 0
+        return remote.run(a, f"restart-check {' '.join(rest) or 'all'}", check)
     if sub == "rebuild":
         return remote.run(a, f"rebuild {' '.join(rest) or 'all'}", lambda ctx: manage.rebuild(ctx, rest))
     if sub == "rm":
@@ -220,6 +227,13 @@ def _targets(a: Args) -> int:
             print(f"[health] target {name} ({env}) declares no health endpoint -- nothing checked (targets.{name}.health.{env})")
             return 0
         failed = targets.check_health_urls(urls, attempts=int(a.value("--attempts", "12")), pause=float(a.value("--pause", "5")))
+        oidc = ((t.get("oidc") or {}).get(env)) or {}
+        if oidc.get("issuer"):
+            ca = str(root / oidc["caFile"]) if oidc.get("caFile") else ""
+            found = targets.check_oidc(str(oidc["issuer"]), ca_file=ca)
+            failed += [f"oidc {f}" for f in found]
+            if not found:
+                print(f"[health] oidc {oidc['issuer']}: discovery and JWKS ready")
         for f in failed:
             print(f"[health] FAILED {f}")
         return 1 if failed else 0
@@ -331,6 +345,7 @@ VERBS = [
          group="delivery", exits=(0, 1, 2, 3, 6), examples=["release list --env prod", "release rollback api --env prod --yes"]),
     Verb("ops", "operate a deployed environment, per service, module or tier (or all)",
          ["ops status|logs|start|stop|restart|rebuild [module|service|tier ...] --env <id>",
+          "ops restart-check [module|service|tier ...] --env <id>   (restart is idempotent: healthy, same image, no drift)",
           "ops rm <module|service|tier ...> --env <id> [--yes]", "ops nuke --env <id> [--yes]"],
          _ops, options=[*TARGET_OPTS, Option("--follow", "logs: keep following"), Option("--tail", "logs: lines (default 200)", "n")],
          group="delivery", exits=(0, 1, 2, 3, 6), examples=["ops status --env prod", "ops logs api --env dev --follow"],
@@ -341,7 +356,7 @@ VERBS = [
           "targets --verify --target <t> --env <id>", "targets --health --target <t> --env <id>"],
          _targets, options=[PLAN, YES, Option("--init", "create the project's tree with its ownership marker (idempotent)"),
                             Option("--verify", "read-only: marker, tree, current, prune limit, runtime, ports, disk"),
-                            Option("--health", "the target's declared health URLs answer below 400"),
+                            Option("--health", "the target's declared health URLs answer below 400, and its OIDC provider is ready (discovery, JWKS)"),
                             Option("--attempts", "health: attempts per URL (default 12)", "n"),
                             Option("--pause", "health: seconds between attempts (default 5)", "s")],
          group="delivery", exits=(0, 1, 2, 3, 4), examples=["targets --plan", "targets --init --target linux --env dev"],

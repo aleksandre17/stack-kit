@@ -47,6 +47,32 @@ def rebuild(ctx: Delivery, wanted: list[str]) -> int:
     return 6 if failed else 0
 
 
+def restart_check(ctx: Delivery, wanted: list[str]) -> list[str]:
+    """Restart is idempotent: each running service, restarted, comes back healthy on the same image,
+    and the environment holds its declared state after (the failures, named)."""
+    from lib.delivery import drift
+
+    failures = []
+    for s in [x for x in running.find(ctx, wanted) if running.current_release(ctx, x) or x.module is None]:
+        name = naming.remote_container(ctx.project, ctx.environment, s.id)
+        image = lambda: ctx.transport.exec(ctx.engine("inspect", "-f", "{{.Config.Image}}", name), readonly=True).out.strip()
+        before = image()
+        ctx.run(ctx.compose("restart", s.id))
+        if ctx.plan:
+            continue
+        bad = running.wait_healthy(ctx, [s])
+        after = image()
+        if bad:
+            failures.append(f"{s.id}: not healthy after a restart ({'; '.join(bad)})")
+        elif after != before:
+            failures.append(f"{s.id}: runs {after} after a restart, {before} before")
+        else:
+            ctx.out(f"[ops] {s.id}: restarted, healthy, same image")
+    if not ctx.plan:
+        failures += [f"after the restarts: {d}" for d in drift.drift(ctx)]
+    return failures
+
+
 def _owned(ctx: Delivery) -> None:
     if not preflight.owned(ctx):
         raise DeliveryError(f"refused: {ctx.places.project_dir} carries no ownership marker of {ctx.project!r} -- "
