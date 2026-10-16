@@ -229,12 +229,14 @@
     {
       "standard": "harvested (round 8)",
       "clause": "backup + verified restore",
-      "mechanism": "backup + verified restore",
+      "mechanism": "backup + verify: every store restores into a uniquely named throwaway database (SQL Server: RESTORE ... WITH MOVE), its anchors queried there, dropped in a finally",
       "evidence": [
-        "tests/unit/test_backup.py::test_a_restore_is_checked_against_its_anchors_and_the_throwaway_database_always_dropped"
+        "tests/unit/test_backup.py::test_a_restore_is_checked_against_its_anchors_and_the_throwaway_database_always_dropped",
+        "tests/unit/test_backup.py::test_sql_server_restores_with_move_into_a_throwaway_database_queried_there_and_dropped",
+        "tests/unit/test_backup.py::test_the_throwaway_database_is_dropped_when_the_restore_fails_or_errors"
       ],
       "status": "partial",
-      "why": "Postgres restores into a throwaway database; SQL Server is checked with RESTORE VERIFYONLY"
+      "why": "proven against the recorded transport only: unproven against a real SQL Server or Postgres"
     },
     {
       "standard": "harvested (round 8)",
@@ -245,7 +247,7 @@
         "tests/unit/test_delivery_engine.py::test_a_recorded_migration_that_changed_or_is_gone_is_refused"
       ],
       "status": "partial",
-      "why": "fresh-chain replay into a throwaway database is not built"
+      "why": "`backup replay` applies the whole chain to an empty throwaway database (tests/unit/test_backup.py::test_the_migration_chain_replays_from_empty_into_a_throwaway_database); proven against the recorded transport only: unproven against a real database"
     },
     {
       "standard": "harvested (round 8)",

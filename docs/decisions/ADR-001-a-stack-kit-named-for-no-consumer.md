@@ -789,7 +789,7 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
 **Owed after amendment 15 (one line each):**
 - The delivery against a real docker host (the layout's `unproven`); Windows/IIS delivery (`iis` pending).
 - ~~`lib/vscode_gen.py` and two compose-gen helpers still name tools~~ -- closed by amendment 16.1.
-- SQL Server's restore check is VERIFYONLY, not a throwaway restore; no fresh-chain migration replay.
+- ~~SQL Server's restore check is VERIFYONLY; no fresh-chain migration replay~~ -- built by amendment 16.3; unproven against a real server.
 - No separate live-parity CI job. (~~java-boot declares no dependency audit~~ -- closed by amendment 16.2.)
 - The image scanner's digest is the host's to pin; the kit ships no default scanner.
 - The kit's schemas are draft-07, not JSON Schema 2020-12; commit messages are not machine-checked.
@@ -822,3 +822,17 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    a Gradle `dependencies` report parsed by the kit (a second resolver beside Gradle's).
    *Unproven here:* no scanner runs in the suite (the command line is recorded); the image tag is
    not digest-pinned by the kit.
+3. **SQL Server restores into a throwaway database; the chain replays from empty.** `backup verify`
+   restores every store into a uniquely named database (`stack_kit_restore_check_<UTC>_<random>`):
+   SQL Server by `RESTORE FILELISTONLY` then `RESTORE DATABASE ... WITH MOVE` each logical file to a
+   name of its own (never over the source), `CHECKSUM, RECOVERY`, replacing `VERIFYONLY`; the anchors
+   are queried in the restored copy (they asked the live database before); the store's `drop` runs
+   in a `finally` (pass, fail or error). sqlcmd reads its password from `SQLCMDPASSWORD`, never an
+   argument. The same throwaway lifecycle gives `backup replay`: a store that declares `create`
+   makes an empty database, the migration service that declares `replay` (`env`, `urls.<store>`,
+   flyway's JDBC URL) is run against it with the whole chain, the host's `stack.migrate.replay`
+   anchors are queried there, and it is dropped. Both verbs print their plan first. *Rejected:* a
+   second SQL Server container per check (the data volume and memory of a second instance on a
+   shared host, for no isolation a database name does not give); `DBCC CHECKDB` in the check (hours
+   on a large database; the host may add it as an anchor). *Unproven:* against a real SQL Server or
+   Postgres -- the suite proves the commands and their order with the recorded transport only.

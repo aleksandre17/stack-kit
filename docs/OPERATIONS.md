@@ -25,7 +25,8 @@ a store's dump in the layout's backups place, and a restore that is checked, not
 
 ```
 stack-kit backup <store> --env <id> [--plan]
-stack-kit backup verify <store> [--file <name>] --env <id>
+stack-kit backup verify <store> [--file <name>] --env <id> [--plan]
+stack-kit backup replay --env <id> [--plan]
 stack-kit backup list <store> --env <id>
 ```
 
@@ -37,7 +38,7 @@ stack-kit backup list <store> --env <id>
 | `--target <name>` | the declared deploy target (default: the environment's) |
 | `--env <id>` | the environment (catalogs.environments; --dev / --prod are short for it) |
 
-How a store dumps, restores, is queried and dropped is its catalog entry (run inside its container, its credentials read there); what a restore must still hold is the host's (stack.infra.backup.<store>.anchors). verify restores into a throwaway database, compares each anchor and drops the database, pass or fail.
+How a store dumps, restores, is queried and dropped is its catalog entry (run inside its container, its credentials read there); what a restore must still hold is the host's (stack.infra.backup.<store>.anchors). verify restores into a uniquely named throwaway database (its files moved, never over the source), compares each anchor there and drops the database, pass or fail; replay applies the whole migration chain to an empty throwaway database (stack.migrate.replay) and drops it the same way. Both print their plan first.
 
 Exit codes: 0, 1, 2, 6.
 

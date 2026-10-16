@@ -84,6 +84,15 @@ def _start(ctx: Delivery, svc: list[Service], release: str, revision: str) -> li
     return [] if ctx.plan else running.wait_healthy(ctx, svc)
 
 
+def ship_migrations(ctx: Delivery, step: dict) -> None:
+    """The migrations directory (`stack.migrate.files`) into the infra place the migration service mounts."""
+    if step.get("files"):
+        src = ctx.root / str(step["files"])
+        if not src.is_dir():
+            raise DeliveryError(f"stack.migrate.files: {step['files']} is not there")
+        ctx.transport.put_tree(src, posixpath.join(ctx.places.of("infra"), "migrations"))
+
+
 def migrate(ctx: Delivery, svc: list[Service]) -> bool:
     """The declared migration step (`stack.migrate`: a one-shot infra service, e.g. flyway), before the
     apps it serves start: its files shipped into the infra place, then `run --rm` -- the database's
@@ -97,11 +106,7 @@ def migrate(ctx: Delivery, svc: list[Service]) -> bool:
         return False
     from lib.delivery import infra
 
-    if step.get("files"):
-        src = ctx.root / str(step["files"])
-        if not src.is_dir():
-            raise DeliveryError(f"stack.migrate.files: {step['files']} is not there")
-        ctx.transport.put_tree(src, posixpath.join(ctx.places.of("infra"), "migrations"))
+    ship_migrations(ctx, step)
     r = ctx.run(infra.compose(ctx, "--profile", "migrate", "run", "--rm", str(step["service"])), check=False)
     if r.code != 0:
         raise DeliveryError(f"the migration step ({step['service']}) failed (exit {r.code}); no app was started", 6)

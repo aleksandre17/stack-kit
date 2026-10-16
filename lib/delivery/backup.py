@@ -7,16 +7,21 @@ its own (`stack.infra.backup.<store>`: `database`, `keep`, `anchors` [{query, eq
 
     backup   the dump, streamed on the server into {backups}/<store>/<UTC time>.<ext> (umask 077),
              with its sha256 beside it; then pruned to `keep`
-    verify   the sha256 checked; the dump restored into stack_kit_restore_check_<time>; each anchor
-             queried and compared; the throwaway database dropped -- always, pass or fail
+    verify   the sha256 checked; the dump restored into stack_kit_restore_check_<time>_<random> (its
+             files moved to names of their own, never over the source); each anchor queried there and
+             compared; the throwaway database dropped -- always, pass, fail or error
+    replay   the migration chain, from the first, applied to an empty throwaway database (a store that
+             declares `create`, a migration service that declares `replay`); its anchors; dropped
     list     the dumps, newest first
 """
 from __future__ import annotations
 
 import posixpath
+import secrets
 import shlex
 import time
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from lib import naming
 from lib.delivery.context import Delivery, DeliveryError
@@ -108,8 +113,41 @@ def _compare(got: str, anchor: dict[str, Any]) -> str | None:
     return None
 
 
+def throwaway_name() -> str:
+    """A database name no other check shares: the prefix, the UTC time and a random suffix."""
+    return CHECK_PREFIX + time.strftime("%Y%m%d%H%M%S", time.gmtime()) + "_" + secrets.token_hex(4)
+
+
+@contextmanager
+def throwaway(ctx: Delivery, recipe: dict[str, Any], env: dict[str, str], *, cleanup: tuple[str, ...] = ()) -> Iterator[str]:
+    """A throwaway database ($CHECK_DB) inside the store's container for the length of a check; dropped
+    -- always, pass, fail or error -- by the store's `drop`, with any file the check put there."""
+    c = _container(ctx, recipe)
+    try:
+        yield c
+    finally:
+        ctx.run(_exec_in(ctx, c, str(recipe.get("drop") or "true"), env), check=False)
+        for inner in cleanup:
+            ctx.run(_exec_in(ctx, c, f"rm -f {shlex.quote(inner)}", {}), check=False)
+
+
+def _anchors(ctx: Delivery, store: str, recipe: dict[str, Any], c: str, env: dict[str, str],
+             anchors: list[dict[str, Any]]) -> list[str]:
+    failures = []
+    for anchor in anchors:
+        got = ctx.run(_exec_in(ctx, c, str(recipe["query"]), {**env, "ANCHOR": str(anchor["query"])}), check=False)
+        if ctx.plan:
+            continue  # a plan prints the query; it compares nothing
+        why = f"query failed (exit {got.code})" if got.code != 0 else _compare(got.out, anchor)
+        if why:
+            failures.append(f"{store} anchor: {why}")
+    return failures
+
+
 def verify(ctx: Delivery, store: str, name: str = "") -> list[str]:
-    """The failures of a restore check (empty: the dump restores and holds its anchors)."""
+    """The failures of a restore check (empty: the dump restores and holds its anchors): the dump
+    restored into a throwaway database of its own (never over the source), each anchor queried
+    THERE, the database dropped whatever the outcome."""
     recipe, host = declared(ctx, store)
     dumps = listing(ctx, store)
     f = posixpath.join(_dir(ctx, store), name) if name else (dumps[0] if dumps else "")
@@ -120,28 +158,62 @@ def verify(ctx: Delivery, store: str, name: str = "") -> list[str]:
         raise DeliveryError(f"stack.infra.backup.{store}.anchors declares nothing to check after a restore -- "
                             f"a restore nobody checks is not verified", 2)
     r = ctx.run(["sh", "-c", f"cd {shlex.quote(posixpath.dirname(f))} && sha256sum -c {shlex.quote(posixpath.basename(f) + '.sha256')}"],
-                check=False)
+                check=False, readonly=True)
     if r.code != 0:
         return [f"{f}: sha256 does not match its sidecar -- the dump is not what was taken"]
-    c = _container(ctx, recipe)
-    check_db = CHECK_PREFIX + time.strftime("%Y%m%d%H%M%S", time.gmtime())
+    check_db = throwaway_name()
     inner = posixpath.join(str(recipe.get("inContainerDir") or "/tmp"), "stack-kit-restore." + str(recipe.get("extension") or "dump"))
     env = {"CHECK_DB": check_db, "RESTORE_FILE": inner, **({"DB_NAME": str(host["database"])} if host.get("database") else {})}
-    failures: list[str] = []
-    try:
+    with throwaway(ctx, recipe, env, cleanup=(inner,)) as c:
         ctx.run(ctx.engine("cp", f, f"{c}:{inner}"))
         restored = ctx.run(_exec_in(ctx, c, str(recipe["restore"]), env), check=False)
         if restored.code != 0:
             return [f"{f}: the restore into {check_db} failed (exit {restored.code})"]
-        for anchor in anchors:
-            got = ctx.run(_exec_in(ctx, c, str(recipe["query"]), {**env, "ANCHOR": str(anchor["query"])}), check=False)
-            why = f"query failed (exit {got.code})" if got.code != 0 else _compare(got.out, anchor)
-            if why:
-                failures.append(f"{store} anchor: {why}")
-    finally:
-        ctx.run(_exec_in(ctx, c, str(recipe.get("drop") or "true"), env), check=False)
-        ctx.run(_exec_in(ctx, c, f"rm -f {shlex.quote(inner)}", {}), check=False)
-    if not failures:
+        failures = _anchors(ctx, store, recipe, c, env, anchors)
+    if not failures and not ctx.plan:
         ctx.out(f"[backup] {store}: {posixpath.basename(f)} restores into a throwaway database and holds "
                 f"{len(anchors)} anchor(s); the database is dropped")
+    return failures
+
+
+def replay(ctx: Delivery) -> list[str]:
+    """A fresh-chain migration replay (`stack.migrate.replay`): every migration, from the first, applied
+    by the migration service to an EMPTY throwaway database -- the chain a new environment would run,
+    not the one the live database happens to have -- then the declared anchors queried there, then the
+    database dropped whatever the outcome. The store declares how an empty database is made (`create`);
+    the migration service declares how it is pointed at one (`replay`: `env` and a `urls` template per
+    store, `{database}` filled)."""
+    from lib.delivery import infra
+    from lib.delivery.release import ship_migrations
+
+    step = (ctx.manifest.get("stack") or {}).get("migrate") or {}
+    how = step.get("replay") or {}
+    if not step.get("service") or not how.get("store"):
+        raise DeliveryError("stack.migrate.replay declares no store: nothing to replay the migrations against", 2)
+    store, service = str(how["store"]), str(step["service"])
+    recipe, _host = declared(ctx, store)
+    if not recipe.get("create"):
+        raise DeliveryError(f"infra '{store}' declares no `create` (compose/infra-catalog.json backup): it gives no "
+                            f"empty database to replay into", 2)
+    pointer = (_catalog(ctx).get(service) or {}).get("replay") or {}
+    url = (pointer.get("urls") or {}).get(store)
+    if not pointer.get("env") or not url:
+        raise DeliveryError(f"the migration service '{service}' declares no replay against {store} "
+                            f"(compose/infra-catalog.json `replay`: env, urls.{store})", 2)
+    check_db = throwaway_name()
+    env = {"CHECK_DB": check_db}
+    with throwaway(ctx, recipe, env) as c:
+        made = ctx.run(_exec_in(ctx, c, str(recipe["create"]), env), check=False)
+        if made.code != 0:
+            return [f"{store}: the empty database {check_db} could not be made (exit {made.code})"]
+        ship_migrations(ctx, step)
+        ran = ctx.run(infra.compose(ctx, "--profile", "migrate", "run", "--rm", "-e",
+                                    f"{pointer['env']}={str(url).replace('{database}', check_db)}", service), check=False)
+        if ran.code != 0:
+            return [f"the migration chain failed on an empty database (exit {ran.code}): a fresh environment would not migrate"]
+        failures = _anchors(ctx, store, recipe, c, env, list(how.get("anchors") or []))
+    if not failures and not ctx.plan:
+        ctx.out(f"[backup] the migration chain replays from empty into a throwaway {store} database"
+                f"{' and holds ' + str(len(how.get('anchors') or [])) + ' anchor(s)' if how.get('anchors') else ''}; "
+                f"the database is dropped")
     return failures

@@ -74,7 +74,17 @@
           "properties": {
             "service": { "type": "string", "minLength": 1 },
             "files": { "type": "string", "minLength": 1 },
-            "modules": { "type": "array", "items": { "type": "string" } }
+            "modules": { "type": "array", "items": { "type": "string" } },
+            "replay": {
+              "type": "object",
+              "description": "`backup replay`: the whole chain applied to an empty throwaway database of `store` (an infra store that declares `create`), then `anchors` queried there; always dropped",
+              "required": ["store"],
+              "properties": {
+                "store": { "type": "string", "minLength": 1 },
+                "anchors": { "type": "array", "items": { "type": "object", "required": ["query"] } }
+              },
+              "additionalProperties": false
+            }
           },
           "additionalProperties": false
         },

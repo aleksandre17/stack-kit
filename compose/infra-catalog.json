@@ -16,7 +16,8 @@
         "dump": "pg_dump -Fc -U \"$POSTGRES_USER\" \"$POSTGRES_DB\"",
         "restore": "createdb -U \"$POSTGRES_USER\" \"$CHECK_DB\" && pg_restore -U \"$POSTGRES_USER\" -d \"$CHECK_DB\" --no-owner \"$RESTORE_FILE\"",
         "query": "psql -U \"$POSTGRES_USER\" -d \"$CHECK_DB\" -tAc \"$ANCHOR\"",
-        "drop": "dropdb -U \"$POSTGRES_USER\" --if-exists \"$CHECK_DB\""
+        "drop": "dropdb -U \"$POSTGRES_USER\" --if-exists \"$CHECK_DB\"",
+        "create": "createdb -U \"$POSTGRES_USER\" \"$CHECK_DB\""
       }
     },
     "redis": {
@@ -66,10 +67,11 @@
         "container": "sqlserver",
         "extension": "bak",
         "inContainerDir": "/var/opt/mssql/backup",
-        "dump": "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -b -Q \"BACKUP DATABASE [$DB_NAME] TO DISK='$DUMP_FILE' WITH COPY_ONLY, CHECKSUM, INIT\"",
-        "restore": "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -b -Q \"RESTORE VERIFYONLY FROM DISK='$RESTORE_FILE' WITH CHECKSUM\"",
-        "query": "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -h -1 -W -b -d \"$DB_NAME\" -Q \"SET NOCOUNT ON; $ANCHOR\"",
-        "drop": "true"
+        "dump": "export SQLCMDPASSWORD=\"$MSSQL_SA_PASSWORD\"; /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -Q \"BACKUP DATABASE [$DB_NAME] TO DISK='$DUMP_FILE' WITH COPY_ONLY, CHECKSUM, INIT\"",
+        "restore": "export SQLCMDPASSWORD=\"$MSSQL_SA_PASSWORD\"; MOVES=$(/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -h -1 -W -s '|' -Q \"SET NOCOUNT ON; RESTORE FILELISTONLY FROM DISK='$RESTORE_FILE'\" | awk -F'|' -v db=\"$CHECK_DB\" -v q=\"'\" 'NF>2 {n++; printf \"%sMOVE N%s%s%s TO N%s/var/opt/mssql/data/%s_%d.%s%s\", (n>1 ? \", \" : \"\"), q, $1, q, q, db, n, ($3==\"L\" ? \"ldf\" : \"mdf\"), q}') && [ -n \"$MOVES\" ] && /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -Q \"RESTORE DATABASE [$CHECK_DB] FROM DISK='$RESTORE_FILE' WITH $MOVES, CHECKSUM, RECOVERY\"",
+        "query": "export SQLCMDPASSWORD=\"$MSSQL_SA_PASSWORD\"; /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -h -1 -W -d \"$CHECK_DB\" -Q \"SET NOCOUNT ON; $ANCHOR\"",
+        "drop": "export SQLCMDPASSWORD=\"$MSSQL_SA_PASSWORD\"; /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -Q \"IF DB_ID('$CHECK_DB') IS NOT NULL BEGIN ALTER DATABASE [$CHECK_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$CHECK_DB]; END\"",
+        "create": "export SQLCMDPASSWORD=\"$MSSQL_SA_PASSWORD\"; /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -Q \"CREATE DATABASE [$CHECK_DB]\""
       }
     },
     "minio": {
@@ -161,7 +163,14 @@
       "needs": [
         "postgres"
       ],
-      "tunnel": []
+      "tunnel": [],
+      "replay": {
+        "env": "FLYWAY_URL",
+        "urls": {
+          "postgres": "jdbc:postgresql://postgres:5432/{database}",
+          "sqlserver": "jdbc:sqlserver://sqlserver:1433;databaseName={database};encrypt=true;trustServerCertificate=true"
+        }
+      }
     },
     "edge": {
       "fragment": "services/edge.yml",
