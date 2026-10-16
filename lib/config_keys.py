@@ -173,6 +173,8 @@ def check(root: Path, manifest: dict[str, Any]) -> Verdict:
 
     verdict.failures += [f"{rel}: {e}" for e in validate(catalogue, json.loads(_SCHEMA.read_text(encoding="utf-8")))]
     rows = [r for r in catalogue.get("keys") or [] if isinstance(r, dict) and r.get("key")]
+    folders = {str(m.get("secretsModule") or name) for name, m in (manifest.get("modules") or {}).items()
+               if isinstance(m, dict)}
     for r in rows:
         if r.get("sensitivity") == "SECRET" and not r.get("rotation"):
             verdict.failures.append(f"{rel}: {r['key']} is SECRET and declares no rotation")
@@ -184,6 +186,13 @@ def check(root: Path, manifest: dict[str, Any]) -> Verdict:
                                     f"secret (only `none`, for a data source)")
         if any(v == "none" for v in per_env.values()) and not r.get("dataSource"):
             verdict.failures.append(f"{rel}: {r['key']} declares `none` for an environment but is no `dataSource`")
+        scoped = (r.get("policy") or {}).get("modules") if isinstance(r.get("policy"), dict) else None
+        if r.get("sensitivity") == "SECRET" and not scoped and len(folders) > 1:
+            # Least privilege: a secret reaches the modules that declare they need it, never every module
+            # by default -- a signing key the UI container can read is a key one more process can leak.
+            verdict.failures.append(f"{rel}: {r['key']} is SECRET and names no module (policy.modules) -- with "
+                                    f"{len(folders)} secrets folders ({', '.join(sorted(folders))}) it would reach "
+                                    f"every one; name the modules that read it")
     known = {(str(k.get("key")), str(k.get("file")).replace("\\", "/")): str(k.get("tracking"))
              for k in catalogue.get("knownExposures") or [] if isinstance(k, dict)}
     for file, where, key in exposures(root, rows, skip={rel}):

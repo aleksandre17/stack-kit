@@ -344,6 +344,26 @@ def test_a_generated_secret_is_made_on_the_server_once_and_never_read_back(proje
     assert b"DB_PASSWORD" not in t.read(f"{ROOT}/shop/staging/stack/env/edge.env")
 
 
+
+def test_a_secret_reaches_only_the_modules_that_name_it(project, tmp_path):
+    # Least privilege: in a project with more than one secrets folder, an unscoped generated secret
+    # is given to no service, and the catalogue check refuses an unscoped SECRET outright.
+    from lib import config_keys
+    from lib.delivery.model import module_services
+
+    (project / "ops" / "config" / "keys.json").write_text(json.dumps({"version": 1, "keys": [
+        {"key": "Jwt:Key", "sensitivity": "SECRET", "owner": "ops", "allowedSource": "server",
+         "rotation": "on compromise", "generate": "random:32"}]}), encoding="utf-8")
+    m = manifest_of(project)
+    m["config"] = {"keys": "ops/config/keys.json"}
+    m["modules"] = {**m["modules"], "ui": {"type": "node-spa", "path": "apps/ui"}}
+    (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
+    ctx = ctx_for(project, server(tmp_path))
+    assert running.generated(ctx, module_services(ctx.manifest, "edge")[0]) == {}
+    verdict = config_keys.check(project, m)
+    assert any("Jwt:Key is SECRET and names no module" in f for f in verdict.failures), verdict.failures
+
+
 def test_the_migration_step_runs_before_the_apps_and_a_failure_starts_none(project, tmp_path):
     (project / "db" / "migrations").mkdir(parents=True)
     (project / "db" / "migrations" / "V1__init.sql").write_text("create table t (id int);", encoding="utf-8")

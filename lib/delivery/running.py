@@ -96,6 +96,11 @@ def credential_files(ctx: Delivery, service: Service) -> dict[str, Path]:
         if folder.is_dir() else {}
 
 
+def _secrets_folders(ctx: Delivery) -> set[str]:
+    return {str(m.get("secretsModule") or name) for name, m in (ctx.manifest.get("modules") or {}).items()
+            if isinstance(m, dict)}
+
+
 def generated(ctx: Delivery, service: Service) -> dict[str, int]:
     """{env name: bytes} of the catalogue keys generated on the server for this service's folder
     (`policy.generate`): the value is made there, once, and never leaves it."""
@@ -107,7 +112,10 @@ def generated(ctx: Delivery, service: Service) -> dict[str, int]:
         if not isinstance(row, dict) or not generate_bytes(row):
             continue
         policy = row.get("policy") if isinstance(row.get("policy"), dict) else {}
-        if not policy.get("modules") or service.secrets_folder in policy["modules"]:
+        # Only the modules that name a generated secret are given it; an unscoped one only in a project
+        # with one secrets folder (the catalogue check refuses it otherwise) -- never every module.
+        named = policy.get("modules") or []
+        if service.secrets_folder in named or (not named and len(_secrets_folders(ctx)) <= 1):
             out[config_policy.env_name(row)] = generate_bytes(row)
     return out
 
