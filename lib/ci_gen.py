@@ -159,6 +159,32 @@ def delivery_plan(ctx: ProjectContext) -> tuple[dict[str, str], list[str], list[
 RELEASE_EVENT = f"({DEFAULT_BRANCH_PUSH}) || github.event_name == 'workflow_dispatch'"
 
 
+def _database(manifest: dict[str, Any], mid: str) -> dict[str, Any]:
+    """The CI test database a module's job runs beside (`ci.database`), or {}."""
+    db = (manifest.get("ci") or {}).get("database") or {}
+    if not db or (db.get("modules") and mid not in db["modules"]):
+        return {}
+    return db
+
+
+def _db_service(db: dict[str, Any]) -> list[str]:
+    """A service container with health options: the job's steps start once the database is healthy."""
+    if not db:
+        return []
+    out = ["    services:", "      db:", f"        image: {_q(db['image'])}"]
+    if db.get("env"):
+        out += ["        env:"] + [f"          {k}: {_q(str(v))}" for k, v in sorted(db["env"].items())]
+    out += ["        ports:", f"          - {_q(str(db.get('port', 5432)) + ':' + str(db.get('port', 5432)))}"]
+    if db.get("health"):
+        opts = f"--health-cmd {_shell_q(db['health'])} --health-interval 5s --health-timeout 5s --health-retries 20"
+        out += [f"        options: {_q(opts)}"]
+    return out
+
+
+def _shell_q(s: str) -> str:
+    return '"' + s.replace('"', '\\"') + '"'
+
+
 def _package_steps(mid: str, module: dict[str, Any], cli: str, pins: dict[str, dict[str, str]]) -> list[str]:
     archive = f".stack-kit/artifacts/{mid}-*.tgz"
     return [
@@ -246,9 +272,17 @@ def render(ctx: ProjectContext) -> str:
         out += [f"  {job}:", f"    name: {_q(f'{mid} ({typ})')}", f"    runs-on: {runner}", "    timeout-minutes: 30"]
         if mid in packaged:
             out += ["    permissions:", "      contents: read", "      id-token: write", "      attestations: write"]
+        db = _database(manifest, mid)
+        out += _db_service(db)
         out += ["    steps:", *_checkout(pins, submodules), *_setup_steps(typ, module, pins)]
+        if db.get("migrate"):
+            out += ["      - name: migrate (the test database, before the tests)", "        env:",
+                    f"          DATABASE_URL: {_q(db['url'])}", f"        run: {_q(db['migrate'])}"]
         for step in steps:
-            out += [f"      - name: {step}", f"        run: {_q(f'pwsh {cli} mod {mid} {step}')}"]
+            out += [f"      - name: {step}"]
+            if db:  # the DB tests run instead of skipping
+                out += ["        env:", f"          DATABASE_URL: {_q(db['url'])}"]
+            out += [f"        run: {_q(f'pwsh {cli} mod {mid} {step}')}"]
         if not steps:
             out.append(f"      - run: {_q(f'echo driver {typ} declares no lifecycle step')}")
         if mid in packaged:

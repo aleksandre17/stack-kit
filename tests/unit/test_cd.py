@@ -223,3 +223,20 @@ def test_a_built_recipe_runs_unprivileged_and_probes_its_port_or_its_declared_pa
     manifest["modules"][mid]["container"] = {"healthPath": "/actuator/health"}
     _, trees = package.read(package.pack(root, manifest, mid))
     assert "GET /actuator/health HTTP/1.0" in next(iter(trees.values()))["Dockerfile"].decode()
+
+
+def test_ci_runs_the_db_tests_beside_a_healthy_database_after_migrating_it(tmp_path, monkeypatch):
+    root = _host(tmp_path, None)
+    mf = root / identity.MANIFEST_FILENAME
+    m = json.loads(mf.read_text(encoding="utf-8"))
+    m["ci"] = {**(m.get("ci") or {}), "database": {"image": "postgres:16-alpine", "env": {"POSTGRES_PASSWORD": "ci"},
+                                                  "port": 5432, "health": "pg_isready -U postgres",
+                                                  "url": "postgres://postgres:ci@localhost:5432/postgres",
+                                                  "migrate": "pwsh tools/stack-kit.ps1 migrations check", "modules": ["api"]}}
+    mf.write_text(json.dumps(m), encoding="utf-8")
+    text = _render(root)
+    api, web = _job(text, "api"), _job(text, "web")
+    assert "services:" in api and "image: 'postgres:16-alpine'" in api and "--health-cmd" in api and "pg_isready" in api
+    assert "DATABASE_URL: 'postgres://postgres:ci@localhost:5432/postgres'" in api
+    assert api.index("name: migrate") < api.index("name: build")
+    assert "services:" not in web and "DATABASE_URL" not in web

@@ -662,6 +662,21 @@
         "prepareEnv": { "type": "string" },
         "waitHealth": { "type": "string" },
         "waitStackHealth": { "type": "string" },
+        "database": {
+          "type": "object",
+          "description": "The test database every module's CI job (or `modules`) runs beside: `image`, `env` (throwaway CI values, never a secret), `port`, `health` (the service container's health command), `url` (exported as DATABASE_URL, so DB tests run instead of skipping), `migrate` (a command run before the tests)",
+          "required": ["image", "url"],
+          "properties": {
+            "image": { "type": "string", "minLength": 1 },
+            "env": { "type": "object", "additionalProperties": { "type": "string" } },
+            "port": { "type": "integer" },
+            "health": { "type": "string" },
+            "url": { "type": "string", "minLength": 1 },
+            "migrate": { "type": "string" },
+            "modules": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
         "actions": {
           "type": "string",
           "description": "The host's own CI action pins (a file shaped like lib/ci-actions.json), over the kit's; each a full commit SHA"
