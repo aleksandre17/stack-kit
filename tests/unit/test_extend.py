@@ -108,3 +108,12 @@ def test_an_undeclared_extension_file_is_reported(root):
     (root / "ops/compose/infra/services/notes.txt").write_text("x", encoding="utf-8")
     assert "ops/compose/infra/services/notes.txt" in extend.undeclared(root, manifest(root))
     assert not [u for u in extend.undeclared(root, manifest(root)) if u.endswith(".yml")]
+
+
+def test_an_ignored_file_is_machine_state_not_an_undeclared_extension(root):
+    import subprocess
+
+    subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+    (root / ".gitignore").write_text("*.local.txt\n", encoding="utf-8")
+    (root / "ops/compose/infra/services/notes.local.txt").write_text("x", encoding="utf-8")
+    assert "ops/compose/infra/services/notes.local.txt" not in extend.undeclared(root, manifest(root))

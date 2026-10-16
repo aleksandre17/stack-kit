@@ -356,7 +356,19 @@ def undeclared(root: Path, manifest: dict[str, Any]) -> list[str]:
                 extra = _companions_of(rel)
                 if not extra:
                     out.append(rel)
-    return out
+    # An ignored file (an env file `extend env` made, a local overlay) is machine state, never a host
+    # extension: only what the repository carries is held to a declared point.
+    return [rel for rel in out if rel not in _ignored(root, out)]
+
+
+def _ignored(root: Path, rels: list[str]) -> set[str]:
+    if not rels:
+        return set()
+    import subprocess
+
+    ran = subprocess.run(["git", "-C", str(root), "check-ignore", "--stdin"], input="\n".join(rels),
+                         capture_output=True, text=True)
+    return {line.strip() for line in ran.stdout.splitlines() if line.strip()}
 
 
 def _companions_of(rel: str) -> bool:
