@@ -21,6 +21,7 @@ of a closed directory. A pending place is printed, never hidden.
 """
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -68,6 +69,14 @@ def derived_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     if declared("adapters.nginx.template"):
         rows.append(_row(declared("adapters.nginx.template"), "file", "module-source",
                          "adapters.nginx.template"))
+    profile = declared("layout.profile")
+    if profile:
+        path = Path(__file__).resolve().parents[1] / "config" / "layout-profiles" / f"{profile}.json"
+        if not path.is_file():
+            rows.append(_row(f"<layout profile {profile}>", "file", "kit", "layout.profile"))
+        else:
+            for e in json.loads(path.read_text(encoding="utf-8")).get("entries") or []:
+                rows.append(_row(e["path"], e.get("kind", "dir"), e.get("holds", ""), f"layout.profile:{profile}"))
     if declared("deploy.targets"):
         rows.append(_row(declared("deploy.targets"), "file", "configuration", "deploy.targets"))
     if declared("config.keys"):

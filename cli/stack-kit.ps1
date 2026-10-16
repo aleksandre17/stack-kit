@@ -40,6 +40,14 @@ $CliRest = [string[]]@($kept)
 $PackageRoot = Split-Path $PSScriptRoot -Parent
 
 if ($Command -eq "init") {
+    # `init --plan` / `init --approve <who>`: draft the manifest from the tree, by the evidence each
+    # driver declares (lib/draft.py, ADR-001 amendment 10); declared fields always win. Plain `init`
+    # bootstraps a new host.
+    if ($CliRest -contains "--plan" -or $CliRest -contains "--approve") {
+        . (Join-Path $PackageRoot "lib\stack-kit-python.ps1")
+        $env:PYTHONPATH = "$PackageRoot"
+        Invoke-StackKitPython (Join-Path $PackageRoot "lib\draft.py") @CliRest
+    }
     & (Join-Path $PackageRoot "toolkit\init\Invoke-ProjectInit.ps1") -PackageRoot $PackageRoot @CliRest
     exit $LASTEXITCODE
 }
@@ -95,6 +103,7 @@ function Show-Help {
     <alias> run                    Same as hybrid boot; aliases from stack-kit.json cli.aliases
 
     init  - full bootstrap (scaffold + seed secrets + compose-gen)
+    init --plan | --approve <who>  Draft the manifest from the tree (driver evidence); declared fields win
 
     Shortcuts (cli.aliases): $aliasLine
 

@@ -84,6 +84,48 @@
           }
         }
       ]
+    },
+    "detect": {
+      "all": [
+        {
+          "any": [
+            {
+              "file": "build.gradle",
+              "matches": "org\\.springframework\\.boot"
+            },
+            {
+              "file": "build.gradle.kts",
+              "matches": "org\\.springframework\\.boot"
+            },
+            {
+              "file": "settings.gradle"
+            },
+            {
+              "file": "settings.gradle.kts"
+            }
+          ]
+        },
+        {
+          "any": [
+            {
+              "file": "build.gradle",
+              "matches": "org\\.springframework\\.boot"
+            },
+            {
+              "file": "build.gradle.kts",
+              "matches": "org\\.springframework\\.boot"
+            },
+            {
+              "file": "*/build.gradle",
+              "matches": "org\\.springframework\\.boot"
+            },
+            {
+              "file": "*/build.gradle.kts",
+              "matches": "org\\.springframework\\.boot"
+            }
+          ]
+        }
+      ]
     }
   },
   "node-vite": {
@@ -162,6 +204,26 @@
           "run": "corepack enable"
         }
       ]
+    },
+    "detect": {
+      "all": [
+        {
+          "file": "package.json"
+        },
+        {
+          "any": [
+            {
+              "file": "vite.config.ts"
+            },
+            {
+              "file": "vite.config.js"
+            },
+            {
+              "file": "vite.config.mjs"
+            }
+          ]
+        }
+      ]
     }
   },
   "node-api": {
@@ -229,6 +291,20 @@
           "run": "corepack enable"
         }
       ]
+    },
+    "detect": {
+      "all": [
+        {
+          "file": "package.json",
+          "matches": "\"(express|fastify|@nestjs/core|koa|@hapi/hapi)\"\\s*:"
+        },
+        {
+          "none": "angular.json"
+        },
+        {
+          "none": "vite.config.*"
+        }
+      ]
     }
   },
   "dotnet-aspnet": {
@@ -291,6 +367,25 @@
           }
         }
       ]
+    },
+    "detect": {
+      "all": [
+        {
+          "file": "*.csproj",
+          "matches": "Sdk=\"Microsoft\\.NET\\.Sdk\\.Web\""
+        }
+      ],
+      "reads": {
+        "dotnet.project": {
+          "name": "*.csproj",
+          "matches": "Sdk=\"Microsoft\\.NET\\.Sdk\\.Web\""
+        },
+        "dotnet.test": {
+          "find": "**/*.csproj",
+          "matches": "Microsoft\\.NET\\.Test\\.Sdk",
+          "mentions": "dotnet.project"
+        }
+      }
     }
   },
   "node-spa": {
@@ -334,6 +429,16 @@
         },
         {
           "run": "corepack enable"
+        }
+      ]
+    },
+    "detect": {
+      "all": [
+        {
+          "file": "package.json"
+        },
+        {
+          "file": "angular.json"
         }
       ]
     }

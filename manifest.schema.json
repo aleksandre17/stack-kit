@@ -545,6 +545,11 @@
       "type": "object",
       "description": "The host's tree as a declared layout, held as a floor by `stack-kit validate` (ADR-001 decision 3). Places the manifest already declares (package, secrets, module paths, compose catalog, ci scripts, infra compose dir, nginx template, config.keys, vscode.cliScript) are rows without being listed here.",
       "properties": {
+        "profile": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A canonical tree the kit declares (config/layout-profiles/<name>.json): its places are rows, derived; `entries` adds only the host's own (ADR-001 amendment 10)"
+        },
         "entries": {
           "type": "array",
           "items": {
@@ -576,6 +581,12 @@
       "properties": {
         "targets": { "type": "string", "minLength": 1 }
       },
+      "additionalProperties": false
+    },
+    "draft": {
+      "type": "object",
+      "description": "Who approved the manifest `init --approve` drafted from the tree, and when (ADR-001 amendment 10)",
+      "properties": { "approvedBy": { "type": "string", "minLength": 1 }, "approvedAt": { "type": "string", "minLength": 1 } },
       "additionalProperties": false
     },
     "commands": {

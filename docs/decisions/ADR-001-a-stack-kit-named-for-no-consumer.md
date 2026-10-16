@@ -503,3 +503,48 @@ PowerShell through the resolver; the flag does not outlive its run; provenance),
 each kind of drift and exits 1, and 2 when pending or unreachable). **Not proven against a real
 server:** sshd, docker's compose-project port labels, `find` on busybox. A dangling-`current` check
 is written and its test skips where the machine cannot create a symlink (this one).
+
+## Amendment 10 — the manifest is drafted from the tree, by declaration (2026-10-16, owner-delegated)
+
+The owner: ten projects must stand on one architecture and structure, and nothing true of all of them
+may be written by hand in each. A host's manifest was hand-written.
+
+1. **Evidence is a driver's declaration.** Each registry entry declares `detect`: `all` conditions on
+   a directory's own files (`{file, matches}`, `{any: [...]}`, `{none}`) and `reads` (what it takes
+   from the evidence: `{name}` -- a matched file's name; `{find, matches, mentions}` -- a repository
+   file whose content matches and mentions an earlier read, as a path from the module). Declared:
+   `dotnet-aspnet` (a `*.csproj` on `Microsoft.NET.Sdk.Web`; reads its project, and the test project
+   that references it), `java-boot` (a Gradle build applying `org.springframework.boot`, itself or one
+   level down -- a multi-project build is one module), `node-spa` (`package.json` + `angular.json`),
+   `node-vite` (`package.json` + a `vite.config`), `node-api` (`package.json` depending on a server
+   framework, and neither of the other two). `lib/draft.py` evaluates declarations and names no
+   ecosystem; a project's own driver (K7b) declares its evidence the same way.
+2. **The draft proposes; the host's declarations win.** `init --plan` prints, against the current
+   manifest, only what is absent: modules (type, role, path, secretsModule, the driver's reads),
+   aliases, `commands`, `layout.profile`. A drafted module is the existing module at the same path,
+   whatever its id; it gains only absent fields. `init --approve <who>` writes it and records
+   `draft.approvedBy`/`approvedAt`. A directory two drivers claim is refused, naming both; the
+   outermost claim wins; the vendored kit, build output, dependencies and nested hosts are never
+   evidence.
+3. **The canonical tree is declared once.** `config/layout-profiles/monorepo.json` (`platform/apps/`,
+   `platform/kits/`, `ops/cli/`, `ops/config/`, `docs/`); a manifest naming `layout.profile` has those
+   places as derived floor rows, and `layout.entries` keeps only the host's own.
+
+*Rejected:* detection in code per ecosystem (a second home for what a driver is); a draft that
+rewrites the manifest (a host's choice -- `launchProfile`, `publishExpect`, its secrets root -- is not
+evidence and would be lost); guessing between two claiming drivers.
+
+Proof: `tests/unit/test_draft.py` -- a geostat-shaped tree (ASP.NET Core + its test project + Angular
+under `platform/apps/inout/`) drafts geostat's modules field for field; merged over geostat's
+manifest it changes no declared leaf and adds only `commands.lint` and `layout.profile`; a
+gesotat-shaped multi-service Gradle build is one `java-boot` module; ambiguity is refused; a project
+driver's evidence claims; `--plan` writes nothing and `--approve` records who.
+`tests/acceptance/test_draft_cli.py` drafts through the CLI. Run read-only against geostat's own
+tree, the draft adds the same two fields and changes nothing.
+
+**Not derived, by design:** a module's `launchProfile`, `configuration`, `publishExpect`,
+`toolchain.version`, `node.scripts` and the secrets root are the host's decisions, so they are kept,
+never drafted. **Owed:** the scaffold `init` writes for a new project (`apps/`, `tools/`,
+`kits/stack-kit`) is not yet the `monorepo` profile it now declares. Moving the scaffold onto
+`platform/apps/<app>/{backend,frontend}` and `platform/kits/` changes every new host's paths, so it
+is its own change.

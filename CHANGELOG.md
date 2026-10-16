@@ -2,6 +2,14 @@
 
 ## 1.2.0-dev — unreleased
 
+### The manifest is drafted from the tree (ADR-001 amendment 10)
+
+- Drivers declare `detect` (the evidence a directory is their module, and what they read from it);
+  `init --plan` drafts modules, aliases, `commands`, `layout.profile` as additions against the current
+  manifest; `init --approve <who>` writes them (`draft.approvedBy`). Declared fields always win; a
+  directory two drivers claim is refused.
+- `layout.profile`: canonical trees declared in `config/layout-profiles/` (`monorepo`), derived as floor rows.
+
 ### Where a deploy goes is declared (ADR-001 amendment 9)
 
 - **Deploy targets:** manifest `deploy.targets` names `ops/deploy/targets.json` (tracked, no secrets;

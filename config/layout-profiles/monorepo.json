@@ -1,0 +1,10 @@
+{
+  "$comment": "The canonical project tree, declared once (ADR-001 amendment 10): a host that names this profile (`layout.profile: \"monorepo\"`) has these places as layout-floor rows, derived, and adds only its own entries. Every app lives in platform/apps/<app>/ (backend/, frontend/ inside it); the kits in platform/kits/; the host's ops in ops/{cli,config,deploy}; its documents in docs/.",
+  "entries": [
+    { "path": "platform/apps/", "kind": "dir", "holds": "module-source" },
+    { "path": "platform/kits/", "kind": "dir", "holds": "kit" },
+    { "path": "ops/cli/", "kind": "dir", "holds": "launcher" },
+    { "path": "ops/config/", "kind": "dir", "holds": "configuration" },
+    { "path": "docs/", "kind": "dir", "holds": "documentation" }
+  ]
+}
