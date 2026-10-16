@@ -5,7 +5,13 @@ from typing import Any
 
 from lib.modules import _modules, driver_deploy_args, driver_delivery, module_ids, module_role
 
-ROLE_DEPLOY_ORDER = ("api", "worker", "gateway", "data", "ui", "other")
+
+
+def role_deploy_order(manifest: dict[str, Any] | None = None) -> list[str]:
+    """Roles in stack-deploy order (catalogs.roles `deployOrder`)."""
+    from lib import catalogs
+
+    return catalogs.ordered("roles", "deployOrder", manifest)
 
 
 def stack_deploy_module_ids(manifest: dict[str, Any]) -> list[str]:
@@ -23,7 +29,8 @@ def ordered_stack_deploy_modules(manifest: dict[str, Any], module_filter: list[s
     """Role-ordered subset preserving relative order within each role from module_filter."""
     allowed = module_filter if module_filter is not None else stack_deploy_module_ids(manifest)
     mods = _modules(manifest)
-    by_role: dict[str, list[str]] = {r: [] for r in ROLE_DEPLOY_ORDER}
+    order = role_deploy_order(manifest)
+    by_role: dict[str, list[str]] = {r: [] for r in order}
     extra: list[str] = []
     for mid in allowed:
         if mid not in mods:
@@ -34,7 +41,7 @@ def ordered_stack_deploy_modules(manifest: dict[str, Any], module_filter: list[s
         else:
             extra.append(mid)
     out: list[str] = []
-    for role in ROLE_DEPLOY_ORDER:
+    for role in order:
         out.extend(by_role.get(role, []))
     out.extend(extra)
     return out

@@ -35,17 +35,31 @@ def load_compose_catalog(path: Path | None = None) -> dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def host_compose_catalog(ctx: ProjectContext) -> dict[str, Any]:
+    """The kit's module templates with the host's own over them: a host's compose catalog may carry
+    `templates` a project driver's `compose.templates` names (ADR-001 amendment 12)."""
+    cat = load_compose_catalog()
+    try:
+        host = json.loads(ctx.catalog_path.read_text(encoding="utf-8")) if ctx.catalog_path.is_file() else {}
+    except (ValueError, AttributeError):
+        host = {}
+    own = host.get("moduleTemplates") if isinstance(host, dict) else None
+    if isinstance(own, dict):
+        cat = {**cat, "templates": {**(cat.get("templates") or {}), **own}}
+    return cat
+
+
 def _rel_posix(from_dir: Path, to_path: Path) -> str:
     return os.path.relpath(to_path, from_dir).replace("\\", "/")
 
 
 def _resolve_dockerfiles(module_path: Path, module_id: str, role: str, driver_type: str) -> tuple[str, str, str]:
-    """Return (dockerfile_dev, dockerfile_prod, build_context_prod_rel_suffix)."""
-    if driver_type == "node-vite":
-        return "Dockerfile", "Dockerfile", "."
-    if (module_path / "Dockerfile.dev").is_file():
-        return "Dockerfile.dev", "Dockerfile", "."
-    return "Dockerfile.dev", "Dockerfile", "."
+    """Return (dockerfile_dev, dockerfile_prod, build_context_prod_rel_suffix): the Dockerfiles the
+    driver declares (`compose.dockerfiles`), else Dockerfile.dev / Dockerfile."""
+    from lib.modules import driver_capability
+
+    declared = (driver_capability(driver_type, "compose", {}) or {}).get("dockerfiles") or {}
+    return str(declared.get("dev") or "Dockerfile.dev"), str(declared.get("prod") or "Dockerfile"), "."
 
 
 def _role_catalog_entry(stack_cat: dict[str, Any], role: str) -> dict[str, Any]:
@@ -104,7 +118,11 @@ def _credential_blocks(
 
 
 def _template_for(driver_type: str, role: str, profile: str, cat: dict[str, Any]) -> str:
-    key_map = (cat.get("templateKey") or {}).get(driver_type, {}).get(role, {})
+    """The template the module's DRIVER declares for its role and profile (`compose.templates`; a
+    project driver declares its own), from the kit's templates or the host's own."""
+    from lib.modules import driver_capability
+
+    key_map = ((driver_capability(driver_type, "compose", {}) or {}).get("templates") or {}).get(role, {})
     tpl_key = key_map.get(profile)
     if not tpl_key:
         raise ValueError(
@@ -234,7 +252,7 @@ def build_manifest_stack_services(
     stack_cat: dict[str, Any] | None = None,
     module_fmt: dict[str, dict[str, str]] | None = None,
 ) -> str:
-    compose_cat = compose_cat or load_compose_catalog()
+    compose_cat = compose_cat or host_compose_catalog(ctx)
     stack_cat = stack_cat or load_stack_catalog(STACK_CATALOG)
     module_ids = stack_compose_module_ids(ctx.manifest)
     ordered = _ordered_modules(ctx.manifest, module_ids)
@@ -286,7 +304,7 @@ def build_single_module_compose(
     compose_cat: dict[str, Any] | None = None,
     stack_cat: dict[str, Any] | None = None,
 ) -> str:
-    compose_cat = compose_cat or load_compose_catalog()
+    compose_cat = compose_cat or host_compose_catalog(ctx)
     stack_cat = stack_cat or load_stack_catalog(STACK_CATALOG)
     return render_module_service(
         ctx=ctx,
@@ -300,28 +318,36 @@ def build_single_module_compose(
     )
 
 
+def _ops_modules_kind(driver_type: str) -> str:
+    """The artifact kind a driver's modules take in the generated ops.modules registry, or ""."""
+    from lib.modules import driver_capability
+
+    return str((driver_capability(driver_type, "compose", {}) or {}).get("opsModules") or "")
+
+
 def ops_modules_lines(
     ctx: ProjectContext,
     fmt_global: dict[str, str],
     features: dict[str, Any],
 ) -> list[str]:
-    """Gradle/docker registry lines for java-boot modules + embedded backend worker."""
+    """Gradle/docker registry lines for the modules whose driver declares `compose.opsModules`, plus the
+    embedded backend worker."""
     deploy = load_deploy_env(ctx.secrets_root)
     lines: list[str] = []
     module_ids = stack_compose_module_ids(ctx.manifest)
     mods = ctx.manifest.get("modules") or {}
     for mid in _ordered_modules(ctx.manifest, module_ids):
         cfg = mods.get(mid)
-        if not isinstance(cfg, dict) or cfg.get("type") != "java-boot":
+        if not isinstance(cfg, dict) or not _ops_modules_kind(str(cfg.get("type") or "")):
             continue
         role = str(cfg.get("role") or "")
         service = resolve_module_service_name(mid, ctx.manifest, deploy, ctx.root.name)
         module_path = ctx.module_path(mid)
-        _, df_prod, prod_suffix = _resolve_dockerfiles(module_path, mid, role, "java-boot")
+        _, df_prod, prod_suffix = _resolve_dockerfiles(module_path, mid, role, str(cfg.get("type")))
         if prod_suffix == "src" and not df_prod.startswith("src/"):
             df_prod = f"src/{df_prod}"
-        # Standalone java-boot modules use root bootJar; embedded backend worker is appended below.
-        lines.append(f"{service}||boot|{df_prod}|yes")
+        # A standalone module builds its own artifact kind; the embedded backend worker is appended below.
+        lines.append(f"{service}||{_ops_modules_kind(str(cfg.get('type')))}|{df_prod}|yes")
     if embedded_worker_enabled(ctx.manifest, features) and primary_api_module_id(
         ctx.manifest, module_ids
     ):

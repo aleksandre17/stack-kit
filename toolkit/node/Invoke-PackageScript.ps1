@@ -24,8 +24,8 @@ $PackageRoot = if ($env:STACK_KIT_KIT_ROOT) { $env:STACK_KIT_KIT_ROOT } else {
 . (Join-Path $PackageRoot "lib\project.ps1")
 . (Join-Path $PackageRoot "lib\drivers.ps1")
 
-#: Steps a package may lack without failing: the kit asks for them, it does not require them.
-$OptionalSteps = @("lint")
+#: Steps a package may lack without failing (catalogs.lifecycle `optional`): asked for, never required.
+$OptionalSteps = @(Get-KitContextLines 'lifecycle:optional')
 
 $root = Get-ProjectRootFromManifest
 $modPath = Get-ModuleProjectPath $ModuleId

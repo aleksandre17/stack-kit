@@ -1,4 +1,4 @@
-# Portable ops toolkit (Bash) — sourced from java-boot driver _init.sh
+# Portable ops toolkit (Bash) — sourced from a bash driver's _init.sh
 # Requires: OPS_SCRIPT_DIR (= module root), OPS_SECRETS_MODULE, PROJECT_DIR, MONOREPO
 
 : "${OPS_SCRIPT_DIR:?OPS_SCRIPT_DIR not set}"

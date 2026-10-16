@@ -1,0 +1,41 @@
+{
+  "$comment": "Module roles, declared once (ADR-001 amendment 12). deployOrder orders a stack deploy, bootOrder `dev up all` (absent: not booted by default), primaryService names the role's primary compose service ({slug}-<primaryService>), serviceOverride the deploy.env key that may rename it, launchCompound whether vscode-gen puts it in the compound launch. A host adds or overrides a role in its manifest (`catalogs.roles`). primaryField: the manifest field that names the role's primary module (else the first of the role).",
+  "entries": [
+    {
+      "id": "api",
+      "deployOrder": 1,
+      "bootOrder": 1,
+      "primaryService": "api",
+      "serviceOverride": "COMPOSE_API_SERVICE",
+      "launchCompound": true,
+      "primaryField": "stack.primaryApiModule"
+    },
+    {
+      "id": "worker",
+      "deployOrder": 2,
+      "bootOrder": 2,
+      "serviceOverride": "COMPOSE_WORKER_SERVICE",
+      "launchCompound": true
+    },
+    {
+      "id": "gateway",
+      "deployOrder": 3
+    },
+    {
+      "id": "data",
+      "deployOrder": 4
+    },
+    {
+      "id": "ui",
+      "deployOrder": 5,
+      "bootOrder": 3,
+      "primaryService": "app",
+      "serviceOverride": "COMPOSE_APP_SERVICE",
+      "launchCompound": true
+    },
+    {
+      "id": "other",
+      "deployOrder": 6
+    }
+  ]
+}

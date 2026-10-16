@@ -59,7 +59,7 @@ class TestNodeApiDriver:
     def test_registered_with_api_role(self, registry: dict):
         assert "node-api" in registry
         assert "api" in registry["node-api"]["roles"]
-        assert registry["node-api"]["runtime"] == "bash"
+        assert "runtime" not in registry["node-api"]  # removed: the script's runtime decides
 
     def test_commands_match_java_boot_service_shape(self, registry: dict):
         cmds = set(driver_commands("node-api"))

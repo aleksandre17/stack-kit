@@ -15,6 +15,15 @@ foreach ($name in @('KitIdentity', 'KitContext', 'KitContextKey', 'KitPython')) 
     }
 }
 
+function Test-KitEnvironment {
+    # True for an environment the catalog declares (config/catalogs/environments.json, or the host's
+    # own entries); else refused, naming the declared ones. The one PowerShell check of it.
+    param([string]$Name)
+    $declared = @(Get-KitContextLines 'environments')
+    if ($declared -contains $Name) { return $true }
+    throw "'$Name' is not a declared environment ($($declared -join ', ')); a host adds one to its manifest's environment catalog"
+}
+
 function Get-KitIdentity {
     # The declaration itself, read as data: names, not rules.
     if ($null -ne $script:KitIdentity) { return $script:KitIdentity }

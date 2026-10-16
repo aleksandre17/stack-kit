@@ -17,8 +17,8 @@ $RepoRoot = Get-ProjectRootFromManifest
 if (-not $RepoRoot) { throw "stack-kit.json not found" }
 $env:STACK_KIT_PROJECT_ROOT = $RepoRoot
 if (-not $ModuleId) { $ModuleId = Get-ModuleIdByRole "api" }
-if (-not $ModuleId) { $ModuleId = (Get-ModuleIdsByDriverType "java-boot" | Select-Object -First 1) }
-if (-not $ModuleId) { throw "manifest: no api / java-boot module" }
+if (-not $ModuleId) { $ModuleId = (Get-ModuleIdsByLayoutSimulator "simulate-backend-layout.ps1" | Select-Object -First 1) }
+if (-not $ModuleId) { throw "manifest: no api module, and no module whose driver declares this simulator" }
 $script:BeModuleId = $ModuleId
 $script:BeSecretsFolder = Get-ModuleSecretsFolder $script:BeModuleId
 

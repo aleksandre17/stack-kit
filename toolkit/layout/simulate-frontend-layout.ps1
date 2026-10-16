@@ -17,8 +17,8 @@ $RepoRoot = Get-ProjectRootFromManifest
 if (-not $RepoRoot) { throw "stack-kit.json not found" }
 $env:STACK_KIT_PROJECT_ROOT = $RepoRoot
 if (-not $ModuleId) { $ModuleId = Get-ModuleIdByRole "ui" }
-if (-not $ModuleId) { $ModuleId = (Get-ModuleIdsByDriverType "node-vite" | Select-Object -First 1) }
-if (-not $ModuleId) { throw "manifest: no ui / node-vite module" }
+if (-not $ModuleId) { $ModuleId = (Get-ModuleIdsByLayoutSimulator "simulate-frontend-layout.ps1" | Select-Object -First 1) }
+if (-not $ModuleId) { throw "manifest: no ui module, and no module whose driver declares this simulator" }
 $script:FeModuleId = $ModuleId
 $script:FeSecretsFolder = Get-ModuleSecretsFolder $script:FeModuleId
 
@@ -223,7 +223,7 @@ function Get-ServerStagingTree {
 $meta = Get-DeployMeta
 $feRoot = Get-ManifestModulePath $script:FeModuleId
 $beModId = Get-ModuleIdByRole "api"
-if (-not $beModId) { $beModId = (Get-ModuleIdsByDriverType "java-boot" | Select-Object -First 1) }
+if (-not $beModId) { $beModId = (Get-ModuleIdsByLayoutSimulator "simulate-backend-layout.ps1" | Select-Object -First 1) }
 $beRoot = if ($beModId) { Get-ManifestModulePath $beModId } else { $null }
 $feRel = (Get-ManifestField "modules.$($script:FeModuleId).path") -replace '\\', '/'
 $script:DeployEnvLbl = Get-DeployEnvPathLabel

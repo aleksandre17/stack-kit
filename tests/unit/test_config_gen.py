@@ -7,7 +7,7 @@ import pytest
 
 from lib.config_gen import (
     check_module_drift,
-    java_boot_modules_with_datastores,
+    config_gen_modules_with_datastores,
     render_module_files,
     strip_generated_header,
     write_module_config,
@@ -26,7 +26,7 @@ def ctx(repo_root: Path, pkg_root: Path) -> ProjectContext:
 
 
 def test_ingestion_listed_for_config_gen(ctx: ProjectContext) -> None:
-    modules = java_boot_modules_with_datastores(ctx)
+    modules = config_gen_modules_with_datastores(ctx)
     assert "worker" in modules
     assert "search" in modules
     assert "api" in modules

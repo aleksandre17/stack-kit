@@ -1,0 +1,8 @@
+{
+  "$comment": "Lifecycle steps, declared once and in pipeline order (ADR-001 amendment 12): each is a CLI verb (`stack-kit <id> [module]`), a driver command, and a CI step. optional: a module whose driver lacks it is skipped and said. A host adds one (e.g. typecheck) in its manifest (`catalogs.lifecycle`, with `after`); its drivers declare the command.",
+  "entries": [
+    { "id": "lint", "optional": true },
+    { "id": "build" },
+    { "id": "test" }
+  ]
+}

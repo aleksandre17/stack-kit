@@ -1,8 +1,8 @@
 #!/bin/bash
-# Step 4 (node-api): docker compose up --build, health-gate, image rollback, info.log.
-# Same lifecycle as java-boot docker-up.sh (build artifact -> up -d -> health-gate ->
+# Step 4 (a workspace image driver): docker compose up --build, health-gate, image rollback, info.log.
+# Same lifecycle as docker-up.sh (build artifact -> up -d -> health-gate ->
 # rollback on failure), but rollback restores the previous IMAGE tag instead of app.jar
-# (node-api builds its image server-side; there is no uploaded jar to swap).
+# (the image is built server-side; there is no uploaded jar to swap).
 #
 # Requires: SERVER, ENVIRONMENT, ENV_FILE, HEALTH_RETRIES, DEPLOY_VERSION.
 

@@ -54,7 +54,7 @@ def _host(tmp_path: Path) -> Path:
     (secrets / ".env.dev").write_text("SK_ECHO_A=dev\nSK_ECHO_B=\n", encoding="utf-8")
     (secrets / ".env").write_text("SK_ECHO_C=shared\n", encoding="utf-8")
     (reg / "registry.json").write_text(json.dumps({OWN: {
-        "label": "echoes its operands", "roles": ["worker"], "runtime": "powershell",
+        "label": "echoes its operands", "roles": ["worker"],
         "commands": {"deploy": "ps1/deploy.ps1", "check": "sh/check.sh"},
         "hybrid": {"script": "ps1/hybrid.ps1"},
         "delivery": {"hybrid": {"via": "hybrid"}, "release": {"command": "deploy", "args": ["dist", "-Environment", "{environment}"]},

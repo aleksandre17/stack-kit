@@ -73,8 +73,10 @@ Required: `version` (integer ≥ 2), `package`, `secrets`, `modules`.
 | `layout.profile` | a canonical tree the kit declares (`config/layout-profiles/<name>.json`; `monorepo`: `platform/apps/`, `platform/kits/`, `ops/cli/`, `ops/config/`, `docs/`): its places are derived rows, and `entries` adds only the host's own |
 | `layout` | the host tree as a declared layout held by `validate` as a floor (`lib/layout_floor.py`): `entries[]` `{path, kind, holds, writer, read_when, lifecycle, pending}` add rows to the places the manifest already declares; `closed` names directories where an undeclared child fails; a `pending` row is printed, not failed |
 | `deploy` | `targets`: the tracked, non-secret targets file (schema `config/deploy-targets.schema.json`), merged under a gitignored `<name>.local.json`. Per target: `runtime` (`docker-compose`, `static`, `iis`), `host`, `user`, `port`, `root` (absolute; required unless `pending`), `ssh` {`identity`: `agent` \| `env:VAR` \| `file:<ignored path>`, `knownHosts`, `hostKeys` `pinned`\|`accept-new`, `config`, `options`}, `layout` (templates over the default), `ports` {`dev`\|`prod`: {service: [port]}}, `health` {`dev`\|`prod`: {service: url}} (`targets --health`), `keep` (releases kept; default 5), `pending`, `description`; top-level `defaults` {`dev`, `prod`}. `validate` refuses a missing root, a secret value or field, a host-key option outside `hostKeys`, an unknown placeholder, a path outside the project's directory, a host port declared twice on one host, a tracked override or key file |
+| `catalogs` | the host's entries over the kit's catalogs (`config/catalogs/`): `roles` {id, deployOrder, bootOrder, primaryService, serviceOverride, primaryField, launchCompound}, `environments` in promotion order {id, workspace, runDefault, deployDefault}, `lifecycle` {id, optional} (each a CLI verb and a CI step), `targetRuntimes` {id}; an entry with a kit id overrides it, a new one goes `after` the id it names. Adding `staging` or `typecheck` is a declaration |
+| `runtimes` | the host's script runtimes over `config/runtimes.json`: id -> {`match`: [globs], `argv`: [`{script}`, `{operands}`, `{bash}`, `{python}`, `{pwsh}`, ...]} or `inSession` (PowerShell) |
 | `commands` | the host's literal command lines for every tool (the agent kit's detector reads them): `test` (required), `build`, `lint`, `run`. `init` writes them through the launcher (`pwsh ops/cli/stack-kit.ps1 test`); `validate` refuses a line naming a missing script |
-| `ci` | `workflow` (where `ci-gen` writes; default `.github/workflows/ci.yml`), `integration`, `prepareEnv`, `waitHealth`, `waitStackHealth`, `healthModules` (subset of health targets), `scripts` (the host's further CI scripts by its own names; each must exist and is a layout-floor row) |
+| `ci` | `actions` (the host's own action pins, SHA-only, over `lib/ci-actions.json`), `workflow` (where `ci-gen` writes; default `.github/workflows/ci.yml`), `integration`, `prepareEnv`, `waitHealth`, `waitStackHealth`, `healthModules` (subset of health targets), `scripts` (the host's further CI scripts by its own names; each must exist and is a layout-floor row) |
 
 `modules.<id>` — required `type`, `role`, `path`, `secretsModule`:
 
@@ -194,23 +196,24 @@ Former-prefix variables (`lib/identity.json` `legacyEnvPrefix`) are adopted inwa
 
 **Authority: [drivers/registry.json](../drivers/registry.json)** (schema `drivers/registry.schema.json`). Type = toolchain; module id = host key; a module always names its `type`.
 
-| Type | Roles | Runtime | Commands | Watch tasks | Launch | Deploy kind / args |
+| Type | Roles | Scripts | Commands | Watch tasks | Launch | Deploy kind / args |
 |---|---|---|---|---|---|---|
-| `node-spa` | ui | powershell | build, test, lint (package.json scripts), run (`start`) | — | node-terminal | release pending (the output directory is the framework's) |
-| `java-boot` | api, worker | bash | deploy, dev, run, build, test, manage, compose, check, modules | `devWatch` | java | runtime / `all --{environment}`, forwards `--no-build`, `--skip-checks` |
-| `node-vite` | ui | powershell | deploy, dev, run, build, test, lint, manage, compose, check | `devWatch`, `deployWatch` | node-terminal | static / `dist -Environment {environment}` |
-| `node-api` | api | bash | deploy, dev, run, build, test, lint, manage, compose, check, modules | `devWatch` | node-terminal | runtime / `--{environment}`, forwards `--no-build`, `--skip-checks` |
-| `dotnet-aspnet` | api | powershell | deploy, run, build, test, lint (`dotnet format --verify-no-changes`), check | — | dotnet | artifact / `artifact` (`deploy remote` refused: delivery not declared) |
+| `node-spa` | ui | the kit's ps1 runners | build, test, lint (package.json scripts), run (`start`) | — | node-terminal | release pending (the output directory is the framework's) |
+| `java-boot` | api, worker | sh, ps1 | deploy, dev, run, build, test, manage, compose, check, modules | `devWatch` | java | runtime / `all --{environment}`, forwards `--no-build`, `--skip-checks` |
+| `node-vite` | ui | ps1 | deploy, dev, run, build, test, lint, manage, compose, check | `devWatch`, `deployWatch` | node-terminal | static / `dist -Environment {environment}` |
+| `node-api` | api | sh, ps1 | deploy, dev, run, build, test, lint, manage, compose, check, modules | `devWatch` | node-terminal | runtime / `--{environment}`, forwards `--no-build`, `--skip-checks` |
+| `dotnet-aspnet` | api | ps1 | deploy, run, build, test, lint (`dotnet format --verify-no-changes`), check | — | dotnet | artifact / `artifact` (`deploy remote` refused: delivery not declared) |
 
 Per-driver detail: [java-boot](../drivers/java-boot/README.md), [node-vite](../drivers/node-vite/README.md), [node-api](../drivers/node-api/README.md), [dotnet-aspnet](../drivers/dotnet-aspnet/README.md), [node-spa](../drivers/node-spa/README.md), [drivers/README.md](../drivers/README.md).
 
-Entry fields: `label`, `roles` (first = default role), `runtime` (`bash` | `powershell`), `commands`
-(name → script; a driver that declares `hybrid.script` is given `run` = the kit's host runner,
+Entry fields (schema `drivers/registry.schema.json`, held over the composed registry by `validate`):
+`label`, `roles` (first = default role; catalogs.roles), `commands`
+(name → script, or `{script, runtime}`: a command runs by its script's runtime, `config/runtimes.json`; a driver that declares `hybrid.script` is given `run` = the kit's host runner,
 `toolkit/hybrid/Invoke-HybridRun.ps1`, and ships no run script of its own; one that declares
 `packageScripts` (step → package.json script) is given `build`, `test`, `lint` = the kit's
 `toolkit/node/Invoke-PackageScript.ps1`, which installs from the lockfile when `node_modules` is
 absent), `ci.setup` (the actions and `run` lines CI sets the toolchain up with; `{toolchain.version|default}`), `tasks` (`devWatch`, `deployWatch` argv; `dev up --mode remote` and `vscode-gen` read them),
-`package` (`{command, args, artifacts}`, `{out}` the staging directory; or `{pending}` with its reason), a release rung's `promotes` (the operands that deploy the packaged artifact without rebuilding), `detect` (the evidence a directory is this driver's module: `all` of `{file, matches}` \| `{any: [...]}` \| `{none}`, relative to the directory; and `reads`: `{name}` a matched file's name, `{find, matches, mentions}` a repository file as a path from the module -- `init --plan` evaluates it, and holds no ecosystem of its own), `vscode.launch`, `deployKind`, `delivery` (rung → `{command, args, forwards}` | `{via}` | `{pending}`; `forwards` names the `stack-deploy` flags a `release` step passes on), `layoutSimulator`, `hybrid.script` (the launch step the hybrid
+`package` (`{command, args, artifacts}`, `{out}` the staging directory; or `{pending}` with its reason), a release rung's `promotes` (the operands that deploy the packaged artifact without rebuilding), `detect` (the evidence a directory is this driver's module: `all` of `{file, matches}` \| `{any: [...]}` \| `{none}`, relative to the directory; and `reads`: `{name}` a matched file's name, `{find, matches, mentions}` a repository file as a path from the module -- `init --plan` evaluates it, and holds no ecosystem of its own), `vscode.launch` (a builder name, or the launch configuration itself as data), `ci` {`setup`, `runsOn`}, `compose` {`templates` (role -> profile -> template), `dockerfiles`, `opsModules`}, `nginx.serves`, `deployKind`, `delivery` (rung → `{command, args, forwards}` | `{via}` | `{pending}`; `forwards` names the `stack-deploy` flags a `release` step passes on), `layoutSimulator`, `hybrid.script` (the launch step the hybrid
 runner dot-sources; a `hybrid` rung requires it), `migrations` (`globs`, `exclude`, `data` patterns; java-boot Flyway SQL, dotnet-aspnet EF Core), `configGen`, `acceptsGlobalCredentials`. A driver that declares no watch task gets none — a declared absence.
 
 Adding a driver (Go, FastAPI, Next.js, a Node API …) — a new type, never a renamed folder:

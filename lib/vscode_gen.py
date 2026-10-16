@@ -244,7 +244,37 @@ def _driver_vscode(driver_id: str) -> dict[str, Any]:
 
 
 def _launch_kind(driver_id: str) -> str:
-    return str(_driver_vscode(driver_id).get("launch") or "")
+    launch = _driver_vscode(driver_id).get("launch")
+    return launch if isinstance(launch, str) else ("data" if isinstance(launch, dict) else "")
+
+
+def _launch_from_data(ctx: ProjectContext, module_id: str, aliases: dict[str, str]) -> dict[str, Any] | None:
+    """A launch configuration the driver declares as data (`vscode.launch` an object): every string in
+    it has {module}, {path}, {label} and {script} filled for the module. A new driver needs no builder."""
+    typ = str(((ctx.manifest.get("modules") or {}).get(module_id) or {}).get("type") or "")
+    template = _driver_vscode(typ).get("launch")
+    dbg = _module_debug_cfg(ctx.manifest, module_id)
+    values = {"module": module_id, "path": "${workspaceFolder}/" + _posix_rel(ctx.root, ctx.module_path(module_id)),
+              "label": str(dbg.get("label") or module_id),
+              "script": str(dbg.get("npmScript") or dbg.get("script") or driver_package_scripts(typ).get("start") or "")}
+
+    def fill(node: Any) -> Any:
+        if isinstance(node, str):
+            for k, v in values.items():
+                node = node.replace("{" + k + "}", v)
+            return node
+        if isinstance(node, list):
+            return [fill(n) for n in node]
+        if isinstance(node, dict):
+            return {k: fill(v) for k, v in node.items()}
+        return node
+
+    cfg = fill(template)
+    cfg.setdefault("name", values["label"])
+    return cfg
+
+
+LAUNCH_BUILDERS["data"] = _launch_from_data
 
 
 def _driver_watch_tasks(driver_id: str) -> dict[str, list[str]]:
@@ -259,6 +289,9 @@ def _driver_watch_tasks(driver_id: str) -> dict[str, list[str]]:
 
 
 def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
+    from lib import catalogs
+
+    compound_roles = catalogs.flagged("roles", "launchCompound", ctx.manifest)
     aliases = infer_cli_aliases(ctx.manifest)
     configs: list[dict[str, Any]] = []
     compounds_members: list[str] = []
@@ -272,7 +305,7 @@ def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
         if not cfg:
             continue
         configs.append(cfg)
-        if read_nested(ctx.manifest, f"modules.{mid}.role", "") in ("ui", "api", "worker"):
+        if read_nested(ctx.manifest, f"modules.{mid}.role", "") in compound_roles:
             compounds_members.append(cfg["name"])
 
     gs = _stack_kit_script_rel(ctx)

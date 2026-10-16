@@ -22,44 +22,35 @@ from conftest import PKG
 
 
 
-# ── 1. No privileged driver name in the generators ────────────────────────────
+# ── 1. No driver is named outside its own directory ───────────────────────────
 
-# Wave 2c closed the last six. The list only ever grows: an interpreter that has
-# stopped naming drivers is added here, and a name that comes back fails the build.
-# There is no exclusion — an exclusion is how a cured file quietly relapses.
-GENERATORS = [
-    "lib/vscode_gen.py",
-    "lib/modules.py",
-    "lib/config_gen.py",
-    "lib/credentials.py",
-    "lib/migrate_layout_preflight.py",
-    "lib/migrate_manifest.py",
-    "lib/stack_deploy.py",
-    "toolkit/hybrid/Invoke-HybridRun.ps1",
-    "cli/stack-kit.ps1",
-    "cli/stack-kit.sh",
-    "lib/resolve_cli.py",
-    "lib/stack_deploy.py",
-    "lib/drivers.ps1",
-    "toolkit/deploy/stack-remote.sh",
-    "toolkit/powershell/Deploy-Path.ps1",
-    "toolkit/node/Invoke-PackageScript.ps1",
-    "toolkit/deploy/migrate-layout.sh",
-    "toolkit/deploy/migrate-backend-layout.sh",
-    "toolkit/deploy/migrate-frontend-layout.sh",
-    "toolkit/deploy/cleanup-scoped-layout.sh",
-    "toolkit/deploy/deploy-watch.sh",
-    "toolkit/deploy/dev-remote.sh",
-    "lib/ci_gen.py",
-    "lib/runs.ps1",
-]
+#: Where a driver may be named: its own directory and the tests. Everything else -- every interpreter,
+#: shim, toolkit script, adapter, CI helper and scaffold script, comments included -- is denied by
+#: default (ADR-001 amendment 12). An allowlist of cured files is how an uncured one stays unseen.
+NAMED_ONLY_IN = ("drivers/", "tests/")
 
 
-@pytest.mark.parametrize("rel", GENERATORS)
-def test_generator_names_no_driver(rel: str) -> None:
-    text = (PKG / rel).read_text(encoding="utf-8")
-    for driver_id in driver_registry():
-        assert driver_id not in text, f"{rel} hardcodes driver '{driver_id}'"
+def _driver_spellings() -> list:
+    """Each driver id as a pattern that matches its hyphen and its underscore spelling."""
+    return [(d, re.compile("[-_]".join(re.escape(part) for part in d.split("-")), re.IGNORECASE))
+            for d in driver_registry()]
+
+
+def test_no_script_outside_drivers_names_a_driver() -> None:
+    import subprocess
+
+    tracked = subprocess.run(["git", "-C", str(PKG), "ls-files", "-co", "--exclude-standard", "*.py", "*.ps1", "*.sh"],
+                             capture_output=True, text=True).stdout.splitlines()
+    spellings = _driver_spellings()
+    offenders = []
+    for rel in tracked:
+        if rel.startswith(NAMED_ONLY_IN) or not (PKG / rel).is_file():
+            continue
+        for n, line in enumerate((PKG / rel).read_text(encoding="utf-8-sig", errors="replace").splitlines(), 1):
+            hit = next((d for d, pat in spellings if pat.search(line)), None)
+            if hit:
+                offenders.append(f"{rel}:{n} names {hit}")
+    assert not offenders, "\n".join(offenders)
 
 
 # ── 1b. The kit's own name has ONE home ───────────────────────────────────────

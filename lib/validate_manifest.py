@@ -86,6 +86,28 @@ def command_line_problems(root: Path, manifest: dict[str, Any]) -> list[str]:
     return out
 
 
+def registry_problems(registry: dict[str, Any], manifest: dict[str, Any]) -> list[str]:
+    """The composed registry (the kit's and the project's drivers) against drivers/registry.schema.json,
+    its roles against catalogs.roles, its command runtimes against the declared runtimes."""
+    from lib import catalogs
+    from lib.modules import script_runtimes
+    from lib.schema_check import validate as schema_validate
+
+    schema = json.loads((Path(__file__).resolve().parents[1] / "drivers" / "registry.schema.json").read_text(encoding="utf-8"))
+    out = [f"drivers: {e}" for e in schema_validate(registry, schema)]
+    roles = set(catalogs.ids("roles", manifest)) | {"any"}
+    runtimes = set(script_runtimes(manifest))
+    for typ, entry in registry.items():
+        for role in entry.get("roles") or []:
+            if role not in roles:
+                out.append(f"drivers: {typ}.roles: '{role}' is not a declared role ({', '.join(sorted(roles))})")
+        for name, cmd in (entry.get("commands") or {}).items():
+            if isinstance(cmd, dict) and cmd.get("runtime") and cmd["runtime"] not in runtimes:
+                out.append(f"drivers: {typ}.commands.{name}.runtime: '{cmd['runtime']}' is not a declared runtime "
+                           f"({', '.join(sorted(runtimes))}; a host adds one in `runtimes`)")
+    return out
+
+
 def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str]:
     errs: list[str] = []
     warnings: list[str] = []
@@ -171,9 +193,9 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
     warnings.extend(validate_stack_deploy(ctx.manifest))
 
     try:
-        from lib.config_gen import check_module_drift, java_boot_modules_with_datastores
+        from lib.config_gen import check_module_drift, config_gen_modules_with_datastores
 
-        for mid in java_boot_modules_with_datastores(ctx):
+        for mid in config_gen_modules_with_datastores(ctx):
             for issue in check_module_drift(ctx, mid):
                 errs.append(f"config-gen: {issue}")
     except ImportError:
@@ -196,6 +218,7 @@ def validate_manifest(
         return [f"drivers: {e}"], []
 
     errs = _validate_required(ctx.manifest)
+    errs.extend(registry_problems(registry, ctx.manifest))
     errs.extend(_validate_jsonschema(with_current_fields(ctx.manifest), schema))
     # A host on a shape the kit no longer spells is told the door that carries it (amendment 7).
     from lib.migrate_manifest import carry_host_shapes
@@ -203,6 +226,9 @@ def validate_manifest(
     errs.extend(f"{c} -- run `migrate --apply`" for c in carry_host_shapes(ctx.manifest))
     proj_errs, warnings = _validate_project(ctx, registry)
     errs.extend(proj_errs)
+    warnings.extend(f"drivers: {typ}.runtime is removed and ignored -- a command runs by its script's runtime "
+                    f"(config/runtimes.json, manifest `runtimes`) or its own {{script, runtime}}"
+                    for typ, entry in registry.items() if "runtime" in entry)
     errs.extend(command_line_problems(ctx.root, ctx.manifest))
     # The declared tree, held as a floor (ADR-001 decision 3).
     from lib.layout_floor import evaluate

@@ -1,0 +1,9 @@
+{
+  "$comment": "How a driver command's script is run, by what it is (ADR-001 amendment 12): `match` globs on the script's file name; `argv` the command line, `{script}` the script, `{operands}` the operands, `{bash}` / `{python}` / `{pwsh}` the interpreters the CLI finds; `inSession` runs a PowerShell script in the CLI's own session, its -Name operands bound to the parameters it declares. A host adds or overrides one in its manifest (`runtimes`); a command may name its runtime outright ({script, runtime}).",
+  "runtimes": {
+    "powershell": { "match": ["*.ps1"], "inSession": true },
+    "bash": { "match": ["*.sh"], "argv": ["{bash}", "{script}", "{operands}"] },
+    "python": { "match": ["*.py"], "argv": ["{python}", "{script}", "{operands}"] },
+    "node": { "match": ["*.js", "*.mjs", "*.cjs"], "argv": ["node", "{script}", "{operands}"] }
+  }
+}

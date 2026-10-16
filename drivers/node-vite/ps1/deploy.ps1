@@ -8,7 +8,7 @@
 param(
     [Parameter(Position=0)] [string]$Arg1 = "",
     [Parameter(Position=1)] [string]$Arg2 = "",
-    [ValidateSet("dev", "prod")]
+    [ValidateScript({ Test-KitEnvironment $_ })]
     [string]$Environment = "prod",
     [int]$DebounceMs = 3000,
     [switch]$NoInitialSync

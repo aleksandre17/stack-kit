@@ -9,7 +9,6 @@
     "acceptsGlobalCredentials": true,
     "deployKind": "runtime",
     "layoutSimulator": "simulate-backend-layout.ps1",
-    "runtime": "bash",
     "commands": {
       "deploy": "sh/deploy.sh",
       "dev": "sh/dev.sh",
@@ -136,6 +135,19 @@
         "build/libs/*.jar",
         "*/build/libs/*.jar"
       ]
+    },
+    "compose": {
+      "templates": {
+        "api": {
+          "dev": "module_java_api_dev",
+          "prod": "module_java_api_prod"
+        },
+        "worker": {
+          "dev": "module_java_worker_dev",
+          "prod": "module_java_worker_prod"
+        }
+      },
+      "opsModules": "boot"
     }
   },
   "node-vite": {
@@ -145,7 +157,6 @@
     ],
     "deployKind": "static",
     "layoutSimulator": "simulate-frontend-layout.ps1",
-    "runtime": "powershell",
     "commands": {
       "deploy": "ps1/deploy.ps1",
       "dev": "ps1/dev.ps1",
@@ -237,6 +248,21 @@
     },
     "package": {
       "pending": "its build is per environment (the API URL is compiled in): one artifact for dev and prod needs runtime config first"
+    },
+    "compose": {
+      "templates": {
+        "ui": {
+          "dev": "module_ui_stack_dev",
+          "prod": "module_ui_stack_prod"
+        }
+      },
+      "dockerfiles": {
+        "dev": "Dockerfile",
+        "prod": "Dockerfile"
+      }
+    },
+    "nginx": {
+      "serves": true
     }
   },
   "node-api": {
@@ -245,7 +271,6 @@
       "api"
     ],
     "deployKind": "runtime",
-    "runtime": "bash",
     "commands": {
       "deploy": "sh/deploy.sh",
       "dev": "sh/dev.sh",
@@ -329,7 +354,6 @@
       "api"
     ],
     "deployKind": "artifact",
-    "runtime": "powershell",
     "commands": {
       "deploy": "ps1/deploy.ps1",
       "check": "ps1/check.ps1",
@@ -420,7 +444,6 @@
     "roles": [
       "ui"
     ],
-    "runtime": "powershell",
     "commands": {},
     "packageScripts": {
       "lint": "lint",

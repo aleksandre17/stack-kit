@@ -321,7 +321,7 @@ def render_module_files(
     return out
 
 
-def java_boot_modules_with_datastores(ctx: ProjectContext) -> list[str]:
+def config_gen_modules_with_datastores(ctx: ProjectContext) -> list[str]:
     out: list[str] = []
     for mid in ctx.list_module_ids():
         if _module_spec(ctx, mid):
@@ -413,7 +413,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     targets: list[str]
     if args.all:
-        targets = java_boot_modules_with_datastores(ctx)
+        targets = config_gen_modules_with_datastores(ctx)
     elif args.module:
         targets = [args.module]
     else:

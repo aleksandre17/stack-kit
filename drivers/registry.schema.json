@@ -1,22 +1,66 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "stack-kit driver registry",
+  "description": "The kit's drivers/registry.json and a project's own registry (drivers.registry), validated together as one composed registry by `validate` (ADR-001 amendment 12). Roles are held to catalogs.roles in code.",
   "type": "object",
   "additionalProperties": {
     "type": "object",
-    "required": ["label", "runtime", "commands"],
+    "required": ["label", "commands"],
     "properties": {
-      "label": { "type": "string" },
-      "runtime": { "enum": ["bash", "powershell"] },
-      "roles": {
-        "type": "array",
-        "items": { "enum": ["api", "ui", "worker", "any"] },
-        "description": "Typical module role — not enforced; modules pick type explicitly"
-      },
+      "label": { "type": "string", "minLength": 1 },
+      "roles": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "The roles the driver serves, first = a module's default role (catalogs.roles, or `any`)" },
+      "runtime": { "type": "string", "description": "Removed in 1.2.0: a command runs by its script's runtime (config/runtimes.json, manifest `runtimes`) or the command's own `runtime`. Read and ignored, with a notice" },
       "commands": {
         "type": "object",
-        "additionalProperties": { "type": "string" }
-      }
-    }
+        "description": "command -> script (driver-relative), or {script, runtime}",
+        "additionalProperties": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            {
+              "type": "object",
+              "required": ["script"],
+              "properties": { "script": { "type": "string", "minLength": 1 }, "runtime": { "type": "string", "minLength": 1 } },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "hybrid": { "type": "object", "properties": { "script": { "type": "string", "minLength": 1 } }, "additionalProperties": false },
+      "tasks": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+      "vscode": {
+        "type": "object",
+        "properties": {
+          "launch": {
+            "oneOf": [
+              { "type": "string", "minLength": 1 },
+              { "type": "object", "description": "A launch configuration as data: {placeholders} {module}, {path}, {label}, {script} are filled per module" }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "delivery": { "type": "object", "additionalProperties": { "type": "object" } },
+      "operands": { "type": "object", "additionalProperties": { "type": "object" } },
+      "ci": {
+        "type": "object",
+        "properties": {
+          "setup": { "type": "array", "items": { "type": "object" } },
+          "runsOn": { "type": "string", "minLength": 1, "description": "The CI runner a module of this driver builds on (default ubuntu-latest)" }
+        },
+        "additionalProperties": false
+      },
+      "detect": { "type": "object" },
+      "package": { "type": "object" },
+      "packageScripts": { "type": "object", "additionalProperties": { "type": "string" } },
+      "deployKind": { "type": "string" },
+      "deployArgs": { "type": "array", "items": { "type": "string" }, "description": "Former home of the release rung's args; read" },
+      "layoutSimulator": { "type": "string" },
+      "migrations": { "type": "object" },
+      "compose": { "type": "object" },
+      "nginx": { "type": "object" },
+      "configGen": { "type": "boolean" },
+      "acceptsGlobalCredentials": { "type": "boolean" }
+    },
+    "additionalProperties": false
   }
 }

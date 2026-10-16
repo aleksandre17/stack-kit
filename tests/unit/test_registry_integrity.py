@@ -9,8 +9,8 @@ def test_all_driver_commands_exist(pkg_root: Path):
     reg_path = pkg_root / "drivers" / "registry.json"
     reg = json.loads(reg_path.read_text(encoding="utf-8"))
     for driver_id, entry in reg.items():
-        runtime = entry.get("runtime", "bash")
         for cmd, rel in entry.get("commands", {}).items():
+            rel = rel["script"] if isinstance(rel, dict) else rel  # a command may name its runtime
             path = pkg_root / "drivers" / driver_id / Path(rel)
             assert path.is_file(), f"{driver_id}.{cmd} -> missing {path}"
 

@@ -6,7 +6,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-MODULE_ROLES = frozenset({"ui", "api", "worker", "gateway", "data", "other"})
+from lib import catalogs
+
+
+def module_roles(manifest: dict[str, Any] | None = None) -> list[str]:
+    """The roles a module may take: config/catalogs/roles.json with the host's (`catalogs.roles`)."""
+    return catalogs.ids("roles", manifest)
 
 
 KIT_DRIVERS = Path(__file__).resolve().parent.parent / "drivers"
@@ -16,22 +21,42 @@ HOST_RUNNER = Path(__file__).resolve().parent.parent / "toolkit" / "hybrid" / "I
 #: A Node package's lifecycle step is the KIT's too: one runner of package.json scripts for every
 #: driver that declares `packageScripts` (step -> script name), given as those commands (amendment 8).
 PACKAGE_SCRIPT = Path(__file__).resolve().parent.parent / "toolkit" / "node" / "Invoke-PackageScript.ps1"
-#: The lifecycle steps every module may be asked for, in the order a pipeline runs them; `stack-kit
-#: build|test|lint` runs one across the modules. `lint` is optional: a module without it is skipped.
-LIFECYCLE_STEPS = ("lint", "build", "test")
-OPTIONAL_STEPS = frozenset({"lint"})
+
+
+def lifecycle_steps(manifest: dict[str, Any] | None = None) -> list[str]:
+    """The lifecycle steps every module may be asked for, in pipeline order (catalogs.lifecycle);
+    each is a CLI verb across the modules (`stack-kit <step> [module]`)."""
+    return catalogs.ids("lifecycle", manifest)
+
+
+def optional_steps(manifest: dict[str, Any] | None = None) -> list[str]:
+    """The steps a module may lack: skipped and said, never failed."""
+    return catalogs.flagged("lifecycle", "optional", manifest)
 
 
 class DriverCollision(ValueError):
     """A project registry declares a driver id the kit already has: two homes for one name."""
 
 
+class DriverRegistryError(ValueError):
+    """A driver registry that cannot be read as one, named -- never read as an empty registry."""
+
+
 def _read_registry(path: Path) -> dict[str, Any]:
+    """A registry file's drivers. An unreadable or malformed file is refused by name: read as {}, a
+    typo would silently remove every driver it declares."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return {k: v for k, v in data.items() if isinstance(v, dict)} if isinstance(data, dict) else {}
+    except OSError as e:
+        raise DriverRegistryError(f"{path.as_posix()}: unreadable ({e})") from e
+    except ValueError as e:
+        raise DriverRegistryError(f"{path.as_posix()}: not JSON ({e})") from e
+    if not isinstance(data, dict):
+        raise DriverRegistryError(f"{path.as_posix()}: a registry is an object of drivers")
+    bad = sorted(k for k, v in data.items() if not isinstance(v, dict) and not str(k).startswith("$"))
+    if bad:
+        raise DriverRegistryError(f"{path.as_posix()}: {', '.join(bad)} not a driver declaration (an object)")
+    return {k: v for k, v in data.items() if isinstance(v, dict)}
 
 
 def project_registry_path(root: Path, manifest: dict[str, Any]) -> Path | None:
@@ -100,13 +125,36 @@ def driver_commands(driver_id: str) -> dict[str, Path]:
     if not isinstance(entry, dict):
         return {}
     home = driver_home(driver_id)
-    out = {str(name): home / str(rel) for name, rel in (entry.get("commands") or {}).items()}
+    out = {str(name): home / str(rel["script"] if isinstance(rel, dict) else rel)
+           for name, rel in (entry.get("commands") or {}).items()}
     if (entry.get("hybrid") or {}).get("script") and "run" not in out:
         out["run"] = HOST_RUNNER
     for step in driver_package_scripts(driver_id):
-        if step in LIFECYCLE_STEPS:
+        if step in lifecycle_steps():
             out.setdefault(step, PACKAGE_SCRIPT)
     return out
+
+
+def driver_command_runtimes(driver_id: str) -> dict[str, str]:
+    """command -> runtime, for the commands a driver names a runtime for ({script, runtime}); every
+    other command runs by its script's runtime (config/runtimes.json)."""
+    entry = driver_registry().get(str(driver_id)) or {}
+    return {str(n): str(c["runtime"]) for n, c in (entry.get("commands") or {}).items()
+            if isinstance(c, dict) and c.get("runtime")}
+
+
+KIT_RUNTIMES = Path(__file__).resolve().parent.parent / "config" / "runtimes.json"
+
+
+def script_runtimes(manifest: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
+    """id -> {match, argv | inSession}: the kit's runtimes with the host's over them (`runtimes`)."""
+    kit = json.loads(KIT_RUNTIMES.read_text(encoding="utf-8"))["runtimes"]
+    if manifest is None:
+        from lib import catalogs
+
+        manifest = catalogs._current_manifest()
+    own = (manifest or {}).get("runtimes") or {}
+    return {**kit, **{str(k): v for k, v in own.items() if isinstance(v, dict)}}
 
 
 def driver_package_scripts(driver_id: str) -> dict[str, str]:
@@ -136,7 +184,7 @@ def driver_default_role(driver_id: str) -> str:
     roles = entry.get("roles")
     if isinstance(roles, list):
         for r in roles:
-            if str(r).strip().lower() in MODULE_ROLES:
+            if str(r).strip().lower() in module_roles():
                 return str(r).strip().lower()
     return ""
 
@@ -153,7 +201,7 @@ def _modules(manifest: dict[str, Any]) -> dict[str, Any]:
 def module_role(manifest: dict[str, Any], module_id: str) -> str:
     cfg = _modules(manifest).get(module_id) or {}
     role = str(cfg.get("role", "")).strip().lower()
-    if role in MODULE_ROLES:
+    if role in module_roles(manifest):
         return role
     # Infer from driver registry roles when manifest omits role (migration)
     return driver_default_role(str(cfg.get("type", ""))) or "other"

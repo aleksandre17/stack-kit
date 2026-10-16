@@ -12,16 +12,16 @@ from pathlib import Path
 
 _LINE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
 
-#: The order a folder's files are read in; a later file's value wins, as it does when the same files
-#: are handed to compose with repeated --env-file.
-PROFILES = ("dev", "prod", "deploy")
+#: The kit's environments when a caller passes none (the catalog's, config/catalogs/environments.json,
+#: is what the resolver passes); a folder's files are read in this order, then `deploy`, a later
+#: file's value winning, as compose does with repeated --env-file.
+DEFAULT_ENVIRONMENTS = ("dev", "prod")
 
 #: A run on this machine (`run`, `hybrid boot`) reads ONE environment's configuration (12-factor III):
 #: the folder's shared, non-secret `.env`, then that environment's file over it. A development run
 #: never reads a production value; production's file is read only when it is asked for (`--env prod`).
 #: (ADR-001 amendment 8; until then a host run filled from `.env.prod`.)
 SHARED = ".env"
-RUN_ENVIRONMENTS = ("dev", "prod")
 
 
 def parse(path: Path) -> dict[str, str]:
@@ -49,10 +49,11 @@ def merged(paths: list[Path]) -> dict[str, str]:
     return out
 
 
-def run_files(secrets_root: Path, folder: str, environment: str = "dev") -> list[Path]:
+def run_files(secrets_root: Path, folder: str, environment: str = "dev",
+              environments: tuple[str, ...] | list[str] = DEFAULT_ENVIRONMENTS) -> list[Path]:
     """The env files a run of one environment reads, in the order they are applied."""
-    if environment not in RUN_ENVIRONMENTS:
-        raise ValueError(f"a run's environment is one of {', '.join(RUN_ENVIRONMENTS)}, not {environment!r}")
+    if environment not in environments:
+        raise ValueError(f"a run's environment is one of {', '.join(environments)}, not {environment!r}")
     files = [secrets_root / folder / SHARED, secrets_root / folder / f".env.{environment}"]
     return [f for f in files if f.is_file()]
 
@@ -65,13 +66,15 @@ def dev_run_loses(secrets_root: Path, folder: str) -> list[str]:
     return sorted(k for k in prod if k not in dev)
 
 
-def folder_files(secrets_root: Path, folder: str, profile: str = "all") -> list[Path]:
-    """The env files of one secrets folder that exist: .env.dev, .env.prod, then the shared
-    deploy.env and the folder's .env.deploy -- or only one profile's."""
+def folder_files(secrets_root: Path, folder: str, profile: str = "all",
+                 environments: tuple[str, ...] | list[str] = DEFAULT_ENVIRONMENTS) -> list[Path]:
+    """The env files of one secrets folder that exist: one per environment in catalog order, then the
+    shared deploy.env and the folder's .env.deploy -- or only one profile's."""
     d = secrets_root / folder
-    wanted = PROFILES if profile == "all" else (profile,)
+    order = (*environments, "deploy")
+    wanted = order if profile == "all" else (profile,)
     files: list[Path] = []
-    for p in PROFILES:
+    for p in (order if profile == "all" or profile in order else (profile,)):
         if p not in wanted:
             continue
         if p == "deploy":

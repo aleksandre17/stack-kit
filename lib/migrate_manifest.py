@@ -25,7 +25,7 @@ def _infer_role(cfg: dict[str, Any]) -> str:
 #: `extensions`, under the same name, so nothing the host wrote is lost (ADR-001 amendment 7).
 MODULE_EXTENSION_FIELDS = ("catalog", "derivation")
 #: `ci` fields that are the kit's own; any other string under `ci` is a host script, by its name.
-CI_KIT_FIELDS = frozenset(CI_SCRIPT_FIELDS) | {"scripts", "healthModules", "workflow"}
+CI_KIT_FIELDS = frozenset(CI_SCRIPT_FIELDS) | {"scripts", "healthModules", "workflow", "actions"}
 
 
 def carry_host_shapes(manifest: dict[str, Any], *, apply: bool = False) -> list[str]:

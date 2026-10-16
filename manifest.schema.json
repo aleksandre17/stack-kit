@@ -160,8 +160,8 @@
           },
           "role": {
             "type": "string",
-            "enum": ["ui", "api", "worker", "gateway", "data", "other"],
-            "description": "Logical role for stack order, layout, and default CLI shortcuts"
+            "minLength": 1,
+            "description": "Logical role for stack order, layout, and default CLI shortcuts: a role of catalogs.roles (config/catalogs/roles.json, or the host's)"
           },
           "path": { "type": "string", "description": "App source dir relative to project root (e.g. apps/backend)" },
           "secretsModule": {
@@ -382,7 +382,7 @@
               "properties": {
                 "from": { "type": "string", "minLength": 1 },
                 "to": { "type": "string", "pattern": "^(?!/)(?![A-Za-z]:)(?!(.*/)?[.][.](/|$)).+$" },
-                "environments": { "type": "array", "minItems": 1, "items": { "enum": ["dev", "prod"] } }
+                "environments": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
               },
               "additionalProperties": false
             }
@@ -575,6 +575,22 @@
       },
       "additionalProperties": false
     },
+    "catalogs": {
+      "type": "object",
+      "description": "The host's entries over the kit's catalogs (config/catalogs/): an entry with a kit id overrides its attributes, a new id is inserted `after` the one it names (ADR-001 amendment 12)",
+      "properties": {
+        "roles": { "type": "array", "items": { "type": "object", "required": ["id"] } },
+        "environments": { "type": "array", "items": { "type": "object", "required": ["id"] } },
+        "lifecycle": { "type": "array", "items": { "type": "object", "required": ["id"] } },
+        "targetRuntimes": { "type": "array", "items": { "type": "object", "required": ["id"] } }
+      },
+      "additionalProperties": false
+    },
+    "runtimes": {
+      "type": "object",
+      "description": "The host's script runtimes over the kit's (config/runtimes.json): id -> {match: [globs], argv: [template]} (ADR-001 amendment 12)",
+      "additionalProperties": { "type": "object" }
+    },
     "deploy": {
       "type": "object",
       "description": "Where deploys go: `targets` names the tracked, non-secret targets file (schema config/deploy-targets.schema.json); a gitignored `<name>.local.json` beside it is merged over it per machine (ADR-001 amendment 9)",
@@ -608,6 +624,10 @@
         "prepareEnv": { "type": "string" },
         "waitHealth": { "type": "string" },
         "waitStackHealth": { "type": "string" },
+        "actions": {
+          "type": "string",
+          "description": "The host's own CI action pins (a file shaped like lib/ci-actions.json), over the kit's; each a full commit SHA"
+        },
         "workflow": {
           "type": "string",
           "description": "Where `ci-gen` writes the generated CI workflow (default .github/workflows/ci.yml)"

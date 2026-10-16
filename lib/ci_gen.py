@@ -24,7 +24,7 @@ if __name__ == "__main__":  # run as a file: the kit root, not lib/, is what `li
 
 from lib.identity import KIT_NAME, MANIFEST_FILENAME  # noqa: E402
 from lib.manifest_defaults import default_field  # noqa: E402
-from lib.modules import LIFECYCLE_STEPS, driver_capability, driver_commands  # noqa: E402
+from lib.modules import driver_capability, driver_commands, lifecycle_steps  # noqa: E402
 from lib.project_context import ProjectContext  # noqa: E402
 
 DEFAULT_WORKFLOW = ".github/workflows/ci.yml"
@@ -36,8 +36,24 @@ class UnpinnedAction(ValueError):
     """A driver asks for an action the kit has not pinned by SHA."""
 
 
-def _pins() -> dict[str, dict[str, str]]:
-    return json.loads(PINS.read_text(encoding="utf-8"))["actions"]
+_SHA = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _pins(ctx: ProjectContext | None = None) -> dict[str, dict[str, str]]:
+    """The kit's pins with the host's over them (`ci.actions`: a file of the same shape), every one a
+    full commit SHA: a project adds `actions/setup-python` without touching the kit, never a tag."""
+    pins = dict(json.loads(PINS.read_text(encoding="utf-8"))["actions"])
+    rel = ((ctx.manifest.get("ci") or {}).get("actions") if ctx is not None else None)
+    if rel:
+        path = ctx.root / str(rel)
+        if not path.is_file():
+            raise UnpinnedAction(f"ci.actions: {rel} is not there")
+        own = json.loads(path.read_text(encoding="utf-8")).get("actions") or {}
+        for action, pin in own.items():
+            if not isinstance(pin, dict) or not _SHA.match(str(pin.get("sha") or "")) or not pin.get("version"):
+                raise UnpinnedAction(f"ci.actions: {action} must be pinned by a full 40-hex commit sha with its version")
+        pins.update(own)
+    return pins
 
 
 def _uses(action: str, pins: dict[str, dict[str, str]]) -> str:
@@ -110,7 +126,9 @@ def delivery_plan(ctx: ProjectContext) -> tuple[dict[str, str], list[str], list[
     if data is None:
         reasons.append("no deploy targets are declared (manifest `deploy.targets`)")
     else:
-        for env in ("dev", "prod"):
+        from lib import catalogs
+
+        for env in catalogs.ids("environments", ctx.manifest):
             name = (data.get("defaults") or {}).get(env)
             target = (data.get("targets") or {}).get(name or "", {})
             if not name:
@@ -134,7 +152,9 @@ def delivery_plan(ctx: ProjectContext) -> tuple[dict[str, str], list[str], list[
             reasons.append(f"{mid} ({typ}): its release does not deploy a packaged artifact (no `promotes`)")
         else:
             promoted.append(mid)
-    if len(chosen) < 2:
+    from lib import catalogs
+
+    if len(chosen) < len(catalogs.ids("environments", ctx.manifest)):
         return chosen, [], reasons
     return chosen, promoted, reasons
 
@@ -183,7 +203,7 @@ def _runs_upload(name: str, pins: dict[str, dict[str, str]]) -> list[str]:
 
 
 def render(ctx: ProjectContext) -> str:
-    pins = _pins()
+    pins = _pins(ctx)
     manifest = ctx.manifest
     cli = launcher(manifest)
     submodules = (ctx.root / ".gitmodules").is_file()
@@ -197,8 +217,11 @@ def render(ctx: ProjectContext) -> str:
         "# Every step runs the command a developer runs locally; the workflow only sequences them.",
     ]
     if promoted:
-        out.append(f"# CD: {', '.join(promoted)} -> {chosen['dev']} (dev, on the default branch) -> {chosen['prod']} "
-                   f"(prod, gated by its GitHub Environment), the same packaged bytes.")
+        from lib import catalogs
+
+        chain = " -> ".join(f"{chosen[e]} ({e})" for e in catalogs.ids("environments", manifest))
+        out.append(f"# CD: {', '.join(promoted)} -> {chain}, on the default branch, each gated by its GitHub "
+                   f"Environment; the same packaged bytes throughout.")
     else:
         out.append("# CD: none -- CI and packaging only, because:")
     out += [f"#   - {r}" for r in reasons]
@@ -216,9 +239,10 @@ def render(ctx: ProjectContext) -> str:
     ]
     for mid, module in modules.items():
         typ = str(module.get("type") or "")
-        steps = [s for s in LIFECYCLE_STEPS if s in driver_commands(typ)]
+        steps = [s for s in lifecycle_steps(manifest) if s in driver_commands(typ)]
         job = re.sub(r"[^A-Za-z0-9_-]", "-", mid)
-        out += [f"  {job}:", f"    name: {_q(f'{mid} ({typ})')}", "    runs-on: ubuntu-latest", "    timeout-minutes: 30"]
+        runner = (driver_capability(typ, "ci", {}) or {}).get("runsOn") or "ubuntu-latest"
+        out += [f"  {job}:", f"    name: {_q(f'{mid} ({typ})')}", f"    runs-on: {runner}", "    timeout-minutes: 30"]
         if mid in packaged:
             out += ["    permissions:", "      contents: read", "      id-token: write", "      attestations: write"]
         out += ["    steps:", *_checkout(pins, submodules), *_setup_steps(typ, module, pins)]
@@ -234,7 +258,10 @@ def render(ctx: ProjectContext) -> str:
         data = deploy_targets.load(ctx.root, manifest) or {}
         secrets_root = str(manifest.get("secrets") or "ops/config").rstrip("/")
         previous: list[str] = [re.sub(r"[^A-Za-z0-9_-]", "-", m) for m in promoted]
-        for env in ("dev", "prod"):
+        from lib import catalogs
+
+        chain = catalogs.ids("environments", manifest)
+        for env in chain:
             name = chosen[env]
             target = data["targets"][name]
             job = f"deploy-{env}"
@@ -243,7 +270,7 @@ def render(ctx: ProjectContext) -> str:
                 f"    name: {_q(f'deploy {env} -> {name}')}",
                 f"    needs: [{', '.join(previous)}]",
                 f"    if: ${{{{ {DEFAULT_BRANCH_PUSH} }}}}",
-                "    runs-on: ubuntu-latest",
+                f"    runs-on: {target.get('runner') or 'ubuntu-latest'}",
                 "    timeout-minutes: 45",
                 f"    environment: {_q(name)}",
                 "    concurrency:",

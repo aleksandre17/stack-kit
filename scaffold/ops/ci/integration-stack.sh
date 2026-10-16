@@ -12,8 +12,8 @@ source "$PKG/lib/project.sh"
 source "$PKG/lib/env.sh"
 
 API_MOD="$(stack_kit_module_id_for_role api)"
-[[ -n "$API_MOD" ]] || API_MOD="$(stack_kit_module_id_for_type java-boot)"
-[[ -n "$API_MOD" ]] || { echo "[ci] ERROR: no api/java-boot module in stack-kit.json" >&2; exit 1; }
+[[ -n "$API_MOD" ]] || API_MOD="$(stack_kit_module_id_for_deploy_kind runtime)"
+[[ -n "$API_MOD" ]] || { echo "[ci] ERROR: no api module, and no module whose driver deploys as runtime" >&2; exit 1; }
 
 BE="$(stack_kit_module_path "$API_MOD")"
 SECRETS_API="$(stack_kit_secrets_dir_for_module "$API_MOD")"

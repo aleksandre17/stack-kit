@@ -39,6 +39,14 @@ function Get-ModuleIdsByDriverType {
     Get-KitContextLines "type:$DriverType"
 }
 
+function Get-ModuleIdsByLayoutSimulator {
+    # The modules whose driver declares this layout simulator (registry `layoutSimulator`).
+    param([Parameter(Mandatory = $true)][string]$Simulator)
+    foreach ($mid in @(Get-KitContextLines 'modules')) {
+        if ((Get-KitContextValue "driver:$(Get-ModuleType $mid):layoutSimulator") -eq $Simulator) { $mid }
+    }
+}
+
 function Get-LayoutSimulatorScript {
     # The layout simulator the module's driver DECLARES, or $null.
     param([Parameter(Mandatory = $true)][string]$ModuleId)

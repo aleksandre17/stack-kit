@@ -33,7 +33,7 @@ function Resolve-ModuleDeployPath {
     # DEPLOY_PATH/DEPLOY_LAYOUT reading when no target is declared (ADR-001 amendment 9).
     param(
         [Parameter(Mandatory = $true)][string]$ContainerName,
-        [Parameter(Mandatory = $true)][ValidateSet("static", "compose-dev", "compose-prod")][string]$Kind
+        [Parameter(Mandatory = $true)][ValidateScript({ $_ -eq "static" -or ($_ -like "compose-*" -and (Test-KitEnvironment $_.Substring(8))) })][string]$Kind
     )
     $answer = Invoke-KitResolver -Arguments @('remote-path', $OpsSecretsModule, $Kind, $ContainerName) | Select-Object -First 1
     if (-not $answer) { throw "no remote path for $ContainerName ($Kind): declare a deploy target (deploy.targets)" }
@@ -53,7 +53,7 @@ function Get-DeployPathCandidates {
 }
 
 function Set-DeployPathForMode {
-    param([Parameter(Mandatory = $true)][ValidateSet("static", "compose-dev", "compose-prod")][string]$Kind)
+    param([Parameter(Mandatory = $true)][ValidateScript({ $_ -eq "static" -or ($_ -like "compose-*" -and (Test-KitEnvironment $_.Substring(8))) })][string]$Kind)
     $script:DEPLOY_PATH = Resolve-ModuleDeployPath -ContainerName $script:APP_NAME -Kind $Kind
     $script:DEPLOY_KIND = $Kind
 }
@@ -92,7 +92,7 @@ if [ -f '$candidate/dist/index.html' ] || [ -f '$candidate/docker-compose.yml' ]
 function Get-SecretsEnvValueForProfile {
     param(
         [string]$Module,
-        [Parameter(Mandatory = $true)][ValidateSet("dev", "prod")][string]$Profile,
+        [Parameter(Mandatory = $true)][ValidateScript({ Test-KitEnvironment $_ })][string]$Profile,
         [string]$Key,
         [string]$Default = $null
     )
@@ -112,7 +112,7 @@ function Get-SecretsEnvValueForProfile {
 }
 
 function Get-ViteApiUrlForEnvironment {
-    param([ValidateSet("dev", "prod")][string]$Environment)
+    param([ValidateScript({ Test-KitEnvironment $_ })][string]$Environment)
     $v = Get-SecretsEnvValueForProfile -Module $OpsSecretsModule -Profile $Environment -Key "VITE_API_URL"
     if ($v) { return $v }
     return Get-EnvValue "VITE_API_URL"
@@ -120,7 +120,7 @@ function Get-ViteApiUrlForEnvironment {
 
 function Invoke-NpmBuildForEnvironment {
     param(
-        [ValidateSet("dev", "prod")][string]$Environment,
+        [ValidateScript({ Test-KitEnvironment $_ })][string]$Environment,
         [string]$LogFile = $script:LOG_FILE
     )
     Push-Location $script:BUILD_CONTEXT
@@ -155,7 +155,7 @@ function Write-NpmLog {
 # Build dist, upload static bundle (+ nginx/runtime), optional nginx reload on server.
 function Invoke-FeStaticPublishCycle {
     param(
-        [Parameter(Mandatory = $true)][ValidateSet("dev", "prod")][string]$Environment,
+        [Parameter(Mandatory = $true)][ValidateScript({ Test-KitEnvironment $_ })][string]$Environment,
         [string]$LogFile = $script:LOG_FILE,
         [switch]$ReloadNginx,
         [ValidateSet("dist", "sync")][string]$DeployMode = "sync"
@@ -177,9 +177,9 @@ function Invoke-FeStaticPublishCycle {
 
 function Write-RemoteDeployManifest {
     param(
-        [ValidateSet("dev", "prod")][string]$Environment,
+        [ValidateScript({ Test-KitEnvironment $_ })][string]$Environment,
         [ValidateSet("local", "dist", "remote", "sync", "dev-bootstrap", "dev-sync")][string]$DeployMode,
-        [ValidateSet("static", "compose-dev", "compose-prod")][string]$Kind
+        [ValidateScript({ $_ -eq "static" -or ($_ -like "compose-*" -and (Test-KitEnvironment $_.Substring(8))) })][string]$Kind
     )
     $manifest = @{
         version     = 1
@@ -202,7 +202,7 @@ function Write-RemoteDeployManifest {
 
 function Publish-RemoteEnvFiles {
     param(
-        [ValidateSet("dev", "prod")][string]$Environment
+        [ValidateScript({ Test-KitEnvironment $_ })][string]$Environment
     )
     $bundle = Join-Path $env:TEMP "stack-kit-fe-stack-$Environment.env"
     $lines = [System.Collections.ArrayList]@()
@@ -233,7 +233,7 @@ function Sync-StaticArtifactsToServer {
         [string]$DistDir,
         [switch]$IncludeNginx,
         [switch]$WriteManifest,
-        [ValidateSet("dev", "prod")][string]$Environment,
+        [ValidateScript({ Test-KitEnvironment $_ })][string]$Environment,
         [ValidateSet("dist", "sync")][string]$DeployMode
     )
     & ssh @(Get-StackKitSshExtraArgs) $script:SERVER "mkdir -p $($script:DEPLOY_PATH)/dist" | Out-Null

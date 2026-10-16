@@ -56,7 +56,13 @@ def main() -> int:
     def _nginx_field(key: str) -> str:
         if nginx.get(key):
             return str(nginx[key])
-        ui_id = ctx.module_id_for_role("ui") or ctx.module_id_for_type("node-vite", 0)
+        # The UI module, else the first whose driver declares it serves through nginx (`nginx.serves`).
+        from lib.modules import driver_capability
+
+        ui_id = ctx.module_id_for_role("ui") or next(
+            (m for m in ctx.list_module_ids()
+             if (driver_capability(str(((ctx.manifest.get("modules") or {}).get(m) or {}).get("type") or ""), "nginx", {})
+                 or {}).get("serves")), None)
         if not ui_id:
             return ""
         rel = ctx.module_path(ui_id).relative_to(root).as_posix()

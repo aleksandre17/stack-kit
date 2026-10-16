@@ -13,18 +13,11 @@
     },
     "defaults": {
       "type": "object",
-      "description": "The target an environment deploys to when no --target is given",
-      "properties": {
-        "dev": {
-          "type": "string",
-          "minLength": 1
-        },
-        "prod": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "additionalProperties": false
+      "description": "The target each environment (catalogs.environments) deploys to when no --target is given",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "targets": {
       "type": "object",
@@ -43,12 +36,9 @@
             "description": "Declared, not reachable yet, and why: printed by validate and targets, refused by every deploy"
           },
           "runtime": {
-            "enum": [
-              "docker-compose",
-              "static",
-              "iis"
-            ],
-            "description": "What runs the deployed module there"
+            "type": "string",
+            "minLength": 1,
+            "description": "What runs the deployed module there (catalogs.targetRuntimes: docker-compose, static, iis, or a host's)"
           },
           "host": {
             "type": "string",
@@ -160,31 +150,17 @@
           "ports": {
             "type": "object",
             "description": "Host ports each service publishes, per environment: unique per host across every target and environment (validate), and refused at deploy when another compose project publishes one",
-            "properties": {
-              "dev": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65535
-                  }
-                }
-              },
-              "prod": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65535
-                  }
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
                 }
               }
-            },
-            "additionalProperties": false
+            }
           },
           "keep": {
             "type": "integer",
@@ -195,23 +171,18 @@
           "health": {
             "type": "object",
             "description": "Health URLs per environment and service, checked by `targets --health` after every deploy",
-            "properties": {
-              "dev": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string",
-                  "pattern": "^https?://"
-                }
-              },
-              "prod": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string",
-                  "pattern": "^https?://"
-                }
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^https?://"
               }
-            },
-            "additionalProperties": false
+            }
+          },
+          "runner": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CI runner a deploy to this target runs on (default ubuntu-latest)"
           }
         },
         "additionalProperties": false

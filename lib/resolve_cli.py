@@ -156,13 +156,13 @@ def _answer(r, verb: str, args: list[str]) -> list[str] | None:
     if verb == "env-value" and 2 <= len(args) <= 3:
         return [r.env_value(args[0], args[1], args[2] if len(args) == 3 else "")]
     if verb == "run-env" and 1 <= len(args) <= 2:
-        return [json.dumps(r.run_env(args[0], args[1] if len(args) == 2 else "dev"), ensure_ascii=False)]
+        return [json.dumps(r.run_env(args[0], args[1] if len(args) == 2 else ""), ensure_ascii=False)]
     if verb == "deploy-env-value" and 1 <= len(args) <= 2:
         return [r.deploy_env_value(args[0], args[1] if len(args) == 2 else "")]
     if verb == "deploy-base" and len(args) == 1:
         return [r.deploy_base(args[0])]
     if verb == "remote-path" and 3 <= len(args) <= 5:
-        return [r.remote_path(args[0], args[1], args[2], args[3] if len(args) > 3 else "prod",
+        return [r.remote_path(args[0], args[1], args[2], args[3] if len(args) > 3 else "",
                               args[4] if len(args) > 4 else "")]
     if verb == "ssh-args" and not args:
         return r.ssh_args()
@@ -218,8 +218,11 @@ def _modules_answer(verb: str, args: list[str]) -> list[str] | None:
     if verb == "stack-steps":
         from lib.stack_deploy import stack_deploy_lines
 
-        environment = args[0] if args and args[0] in ("dev", "prod") else "prod"
-        flags = args[1:] if args and args[0] in ("dev", "prod") else args
+        from lib import catalogs
+
+        envs = catalogs.ids("environments", ctx.manifest)
+        environment = args[0] if args and args[0] in envs else catalogs.default_environment("deploy", ctx.manifest)
+        flags = args[1:] if args and args[0] in envs else args
         return stack_deploy_lines(ctx.manifest, environment, flags)
     if verb == "stack-health" and not args:
         from lib.ci_health import stack_health_targets

@@ -51,19 +51,30 @@ def stack_compose_module_ids(manifest: dict[str, Any]) -> list[str]:
     return list(mods.keys()) if isinstance(mods, dict) else []
 
 
-def primary_api_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
-    """The module the stack's API is: `stack.primaryApiModule` when declared, else the first module
-    whose role is `api`. No module id is spelled here -- an id is the project's word (ADR-001)."""
+def primary_module_id(manifest: dict[str, Any], role: str, module_ids: list[str] | None = None) -> str | None:
+    """A role's primary module: the one the role's `primaryField` names (catalogs.roles), else the
+    first module of the role. No module id is spelled here -- an id is the project's word (ADR-001)."""
+    from lib import catalogs
+
     ids = module_ids if module_ids is not None else stack_compose_module_ids(manifest)
     mods = manifest.get("modules") or {}
-    declared = (manifest.get("stack") or {}).get("primaryApiModule")
-    if declared in ids and isinstance(mods.get(declared), dict):
-        return declared
+    field = (catalogs.entry("roles", role, manifest) or {}).get("primaryField")
+    if field:
+        cur: Any = manifest
+        for part in str(field).split("."):
+            cur = cur.get(part) if isinstance(cur, dict) else None
+        if cur in ids and isinstance(mods.get(cur), dict):
+            return cur
     for mid in ids:
         cfg = mods.get(mid)
-        if isinstance(cfg, dict) and cfg.get("role") == "api":
+        if isinstance(cfg, dict) and cfg.get("role") == role:
             return mid
     return None
+
+
+def primary_api_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
+    """The module the stack's API is (`stack.primaryApiModule`, else the first `api`)."""
+    return primary_module_id(manifest, "api", module_ids)
 
 
 def embedded_worker_enabled(
@@ -90,25 +101,13 @@ def effective_compose_features(
 
 
 def primary_worker_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
-    ids = module_ids if module_ids is not None else stack_compose_module_ids(manifest)
-    mods = manifest.get("modules") or {}
-    for mid in ids:
-        cfg = mods.get(mid)
-        if isinstance(cfg, dict) and cfg.get("role") == "worker":
-            return mid
-    return None
+    return primary_module_id(manifest, "worker", module_ids)
 
 
 def primary_ui_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:
-    ids = module_ids if module_ids is not None else stack_compose_module_ids(manifest)
-    mods = manifest.get("modules") or {}
-    if "frontend" in ids and isinstance(mods.get("frontend"), dict):
-        return "frontend"
-    for mid in ids:
-        cfg = mods.get(mid)
-        if isinstance(cfg, dict) and cfg.get("role") == "ui":
-            return mid
-    return None
+    """The first `ui` module. (It once privileged a module literally named `frontend`, a consumer's
+    word; the role is the agnostic form.)"""
+    return primary_module_id(manifest, "ui", module_ids)
 
 
 def resolve_module_service_name(
@@ -122,32 +121,20 @@ def resolve_module_service_name(
     cfg = mods.get(module_id)
     if not isinstance(cfg, dict):
         raise KeyError(f"manifest modules.{module_id} missing")
+    from lib import catalogs
+
     role = str(cfg.get("role") or "")
     target = str(cfg.get("target") or module_id)
     slug = compose_slug(deploy, repo_name)
-
-    if role == "ui":
-        if module_id == primary_ui_module_id(manifest):
-            # Primary UI: honor the legacy override, else the canonical `-app`
-            # service. (Previously this branch was reached only for a module
-            # LITERALLY named "frontend" — a privileged consumer name; the
-            # role + primary derivation is the agnostic form, mirroring the
-            # primary-api branch below.)
-            return deploy.get("COMPOSE_APP_SERVICE") or f"{slug}-app"
-        return f"{slug}-{(target or module_id).replace('_', '-')}"
-    if role == "worker":
-        override = deploy.get("COMPOSE_WORKER_SERVICE")
-        if override and module_id == (primary_worker_module_id(manifest) or module_id):
-            return override
-        return f"{slug}-{(target or module_id).replace('_', '-')}"
-    if role == "api":
-        if module_id == primary_api_module_id(manifest):
-            # Primary API: honor the legacy override, else derive from the slug.
-            # (Previously returned the override unconditionally — yielding None
-            # when COMPOSE_API_SERVICE was unset for a primary api not named
-            # "backend". The "backend" branch above already had this fallback.)
-            return deploy.get("COMPOSE_API_SERVICE") or f"{slug}-api"
-        return f"{slug}-{(target or module_id).replace('_', '-')}"
+    # A role's primary module takes the role's own service name (catalogs.roles `primaryService`),
+    # or the deploy.env key that renames it (`serviceOverride`); every other module its target or id.
+    declared = catalogs.entry("roles", role, manifest) or {}
+    if declared and module_id == primary_module_id(manifest, role):
+        override = declared.get("serviceOverride")
+        if override and deploy.get(override):
+            return deploy[override]
+        if declared.get("primaryService"):
+            return f"{slug}-{declared['primaryService']}"
     return f"{slug}-{(target or module_id).replace('_', '-')}"
 
 

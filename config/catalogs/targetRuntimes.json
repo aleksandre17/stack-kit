@@ -1,0 +1,8 @@
+{
+  "$comment": "What runs a deployed module on a deploy target (`targets.<name>.runtime`), declared once (ADR-001 amendment 12). A host adds one in its manifest (`catalogs.targetRuntimes`).",
+  "entries": [
+    { "id": "docker-compose" },
+    { "id": "static" },
+    { "id": "iis" }
+  ]
+}

@@ -34,8 +34,8 @@ if (-not $Root) {
     exit 1
 }
 
-# Default boot order by role; a consumer may declare its own as dev.bootOrder.
-$DefaultBootOrder = @("api", "worker", "ui")
+# Default boot order by role: catalogs.roles `bootOrder`; a consumer may declare its own as dev.bootOrder.
+$DefaultBootOrder = @(Get-KitContextLines 'roles:bootOrder')
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -9,13 +9,15 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [string]$ModuleId = $env:STACK_KIT_MODULE_ID,
-    [ValidateSet("dev", "prod")][string]$Environment = "dev",
+    [string]$Environment = "",
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest = @()
 )
 for ($i = 0; $i -lt $Rest.Count; $i++) {
     if ($Rest[$i] -eq "--env" -and $i + 1 -lt $Rest.Count) { $Environment = $Rest[++$i] }
 }
-if ($Environment -notin @("dev", "prod")) { throw "--env is dev or prod, not '$Environment'" }
+. (Join-Path $(if ($env:STACK_KIT_KIT_ROOT) { $env:STACK_KIT_KIT_ROOT } else { Split-Path (Split-Path $PSScriptRoot -Parent) -Parent }) "lib\project.ps1")
+if (-not $Environment) { $Environment = Get-KitContextValue 'environment:run' }
+$null = Test-KitEnvironment $Environment
 
 $ErrorActionPreference = "Stop"
 if (-not $ModuleId) {

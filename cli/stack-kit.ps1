@@ -25,7 +25,8 @@ for ($i = 0; $i -lt $CliRest.Count; $i++) {
         $env:STACK_KIT_TARGET = [string]$CliRest[++$i]; $env:STACK_KIT_TARGET_FROM_FLAG = "1"; continue
     }
     $asked = $null
-    if (($a -eq "--env" -or $a -eq "-Environment") -and $i + 1 -lt $CliRest.Count -and [string]$CliRest[$i + 1] -in @("dev", "prod")) {
+    # Any environment the catalog declares (the resolver refuses one it does not); never an option.
+    if (($a -eq "--env" -or $a -eq "-Environment") -and $i + 1 -lt $CliRest.Count -and -not ([string]$CliRest[$i + 1]).StartsWith("-")) {
         $asked = [string]$CliRest[$i + 1]
     }
     if ($a -eq "--dev") { $asked = "dev" }
@@ -88,7 +89,7 @@ function Show-Help {
 
     init | validate | migrate | vscode-gen | config-gen | ci-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout | hybrid | dev
 
-    build | test | lint [module ...]   The step for every module (or those named), fail-fast
+    <step> [module ...]            A lifecycle step (catalogs.lifecycle: lint, build, test, ...) for every module, fail-fast
 
     package <module> | unpack <module> <archive>   Build once: one archive per commit; the same bytes back
     targets [--plan]               Each declared deploy target (and with --plan every module's remote paths)
@@ -159,14 +160,49 @@ if (-not (Test-Path $bash)) {
 
 
 
+function Resolve-ScriptRuntime {
+    # The runtime a command runs under: the one it names ({script, runtime}), else the first declared
+    # runtime whose `match` its file name fits (config/runtimes.json, the host's `runtimes`).
+    param([string]$Script, [string]$Declared = "")
+    if ($Declared) { return $Declared }
+    $name = Split-Path $Script -Leaf
+    foreach ($rt in @(Get-KitContextLines 'runtimes')) {
+        foreach ($glob in @(Get-KitContextLines "runtime:$($rt):match")) { if ($name -like $glob) { return $rt } }
+    }
+    return $null
+}
+
 function Invoke-DriverScript {
-    # Runs one driver script by what it IS: a .sh under bash, a .ps1 in this session. A PowerShell
-    # script's `-Name value` operands bind to the parameters it declares (a switch takes no value);
-    # every other operand stays positional, in order. No driver is named here (ADR-001 K6).
-    param([string]$Script, [string[]]$Operands = @())
-    if ($Script -like '*.sh') {
-        if (-not (Test-Path $bash)) { Write-Host "  Git Bash required for $Script" -ForegroundColor Red; exit 1 }
-        & $bash $Script @Operands
+    # Runs one driver script by the runtime that declares it (ADR-001 amendment 12): a runtime's argv
+    # template ({script}, {operands}, {bash}, {python}, {pwsh}), or -- the `inSession` runtime -- a
+    # PowerShell script in this session, its `-Name value` operands bound to the parameters it declares
+    # (a switch takes no value), every other operand positional, in order. No driver is named here.
+    param([string]$Script, [string[]]$Operands = @(), [string]$Runtime = "")
+    $rt = Resolve-ScriptRuntime -Script $Script -Declared $Runtime
+    if (-not $rt) {
+        throw "no declared runtime runs $(Split-Path $Script -Leaf): declare one (manifest ``runtimes``) or the command's own {script, runtime}"
+    }
+    if ((Get-KitContextValue "runtime:$($rt):inSession") -ne "true") {
+        $template = Get-KitContextValue "runtime:$($rt):argv"
+        if (-not $template) { throw "runtime '$rt' declares neither argv nor inSession" }
+        $argv = [System.Collections.ArrayList]@()
+        foreach ($token in @($template | ConvertFrom-Json)) {
+            switch ([string]$token) {
+                "{script}" { [void]$argv.Add($Script) }
+                "{operands}" { foreach ($o in $Operands) { [void]$argv.Add([string]$o) } }
+                "{bash}" {
+                    if (-not (Test-Path $bash)) { throw "bash is required for $(Split-Path $Script -Leaf) (Git Bash on Windows)" }
+                    [void]$argv.Add($bash)
+                }
+                "{python}" { foreach ($p in @(Get-StackKitPythonArgs)) { [void]$argv.Add([string]$p) } }
+                "{pwsh}" { [void]$argv.Add((Get-Process -Id $PID).Path) }
+                default { [void]$argv.Add([string]$token) }
+            }
+        }
+        $global:LASTEXITCODE = 0
+        $exe = $argv[0]
+        $rest = @($argv | Select-Object -Skip 1)
+        & $exe @rest
         return
     }
     $declared = (Get-Command $Script).Parameters
@@ -260,16 +296,17 @@ function Invoke-ModuleDriver {
         exit 1
     }
     $script = Get-DriverCommandPath -ModuleId $ModuleId -Command $sub
+    $runtime = Get-KitContextValue "driver:$($modType):commandRuntime:$sub"
     $env:STACK_KIT_MODULE_ID = $ModuleId
     # The command by name, for a script that is several drivers' (the kit's runners).
     $env:STACK_KIT_COMMAND = $sub
     if ($deliverRung) {
         exit (Invoke-RecordedStep -Kind "deliver" -Step $deliverRung -ModuleId $ModuleId -Environment $environment -Action {
-            Invoke-DriverScript -Script $script -Operands $rest
+            Invoke-DriverScript -Script $script -Operands $rest -Runtime $runtime
         })
     }
     try {
-        Invoke-DriverScript -Script $script -Operands $rest
+        Invoke-DriverScript -Script $script -Operands $rest -Runtime $runtime
     } catch {
         Write-Host "[$ModuleId $sub] $($_.Exception.Message)" -ForegroundColor Red
         exit 1
@@ -511,9 +548,6 @@ $globalCommands = @{
         exit $LASTEXITCODE
     }
 
-    "build" = { Invoke-LifecycleStep -Step "build" -Only $CliRest }
-    "test" = { Invoke-LifecycleStep -Step "test" -Only $CliRest }
-    "lint" = { Invoke-LifecycleStep -Step "lint" -Only $CliRest }
 
     "targets" = {
         $env:PYTHONPATH = "$PackageRoot"
@@ -570,6 +604,12 @@ $globalCommands = @{
 }
 
 
+
+# Every lifecycle step the catalog declares (catalogs.lifecycle: lint, build, test, or a host's own)
+# is a verb across the modules; adding one adds no line here.
+if ($Command -in @(Get-KitContextLines 'lifecycle:steps') -and -not $globalCommands.ContainsKey($Command)) {
+    Invoke-LifecycleStep -Step $Command -Only $CliRest
+}
 
 if ($globalCommands.ContainsKey($Command)) {
 

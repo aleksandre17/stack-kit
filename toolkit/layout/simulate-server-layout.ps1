@@ -1,4 +1,4 @@
-# Simulates remote directory layout after deploy (dry-run, no SSH).
+﻿# Simulates remote directory layout after deploy (dry-run, no SSH).
 # Usage: .\scripts\simulate-server-layout.ps1 [-Json]
 
 param([switch]$Json)
@@ -12,9 +12,9 @@ $RepoRoot = Get-ProjectRootFromManifest
 if (-not $RepoRoot) { throw "stack-kit.json not found" }
 $env:STACK_KIT_PROJECT_ROOT = $RepoRoot
 $script:FeModuleId = Get-ModuleIdByRole "ui"
-if (-not $script:FeModuleId) { $script:FeModuleId = (Get-ModuleIdsByDriverType "node-vite" | Select-Object -First 1) }
+if (-not $script:FeModuleId) { $script:FeModuleId = (Get-ModuleIdsByLayoutSimulator "simulate-frontend-layout.ps1" | Select-Object -First 1) }
 $script:BeModuleId = Get-ModuleIdByRole "api"
-if (-not $script:BeModuleId) { $script:BeModuleId = (Get-ModuleIdsByDriverType "java-boot" | Select-Object -First 1) }
+if (-not $script:BeModuleId) { $script:BeModuleId = (Get-ModuleIdsByLayoutSimulator "simulate-backend-layout.ps1" | Select-Object -First 1) }
 $script:FeSecretsFolder = if ($script:FeModuleId) { Get-ModuleSecretsFolder $script:FeModuleId } else { $null }
 $script:BeSecretsFolder = if ($script:BeModuleId) { Get-ModuleSecretsFolder $script:BeModuleId } else { $null }
 

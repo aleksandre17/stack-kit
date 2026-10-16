@@ -2,6 +2,19 @@
 
 ## 1.2.0-dev — unreleased
 
+### Extension is a declaration (ADR-001 amendment 12)
+
+- Script runtimes declared (`config/runtimes.json`, manifest `runtimes`); a command may be
+  `{script, runtime}`. **Removed:** the registry's `runtime` field (read with a notice).
+- `validate` holds the composed registry to `drivers/registry.schema.json`; a malformed registry is
+  refused by name.
+- Catalogs (`config/catalogs/`, manifest `catalogs`): roles, environments, lifecycle steps, target
+  runtimes; every lifecycle step is a CLI verb; adding `staging` or `typecheck` touches no code.
+- Driver capabilities replace every driver id outside `drivers/` (compose templates, Dockerfiles,
+  ops modules, nginx, layout simulators); `compose-catalog.json` lost `templateKey`.
+- `ci.actions` (project pins, SHA-only); `vscode.launch` as data; `ci.runsOn` / target `runner`.
+- The compose naming no longer privileges a module named `frontend`.
+
 ### CD generated: build once, promote the same bytes (ADR-001 amendment 11)
 
 - `stack-kit package <module>` / `unpack <module> <archive>`: the driver's declared `package` step, one

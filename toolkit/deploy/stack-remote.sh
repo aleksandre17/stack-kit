@@ -4,14 +4,16 @@
 
 set -euo pipefail
 PKG="$(cd "$(dirname "$0")/../.." && pwd)"
-ROOT="$(cd "$PKG/../.." && pwd)"
 export STACK_KIT_KIT_ROOT="$PKG"
 
 # shellcheck source=../../lib/project.sh
 source "$PKG/lib/project.sh"
 
-STACK_KIT_PROJECT_ROOT="$(stack_kit_find_project_root "$ROOT" 2>/dev/null || echo "$ROOT")"
+# The project is the declared root, else the one the working directory is in (the resolver's one
+# discovery) -- never a guess from where the kit happens to be vendored.
+STACK_KIT_PROJECT_ROOT="$(stack_kit_find_project_root)" || { echo "  ERROR: no project manifest here" >&2; exit 1; }
 export STACK_KIT_PROJECT_ROOT
+ROOT="$STACK_KIT_PROJECT_ROOT"
 
 ENV_FLAG="--prod"
 EXTRA=()

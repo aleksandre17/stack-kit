@@ -1,8 +1,8 @@
-﻿# Portable ops toolkit (PowerShell) — dot-source via node-vite driver _init.ps1
+﻿# Portable ops toolkit (PowerShell) — dot-sourced via a PowerShell driver's _init.ps1
 # Requires: $OpsScriptRoot (= module root), $OpsModuleRoot, $OpsSecretsModule, $OpsComposeFile
 
 if (-not $OpsScriptRoot -or -not $OpsSecretsModule) {
-    throw "Load node-vite _init.ps1 before the ops toolkit (_common.ps1)."
+    throw "Load the driver's _init.ps1 before the ops toolkit (_common.ps1)."
 }
 
 $ROOT = $OpsModuleRoot

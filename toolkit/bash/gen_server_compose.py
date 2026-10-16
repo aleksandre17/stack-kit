@@ -51,9 +51,9 @@ def _normalize_volumes(volumes: list) -> list:
 # context + Dockerfile under the remote service path ($rp), and declares it here so the
 # emitted compose's `build:` resolves correctly when `docker compose` runs from `$rp`.
 #
-#   jar          (java-boot, upload.sh):       Dockerfile + app.jar are scp'd to $rp itself.
+#   jar          (a JAR driver, upload.sh):       Dockerfile + app.jar are scp'd to $rp itself.
 #                                              Build context is $rp, Dockerfile at $rp/Dockerfile.
-#   context-dir  (node-api, node-upload.sh):   the pnpm workspace is rsynced to $rp/context/
+#   context-dir  (a workspace driver, node-upload.sh):   the pnpm workspace is rsynced to $rp/context/
 #                                              and the Dockerfile scp'd to $rp/Dockerfile, so
 #                                              the context is $rp/context and the Dockerfile is
 #                                              one level up (../Dockerfile relative to context).
@@ -94,7 +94,7 @@ def main() -> int:
         default="jar",
         choices=tuple(BUILD_LAYOUTS),
         help="Where the upload step placed the build context + Dockerfile under $rp "
-        "(jar=java-boot, context-dir=node-api). Default 'jar' preserves legacy behavior.",
+        "(jar = a JAR artifact, context-dir = a workspace built on the server). Default 'jar' preserves legacy behavior.",
     )
     p.add_argument("--out", required=True)
     args = p.parse_args()

@@ -605,3 +605,61 @@ round trip, its sha256 and an escaping member refused; `--health` against a loca
 `tests/acceptance/test_lifecycle.py` (`stack-kit package` through the real CLI).
 **Nothing has run on GitHub:** the workflow is proven as generated text and its commands as local
 runs, until the owner pushes it.
+
+## Amendment 12 — extension is a declaration; the kit stays untouched (2026-10-16, owner-delegated)
+
+An independent extensibility audit measured that a new driver (`python-fastapi`) needed four kit files
+changed, and that script languages were closed at two. Each finding, fixed by a declaration a project
+can extend, and proven by a test that adds the case with the kit untouched:
+
+1. **Script runtimes are declared** (`config/runtimes.json`; a host adds or overrides one in
+   `runtimes`): `match` globs on the script's name and an `argv` template (`{script}`, `{operands}`,
+   `{bash}`, `{python}`, `{pwsh}`), or `inSession` for PowerShell, the one runtime whose `-Name`
+   operands bind to declared parameters. A command is `"path"` or `{script, runtime}`. The CLI used to
+   introspect every non-`.sh` script as PowerShell, so a `.py` with a `-Flag` operand crashed. The
+   registry's `runtime` field was dead (java-boot said bash and its build is `.ps1`): removed, and read
+   with a notice where a project registry still carries it. `drivers/registry.schema.json` -- never
+   loaded before -- now holds the composed registry in `validate`, every field typed and a misspelt
+   one refused; roles are held to the roles catalog in code.
+2. **No driver is named outside its directory.** Compose templates (`compose.templates`), Dockerfiles
+   (`compose.dockerfiles`), the ops-modules registry (`compose.opsModules`), the nginx-served UI
+   (`nginx.serves`), the layout simulators (by the simulator a driver declares) and the CI fallback
+   module (by deploy kind) are driver declarations; `compose-catalog.json` lost `templateKey`, and a
+   host's catalog may add module templates (`moduleTemplates`). `config_gen` asks the `configGen`
+   capability under its own name. `test_declared_agnosticism.py` is deny-by-default over every tracked
+   `*.py`, `*.ps1`, `*.sh` outside `drivers/` and `tests/`, in hyphen and underscore spellings, comments
+   included -- an allowlist of cured files is how an uncured one stays unseen.
+3. **CI pins and launch configurations are open.** `ci.actions` names the host's own pin file, still
+   full SHAs only (a tag is refused); a driver's `vscode.launch` may be data with `{module}`,
+   `{path}`, `{label}`, `{script}` filled per module; a driver's `ci.runsOn` and a target's `runner`
+   choose the CI runner.
+4. **One declared catalog each** (`config/catalogs/`, extended in the manifest's `catalogs`, an entry
+   inserted `after` another): **roles** (`deployOrder`, `bootOrder`, `primaryService`,
+   `serviceOverride`, `primaryField`, `launchCompound` -- replacing copies in modules, stack_deploy,
+   dev up, vscode-gen, the compose naming switch and both schemas; the compose naming no longer
+   privileges a module named `frontend`), **environments** in promotion order (`workspace`,
+   `runDefault`, `deployDefault` -- replacing the dev/prod lists and ValidateSets in envfile, targets,
+   the resolver, env.ps1, the host runner, Deploy-Path.ps1, the CLI and the schemas), **lifecycle**
+   steps (`optional`; each is a CLI verb and a CI step) and **target runtimes**. Adding `staging` or
+   `typecheck` touches no code: `tests/unit/test_extension.py` and
+   `tests/acceptance/test_extension_cli.py` add both by declaration and run them -- a host run in
+   staging reads `.env.staging`, CD promotes dev -> staging -> prod, `stack-kit typecheck` runs a
+   project driver's step under a project-declared runtime.
+5. **Small.** A malformed registry is refused by name (it read as `{}`, silently removing every
+   driver). `stack-remote.sh` finds the project through the resolver, not two levels above the kit.
+
+**Not catalogued, and why:** the `validate.stages` kinds (`setup` ... `anchor`, `teardown`) are the
+proof grammar the pipeline interpreter enforces (an anchor compares, teardown always runs), not a
+step a driver runs. The kit's own drivers' flag grammars (`java-boot` deploy's `--dev|--prod`) are the
+driver's code: a host adding `staging` declares it in the catalog, and a driver that must learn it
+learns it in its own directory.
+
+*Rejected:* a plugin API in code for each extension point (a second grammar beside the registry's);
+keeping the closed enums in the schemas and adding an overlay schema (two homes for one list).
+
+**Owed, recorded, not done now:** split `cli/stack-kit.ps1` into discovered verbs (as the agent kit
+discovers its verbs from files), and `lib/resolution.py` and `lib/targets.py` into smaller modules;
+remove the import cycles behind the function-local imports (`modules` <-> `project_context`,
+`modules` -> `stack_deploy`, `catalogs` -> `project_context`); fold the per-ecosystem deploy pipelines
+in `toolkit/deploy/` (`node-upload.sh` "mirror of upload.sh", `node-docker-up.sh`, `pnpm-build.sh`
+beside `gradle-build.sh`) into one generic container pipeline whose steps a driver declares.

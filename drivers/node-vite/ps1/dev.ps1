@@ -7,7 +7,7 @@
 param(
     [Parameter(Position = 0)]
     [string]$SubCommand = "help",
-    [ValidateSet("dev", "prod")]
+    [ValidateScript({ Test-KitEnvironment $_ })]
     [string]$Environment = "dev",
     [int]$DebounceMs = 1500,
     [switch]$NoBuild,

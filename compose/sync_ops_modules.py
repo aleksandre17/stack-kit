@@ -18,8 +18,10 @@ SHARED = "|shared|library||yes\n"
 def _shared_module_line(root: Path, manifest: dict) -> str | None:
     """Emit shared Gradle submodule row only when the consumer still has apps/backend/shared."""
     modules = manifest.get("modules") or {}
-    # The JVM module that may carry a shared gradle module: the first one the manifest declares.
-    jvm = next((m for m in modules.values() if isinstance(m, dict) and m.get("type") == "java-boot"), {})
+    # The module that may carry a shared build module: the first whose driver declares ops modules.
+    from manifest_compose import _ops_modules_kind
+
+    jvm = next((m for m in modules.values() if isinstance(m, dict) and _ops_modules_kind(str(m.get("type") or ""))), {})
     rel = jvm.get("path") or "apps/backend"
     if (root / rel / "shared" / "build.gradle.kts").is_file():
         return SHARED.rstrip()

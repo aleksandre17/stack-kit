@@ -36,7 +36,19 @@ DEFAULT_LAYOUT = KIT / "config" / "deploy-layout.default.json"
 #: The places a layout declares (config/deploy-layout.default.json), in the order a tree prints them.
 KINDS = ("project", "environment", "unit", "logs", "releases", "current", "runtime", "workspace", "stack",
          "stackEnv", "infra")
-ENVIRONMENTS = ("dev", "prod")
+
+
+def environments(manifest: dict[str, Any] | None = None) -> list[str]:
+    """The environments a target tree splits by (catalogs.environments)."""
+    from lib import catalogs
+
+    return catalogs.ids("environments", manifest)
+
+
+def _workspace_envs(manifest: dict[str, Any] | None = None) -> list[str]:
+    from lib import catalogs
+
+    return catalogs.flagged("environments", "workspace", manifest)
 _PLACEHOLDER = re.compile(r"\{(@?[A-Za-z]+)\}")
 _VALUES = {"root", "project", "environment", "service", "container", "folder", "infraSlug"}
 _ALLOWED = _VALUES | {f"@{k}" for k in KINDS}
@@ -154,10 +166,10 @@ def problems(root: Path, manifest: dict[str, Any]) -> list[str]:
                 out.append(f"{where}.layout.{tpl_name}: unknown placeholder(s) {', '.join(bad)}")
                 continue
             if t.get("root"):
-                for env in ENVIRONMENTS:
+                for env in environments(manifest):
                     try:
                         render(t, tpl_name, project="p", environment=env, service="s", container="s",
-                               folder="f", infra_slug="i")
+                               folder="f", infra_slug="i", manifest=manifest)
                     except TargetError as e:
                         out.append(f"{where}.layout.{tpl_name}: {e}")
                         break
@@ -173,9 +185,23 @@ def problems(root: Path, manifest: dict[str, Any]) -> list[str]:
     if local_file(path).is_file() and _tracked(root, local_file(path).relative_to(root).as_posix()):
         out.append(f"{local_file(path).relative_to(root).as_posix()}: tracked by git -- the per-machine override is ignored by design")
     defaults = data.get("defaults") or {}
+    envs = environments(manifest)
+    from lib import catalogs
+
+    runtimes = catalogs.ids("targetRuntimes", manifest)
     for env, name in defaults.items():
+        if env not in envs:
+            out.append(f"{rel}: defaults.{env}: '{env}' is not a declared environment ({', '.join(envs)})")
         if name not in (data.get("targets") or {}):
             out.append(f"{rel}: defaults.{env} names '{name}', which is not a target")
+    for name, t in (data.get("targets") or {}).items():
+        if isinstance(t, dict) and t.get("runtime") not in runtimes:
+            out.append(f"{rel}: targets.{name}.runtime: '{t.get('runtime')}' is not a declared target runtime "
+                       f"({', '.join(runtimes)}; a host adds one in catalogs.targetRuntimes)")
+        for field in ("ports", "health"):
+            for env in (t.get(field) or {}) if isinstance(t, dict) else {}:
+                if env not in envs:
+                    out.append(f"{rel}: targets.{name}.{field}.{env}: '{env}' is not a declared environment")
     seen: dict[tuple[str, int], str] = {}
     for host, name, env, service, port in _ports(data):
         here = f"targets.{name}.ports.{env}.{service}"
@@ -267,7 +293,10 @@ def _tracked(root: Path, rel: str) -> bool:
 def select(data: dict[str, Any], name: str = "", environment: str = "") -> tuple[str, dict[str, Any]]:
     """The target asked for (`--target`), else the environment's default, else the only one."""
     targets = data.get("targets") or {}
-    environment = environment or "prod"
+    if not environment:
+        from lib import catalogs
+
+        environment = catalogs.default_environment("deploy")
     chosen = name or (data.get("defaults") or {}).get(environment) or (next(iter(targets)) if len(targets) == 1 else "")
     if not chosen:
         raise TargetError(f"no target for '{environment}': pass --target <{'|'.join(targets) or 'name'}> "
@@ -293,7 +322,8 @@ def server(name: str, target: dict[str, Any]) -> str:
 
 
 def render(target: dict[str, Any], kind: str, *, project: str, folder: str = "", container: str = "",
-           environment: str = "prod", infra_slug: str = "", service: str = "") -> str:
+           environment: str = "prod", infra_slug: str = "", service: str = "",
+           manifest: dict[str, Any] | None = None) -> str:
     """One remote path of a kind, from the target's layout over the kit's default -- normalised, and
     refused unless it lies under the project's own directory (and that under the target's root): one
     project can never write where another lives."""
@@ -301,8 +331,9 @@ def render(target: dict[str, Any], kind: str, *, project: str, folder: str = "",
 
     if kind not in KINDS:
         raise TargetError(f"no layout kind '{kind}' (kinds: {', '.join(KINDS)})")
-    if environment not in ENVIRONMENTS:
-        raise TargetError(f"no environment '{environment}' (environments: {', '.join(ENVIRONMENTS)})")
+    known = environments(manifest)
+    if environment not in known:
+        raise TargetError(f"no environment '{environment}' (environments: {', '.join(known)})")
     layout = {**default_layout(), **(target.get("layout") or {})}
     root = str(target.get("root") or "")
     values = {"root": root.rstrip("/"), "project": project, "environment": environment,
@@ -384,7 +415,7 @@ def declared_tree(target: dict[str, Any], *, project: str, services: list[str], 
     for env in environments:
         units = {svc: r("unit", env, svc) for svc in services}
         owned = set(units.values()) | {r("stack", env), r("infra", env)}
-        if env == "dev":
+        if env in _workspace_envs():
             owned |= {r("workspace", env, svc) for svc in services}
         tree["environments"][env] = {"dir": r("environment", env), "units": units, "owned": sorted(owned)}
     return tree
@@ -519,8 +550,8 @@ def verify(r: Any, data: dict[str, Any], argv: list[str]) -> int:
     import os
     import shutil
 
-    environments = [a for a in ENVIRONMENTS if f"--env={a}" in argv] or (
-        [argv[argv.index("--env") + 1]] if "--env" in argv and argv.index("--env") + 1 < len(argv) else list(ENVIRONMENTS))
+    environments_ = ([argv[argv.index("--env") + 1]] if "--env" in argv and argv.index("--env") + 1 < len(argv)
+                     else environments(r.manifest))
     try:
         name, t = select(data, identity.env("TARGET"), identity.env("ENVIRONMENT"))
         reachable(name, t)
@@ -529,7 +560,7 @@ def verify(r: Any, data: dict[str, Any], argv: list[str]) -> int:
         return 2
     project = r.project_slug()
     services = [container for _mid, _folder, container in r.module_deploy_units()]
-    tree = declared_tree(t, project=project, services=services, environments=environments,
+    tree = declared_tree(t, project=project, services=services, environments=environments_,
                          infra_slug=r.infra_slug())
     ssh = shutil.which("ssh")
     if not ssh:
@@ -543,7 +574,7 @@ def verify(r: Any, data: dict[str, Any], argv: list[str]) -> int:
         return 2
     drift = verify_report(tree, ran.stdout, project=project, repository=repository_identity(r.root),
                           keep_limit=keep(t))
-    head = f"[verify] target {name}: {tree['project']} ({', '.join(environments)})"
+    head = f"[verify] target {name}: {tree['project']} ({', '.join(environments_)})"
     if not drift:
         print(f"{head}: matches the declared tree")
         return 0
@@ -556,7 +587,11 @@ def verify(r: Any, data: dict[str, Any], argv: list[str]) -> int:
 def _environment(argv: list[str]) -> str:
     if "--env" in argv and argv.index("--env") + 1 < len(argv):
         return argv[argv.index("--env") + 1]
-    return identity.env("ENVIRONMENT") or "prod"
+    if identity.env("ENVIRONMENT"):
+        return identity.env("ENVIRONMENT")
+    from lib import catalogs
+
+    return catalogs.default_environment("deploy")
 
 
 def health(data: dict[str, Any], argv: list[str], *, attempts: int = 0, pause: float = 0.0) -> int:
@@ -644,7 +679,7 @@ def main(argv: list[str]) -> int:
         units = r.module_deploy_units()
         print(f"  {render(t, 'project', project=project)}/            the project's own directory")
         print(f"    {MARKER}                ownership: {json.dumps({'project': project, 'repository': repository_identity(r.root)})}")
-        for env in ENVIRONMENTS:
+        for env in environments(r.manifest):
             env_dir = render(t, "environment", project=project, environment=env)
             print(f"    {env_dir}/     compose project {compose_project(project, env)}")
             print(f"      stack/                stack config: {render(t, 'stack', project=project, environment=env)}{mark('stack')}")
@@ -656,7 +691,7 @@ def main(argv: list[str]) -> int:
                       f"{'  ports ' + ','.join(map(str, ports)) if ports else ''}")
                 for kind in ("logs", "releases", "current", "runtime"):
                     print(f"        {kind:<10}          {render(t, kind, project=project, environment=env, service=container)}{mark(kind)}")
-                if env == "dev":
+                if env in _workspace_envs(r.manifest):
                     print(f"        workspace           {render(t, 'workspace', project=project, environment=env, service=container)}")
             print(f"      infra/                {render(t, 'infra', project=project, environment=env, infra_slug=r.infra_slug())}")
     return 0

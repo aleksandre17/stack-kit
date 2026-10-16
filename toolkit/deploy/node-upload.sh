@@ -1,6 +1,6 @@
 #!/bin/bash
-# Step 3 (node-api): upload build context + Dockerfile + env to server runtime path.
-# Mirror of upload.sh, minus the JAR. The node-api image is built server-side from the
+# Step 3 (a workspace image driver): upload build context + Dockerfile + env to server runtime path.
+# Mirror of upload.sh, minus the JAR. The image is built server-side from the
 # pnpm workspace (multi-stage Dockerfile), so we ship the workspace source (no node_modules/
 # dist/.git) instead of an app.jar. The previously-running image is tagged :previous for
 # rollback (image rollback replaces the JAR-version rollback in node-docker-up.sh).
@@ -9,9 +9,9 @@
 #           PROJECT_DIR, SECRETS_DIR, NODE_WORKSPACE_DIR (from _init.sh / deploy.sh).
 
 # Declare the server-side build layout for gen_server_compose.py (server-compose.sh reads
-# SERVER_BUILD_LAYOUT). node-api lands the pnpm workspace under $rp/context/ and the
+# SERVER_BUILD_LAYOUT). This pipeline lands the pnpm workspace under $rp/context/ and the
 # Dockerfile at $rp/Dockerfile, so the emitted build.context must be ./context with the
-# Dockerfile resolved as ../Dockerfile. (java-boot uses the default 'jar' layout: context $rp.)
+# Dockerfile resolved as ../Dockerfile. (a JAR pipeline uses the default 'jar' layout: context $rp.)
 export SERVER_BUILD_LAYOUT="context-dir"
 
 node_upload_service() {
@@ -50,7 +50,7 @@ node_upload_service() {
     rm -f "/tmp/${prefix}-${STACK_KIT_MODULE_ID}.log"
   fi
 
-  # Manifest-declared credentials (same contract as java-boot upload.sh).
+  # Manifest-declared credentials (same contract as upload.sh).
   local cred_file
   while IFS=$'\t' read -r cred_file _mount _ev; do
     [[ -n "$cred_file" ]] || continue

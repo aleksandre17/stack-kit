@@ -34,8 +34,7 @@ from lib import envfile, identity
 from lib.credentials import module_credentials
 from lib.manifest_defaults import flatten_defaults
 from lib.modules import (
-    LIFECYCLE_STEPS,
-    OPTIONAL_STEPS,
+    driver_command_runtimes,
     driver_commands,
     driver_default_role,
     driver_delivery,
@@ -188,14 +187,34 @@ def _drivers() -> dict[str, str]:
     out: dict[str, str] = {}
     registry = {k: v for k, v in driver_registry().items() if isinstance(v, dict)}
     out["drivers"] = _lines(sorted(registry))
-    out["lifecycle:steps"] = _lines(LIFECYCLE_STEPS)
-    out["lifecycle:optional"] = _lines(sorted(OPTIONAL_STEPS))
+    from lib import catalogs
+    from lib.modules import lifecycle_steps, optional_steps
+
+    out["lifecycle:steps"] = _lines(lifecycle_steps())
+    out["lifecycle:optional"] = _lines(optional_steps())
+    out["environments"] = _lines(catalogs.ids("environments"))
+    out["environment:run"] = catalogs.default_environment("run")
+    out["environment:deploy"] = catalogs.default_environment("deploy")
+    out["roles"] = _lines(catalogs.ids("roles"))
+    out["roles:bootOrder"] = _lines(catalogs.ordered("roles", "bootOrder"))
+    from lib.modules import script_runtimes
+
+    runtimes = script_runtimes()
+    out["runtimes"] = _lines(runtimes)
+    for rid, spec in runtimes.items():
+        out[f"runtime:{rid}:match"] = _lines(spec.get("match") or [])
+        if spec.get("inSession"):
+            out[f"runtime:{rid}:inSession"] = "true"
+        if spec.get("argv"):
+            out[f"runtime:{rid}:argv"] = json.dumps(spec["argv"])
     for typ, entry in registry.items():
         home = driver_home(typ)
         commands = driver_commands(typ)
         out[f"driver:{typ}:commands"] = _lines(sorted(commands))
         for name, path in commands.items():
             out[f"driver:{typ}:command:{name}"] = str(path)
+        for name, runtime in driver_command_runtimes(typ).items():
+            out[f"driver:{typ}:commandRuntime:{name}"] = runtime
         out[f"driver:{typ}:defaultRole"] = driver_default_role(typ)
         for name, argv in (entry.get("tasks") or {}).items():
             if isinstance(argv, list):
@@ -239,8 +258,7 @@ TARGET_KEYS = frozenset({"DEPLOY_SERVER", "DEPLOY_SERVER_BASE", "DEPLOY_PATH", "
 #: (runtime), a static module's and a compose deploy's directory are all the service's unit; a
 #: module's base is its environment's tree. `compose-dev`/`compose-prod` name the environment.
 REMOTE_KINDS = {"module": "environment", "runtime": "unit", "static": "unit", "compose": "unit",
-                "compose-dev": "unit", "compose-prod": "unit", "workspace": "workspace", "logs": "logs",
-                "unit": "unit", "project": "project"}
+                "workspace": "workspace", "logs": "logs", "unit": "unit", "project": "project"}
 
 
 class Resolver:
@@ -287,24 +305,34 @@ class Resolver:
         if key == "DEPLOY_PATH":
             if not folder:
                 return ""
-            env = identity.env("ENVIRONMENT") or "prod"
+            env = (identity.env("ENVIRONMENT") or self._deploy_default())
             kind = "infra" if folder == "infra" else "environment"
             return targets.render(t, kind, project=self.project_slug(), environment=env, folder=folder,
-                                  infra_slug=self.infra_slug())
+                                  infra_slug=self.infra_slug(), manifest=self.manifest)
         if key == "DEPLOY_LAYOUT":
             return "structured"
         if key == "DEPLOY_PATH_MODE":
             return "base"
         return ""  # DEPLOY_SSH_*: the target's ssh is `ssh-args`'
 
-    def remote_path(self, folder: str, kind: str, container: str, environment: str = "prod",
+    def _deploy_default(self) -> str:
+        from lib import catalogs
+
+        return catalogs.default_environment("deploy", self.manifest)
+
+    def remote_path(self, folder: str, kind: str, container: str, environment: str = "",
                     service: str = "") -> str:
         """Where one deploy unit of a module lives on the target: the target's layout over the kit's
         default; without a declared target, the deprecated DEPLOY_PATH/DEPLOY_LAYOUT reading."""
-        if kind not in REMOTE_KINDS:
-            raise ValueError(f"no remote kind '{kind}' (kinds: {', '.join(REMOTE_KINDS)})")
+        environment = environment or self._deploy_default()
+        # `compose-<environment>` names the environment (any the catalog declares).
         if kind.startswith("compose-"):
-            environment = kind.split("-", 1)[1]
+            from lib import catalogs
+
+            environment = catalogs.require("environments", kind.split("-", 1)[1], self.manifest, what="remote-path")
+            kind = "compose"
+        if kind not in REMOTE_KINDS:
+            raise ValueError(f"no remote kind '{kind}' (kinds: {', '.join(REMOTE_KINDS)}, compose-<environment>)")
         chosen = self.target()
         if chosen is not None:
             from lib import targets
@@ -312,9 +340,7 @@ class Resolver:
             name, t = chosen
             targets.reachable(name, t)
             return targets.render(t, REMOTE_KINDS[kind], project=self.project_slug(), folder=folder,
-                                  container=container, environment=environment, service=service or container)
-        if kind.startswith("compose-"):
-            kind = "compose"
+                                  container=container, environment=environment, service=service or container, manifest=self.manifest)
         from lib import deploy_paths
 
         # A folder without its own DEPLOY_PATH inherits the deploy-base folder's (workers the API's).
@@ -329,7 +355,7 @@ class Resolver:
         if kind in ("runtime", "workspace"):
             return deploy_paths.resolve_backend_deploy_path(base=base, container_name=container, kind=kind,
                                                             layout=layout or "flat", path_mode=mode)
-        front = "static" if kind == "static" else f"compose-{environment}"
+        front = "static" if kind == "static" else ("compose-dev" if environment == "dev" else "compose-prod")
         return deploy_paths.resolve_module_deploy_path(base=base, container_name=container, kind=front,
                                                        layout=layout or "structured", path_mode=mode)
 
@@ -359,7 +385,7 @@ class Resolver:
             return ""
         from lib import targets
 
-        return targets.compose_project(self.project_slug(), environment or identity.env("ENVIRONMENT") or "prod")
+        return targets.compose_project(self.project_slug(), environment or (identity.env("ENVIRONMENT") or self._deploy_default()))
 
     def remote_preflight(self, services: list[str]) -> str:
         """The server-side preflight of a deploy (ownership marker, foreign ports); "" without a target."""
@@ -370,7 +396,7 @@ class Resolver:
 
         name, t = chosen
         targets.reachable(name, t)
-        return targets.preflight(t, project=self.project_slug(), environment=identity.env("ENVIRONMENT") or "prod",
+        return targets.preflight(t, project=self.project_slug(), environment=(identity.env("ENVIRONMENT") or self._deploy_default()),
                                  repository=targets.repository_identity(self.root), services=services)
 
     def confined(self, path: str) -> bool:
@@ -402,7 +428,9 @@ class Resolver:
         return [f for f in self.ctx.get("secretsFolders", "").split("\n") if f]
 
     def env_files(self, folder: str, profile: str = "all") -> list[Path]:
-        return envfile.folder_files(self.secrets_root, folder, profile)
+        from lib import catalogs
+
+        return envfile.folder_files(self.secrets_root, folder, profile, catalogs.ids("environments", self.manifest))
 
     def env_value(self, folder: str, key: str, default: str = "") -> str:
         """The last non-empty value of `key` across the folder's env files, as compose would apply it
@@ -412,9 +440,14 @@ class Resolver:
             return answered or default
         return envfile.merged(self.env_files(folder)).get(key, default)
 
-    def run_env(self, folder: str, environment: str = "dev") -> dict[str, str]:
-        """The variables a run of the folder's module sets, for one environment (envfile.run_files)."""
-        return envfile.merged(envfile.run_files(self.secrets_root, folder, environment))
+    def run_env(self, folder: str, environment: str = "") -> dict[str, str]:
+        """The variables a run of the folder's module sets, for one environment (envfile.run_files);
+        the catalog's run default when none is asked for."""
+        from lib import catalogs
+
+        envs = catalogs.ids("environments", self.manifest)
+        environment = environment or catalogs.default_environment("run", self.manifest)
+        return envfile.merged(envfile.run_files(self.secrets_root, folder, environment, envs))
 
     def deploy_env_value(self, key: str, default: str = "") -> str:
         """A declared target's answer for a deploy key; else an operator's process environment, then

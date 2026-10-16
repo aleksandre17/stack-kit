@@ -29,7 +29,7 @@ def _host(tmp_path: Path, driver_id: str = OWN) -> Path:
     (reg / driver_id / "sh").mkdir(parents=True)
     (reg / driver_id / "sh" / "check.sh").write_text("echo project-driver-ran\n", encoding="utf-8")
     (reg / "registry.json").write_text(json.dumps({driver_id: {
-        "label": "a project's own driver", "roles": ["worker"], "runtime": "bash",
+        "label": "a project's own driver", "roles": ["worker"],
         "commands": {"check": "sh/check.sh"}}}), encoding="utf-8")
     mf = root / identity.MANIFEST_FILENAME
     manifest = json.loads(mf.read_text(encoding="utf-8"))

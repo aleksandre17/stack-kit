@@ -1,7 +1,7 @@
 #!/bin/bash
-# Step 1 (node-api): local pnpm build verify — mirror of gradle-build.sh deploy_step_build.
+# Step 1 (a pnpm workspace driver): local pnpm build verify — mirror of gradle-build.sh deploy_step_build.
 #
-# The node-api production image (multi-stage Dockerfile) compiles tsc -> dist INSIDE the
+# The production image (multi-stage Dockerfile) compiles tsc -> dist INSIDE the
 # image at `compose up --build` time, so this host build is a fail-fast compile check
 # (and warms dist/ for local run), not the artifact source. It is skipped on --no-build.
 #
@@ -24,7 +24,7 @@ deploy_step_build() {
   local prefix local_build_log
   prefix="${OPS_BUILD_TMP_PREFIX:-ops-build}"
   local_build_log="/tmp/${prefix}-${STACK_KIT_MODULE_ID}.log"
-  { echo "=== node-api build [$NODE_PKG_FILTER] $(date) ==="; } >"$local_build_log"
+  { echo "=== workspace build [$NODE_PKG_FILTER] $(date) ==="; } >"$local_build_log"
 
   if ! command -v pnpm >/dev/null 2>&1; then
     deploy_log "  [WARN] pnpm not on PATH locally — skipping host build (server image build still compiles)"

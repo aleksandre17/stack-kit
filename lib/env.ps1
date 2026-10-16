@@ -30,7 +30,7 @@ function Get-SecretsModuleDir {
 function Get-SecretsEnvFiles {
     param(
         [Parameter(Mandatory = $true)][string]$Module,
-        [ValidateSet("dev", "prod", "deploy", "all")][string]$Profile = "all"
+        [ValidateScript({ $_ -in @("deploy", "all") -or (Test-KitEnvironment $_) })][string]$Profile = "all"
     )
     @(Invoke-KitResolver -Arguments @('env-files', $Module, $Profile) | Where-Object { $_ })
 }
@@ -46,7 +46,8 @@ function Get-SecretsEnvValue {
 function Import-ModuleRunEnv {
     # A run's environment into this process: the folder's shared .env, then the one environment's
     # file over it (the resolver's rule, envfile.run_files). The values cross a pipe, never the console.
-    param([Parameter(Mandatory = $true)][string]$Module, [ValidateSet("dev", "prod")][string]$Environment = "dev")
+    # No environment: the catalog's run default (the resolver answers it, and refuses an undeclared one).
+    param([Parameter(Mandatory = $true)][string]$Module, [string]$Environment = "")
     $json = Invoke-KitResolver -Arguments @('run-env', $Module, $Environment) | Select-Object -First 1
     if (-not $json) { return }
     foreach ($p in ($json | ConvertFrom-Json).PSObject.Properties) {
@@ -57,7 +58,7 @@ function Import-ModuleRunEnv {
 function Get-ComposeEnvFileArgs {
     param(
         [Parameter(Mandatory = $true)][string]$Module,
-        [ValidateSet("dev", "prod")][string]$Environment
+        [ValidateScript({ Test-KitEnvironment $_ })][string]$Environment
     )
     $args = [System.Collections.ArrayList]@()
     foreach ($f in (Get-SecretsEnvFiles -Module $Module -Profile $Environment)) {
@@ -106,7 +107,7 @@ function Resolve-InfraDeployPath {
 }
 
 function Get-StackComposeEnvFileArgs {
-    param([ValidateSet("dev", "prod")][string]$Environment)
+    param([ValidateScript({ Test-KitEnvironment $_ })][string]$Environment)
     $args = [System.Collections.ArrayList]@()
     $seen = @{}
     foreach ($folder in (Get-ListedSecretsModuleFolders)) {
