@@ -141,7 +141,11 @@ def _scan(a: Args) -> int:
         print("  Usage: scan secrets [--history]")
         return 2
     ctx = ProjectContext.discover()
-    lines = secret_scan.main_lines(ctx.root, ctx.manifest, a.has("--history"))
+    try:
+        lines = secret_scan.main_lines(ctx.root, ctx.manifest, a.has("--history"))
+    except secret_scan.ScanError as e:
+        print(f"  [scan] NOT RUN: {e}")
+        return 2
     for line in lines:
         print(f"  {line}")
     print("  [scan] " + (f"{len(lines)} finding(s) -- values are never printed; allow one by path and rule with its reason "
@@ -181,7 +185,7 @@ VERBS = [
                  "projection; a release refuses one (exit 5). Paths: manifest `projections.containers` "
                  "(default ops/containers/{module}/Dockerfile) and `projections.stack` (default ops/compose/stack/{environment}/compose.yml)."),
     Verb("scan", "the secret boundary: credential-shaped values in the tracked tree (and, --history, every commit)",
-         ["scan secrets [--history]"], _scan, options=[Option("--history", "every line any commit added, too")], exits=(0, 1),
+         ["scan secrets [--history]"], _scan, options=[Option("--history", "every line any commit added, too")], exits=(0, 1, 2),
          details="JWTs, passwords in URLs, connection-string passwords, private keys, committed env files, binaries in the "
                  "tooling directories, and values the operator lists as leaked (security.knownLeaks: sha256 fingerprints). "
                  "Placeholders are not values; a file the configuration catalogue tracks (knownExposures) is not failed twice."),

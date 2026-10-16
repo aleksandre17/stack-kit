@@ -907,3 +907,16 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    the SBOM is still of the module's source tree (it lists dependencies, not files); a remote-dev
    workspace keeps files out by the module's `dev.excludes`. *Rejected:* a per-driver exclude (every
    driver would carry the same rule; one step holds it).
+10. **The scan's patterns may be the host's.** `security.secretPatterns` names one or more documents
+   of agent-kit's edit-gate contract (`gates[]`: `id`, `paths`, `forbids`, `proves`, `admits`), read
+   by path -- the kit imports nothing of agent-kit. Each gate is a scan rule (its `forbids` applied
+   per line, on the files its `paths` matches), used only once its own calibration holds (it refuses
+   its `proves` and admits its `admits`), else the scan refuses to run (exit 2) and validate names
+   it. The kit's four built-in pattern rules apply only when no document is declared; the structural
+   rules (a committed env file, a tooling binary, a known leak) always hold; a declared document is
+   not itself scanned (it carries its calibration). validate warns where `security.allow` names a
+   rule the declared set lacks -- the one way a host can declare both. *Rejected:* merging the
+   built-in set with the declared one (two policies for one boundary, and a host could not retire a
+   noisy built-in); importing agent-kit's judge (a dependency between kits that share only shapes).
+   The contract's own field names are used (`gates[].forbids`), not the `rules[].pattern` the request
+   named, since that is the document the host already holds.
