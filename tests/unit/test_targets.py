@@ -263,3 +263,29 @@ def test_a_runtime_config_destination_stays_inside_the_units_runtime(to):
     item = schema["properties"]["modules"]["additionalProperties"]["properties"]["runtimeConfig"]["items"]
     assert schema_validate({"from": "a", "to": to, "environments": ["prod"]}, item), to
     assert schema_validate({"from": "a", "to": "conf/nginx.conf", "environments": ["prod"]}, item) == []
+
+
+def test_a_layout_that_lets_two_environments_share_a_place_is_refused(tmp_path):
+    shared = {**PROD, "layout": {"environment": "{@project}/live"}}
+    root = _host(tmp_path / "iso", _doc(prod=shared))
+    found = targets.problems(root, _manifest(root))
+    assert any("dev and prod share" in p for p in found), found
+    root2 = _host(tmp_path / "ok", _doc(prod=PROD))
+    assert not [p for p in targets.problems(root2, _manifest(root2)) if "share" in p]
+
+
+def test_an_env_file_is_injected_from_outside_the_repository(tmp_path, monkeypatch):
+    from lib import envfile
+
+    secrets = tmp_path / "ops" / "config"
+    (secrets / "api").mkdir(parents=True)
+    (secrets / "api" / ".env").write_text("SHARED=1\n", encoding="utf-8")
+    (secrets / "api" / ".env.prod").write_text("WHERE=repo\n", encoding="utf-8")
+    outside = tmp_path / "runner-temp" / "api.env.prod"
+    outside.parent.mkdir()
+    outside.write_text("WHERE=store\n", encoding="utf-8")
+    monkeypatch.setenv(envfile.injected_name("api", "prod"), str(outside))
+    assert envfile.merged(envfile.run_files(secrets, "api", "prod")) == {"SHARED": "1", "WHERE": "store"}
+    monkeypatch.setenv(envfile.injected_name("api", "prod"), str(tmp_path / "missing"))
+    with pytest.raises(FileNotFoundError, match="STACK_KIT_ENV_FILE_API_PROD"):
+        envfile.run_files(secrets, "api", "prod")

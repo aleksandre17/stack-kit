@@ -121,6 +121,7 @@ def service_document(service: Service, *, project: str, environment: str, target
         doc["volumes"] = volumes
     if spec.get("dependsOn"):
         doc["depends_on"] = list(spec["dependsOn"])
+    doc["logging"] = target.get("logging") or d["logging"]  # rotated: a disk the projects share stays finite
     return doc
 
 

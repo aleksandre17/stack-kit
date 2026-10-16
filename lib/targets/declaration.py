@@ -181,6 +181,8 @@ def problems(root: Path, manifest: dict[str, Any]) -> list[str]:
             if str(opt).split("=", 1)[0].lower() in _HOST_KEY_OPTIONS:
                 out.append(f"{where}.ssh.options: {opt.split('=', 1)[0]} is `hostKeys`' to set (pinned | accept-new)")
         out += [f"{where}.{p}" for p in layout.problems(t, envs)]
+        if t.get("root"):
+            out += [f"{where}.{p}" for p in layout.isolation_problems(t, envs)]
         identity_ref = str((t.get("ssh") or {}).get("identity") or "")
         if identity_ref.startswith("file:") and tracked(root, identity_ref[5:]):
             out.append(f"{where}.ssh.identity: {identity_ref[5:]} is tracked by git -- a key file is never committed")

@@ -121,6 +121,23 @@ def problems(target: dict[str, Any], environments: list[str]) -> list[str]:
     return out
 
 
+def isolation_problems(target: dict[str, Any], environments: list[str]) -> list[str]:
+    """Each environment its own tree, stack and state: a layout that renders two environments into one
+    place (or one inside the other) would let a dev deploy overwrite production."""
+    out = []
+    for i, a in enumerate(environments):
+        for b in environments[i + 1:]:
+            for kind in ("environment", "stack", "stackCompose", "stackState", "infra", "backups"):
+                try:
+                    pa = render(target, kind, project="p", environment=a, service="s", tier="t")
+                    pb = render(target, kind, project="p", environment=b, service="s", tier="t")
+                except LayoutError:
+                    continue
+                if under(pa, pb) or under(pb, pa):
+                    out.append(f"layout.{kind}: {a} and {b} share {pa if under(pb, pa) else pb} -- each environment needs its own")
+    return out
+
+
 class Places:
     """The rendered places of one project's environment on one target: what every remote step gets
     instead of a root. `of(kind, service)` answers a service's place; `confine` is the environment's

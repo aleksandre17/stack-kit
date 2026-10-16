@@ -265,6 +265,10 @@
               }
             },
             "additionalProperties": false
+          },
+          "logging": {
+            "type": "object",
+            "description": "Container log rotation for this target's stacks (compose `logging`; default config/delivery.json)"
           }
         },
         "additionalProperties": false

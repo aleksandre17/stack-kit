@@ -53,7 +53,10 @@ def run_files(secrets_root: Path, folder: str, environment: str = "dev",
     """The env files a run of one environment reads, in the order they are applied."""
     if environment not in environments:
         raise ValueError(f"a run's environment is one of {', '.join(environments)}, not {environment!r}")
-    files = [secrets_root / folder / SHARED, secrets_root / folder / f".env.{environment}"]
+    own = injected(folder, environment)
+    if own is not None and not own.is_file():
+        raise FileNotFoundError(f"{injected_name(folder, environment)} names {own}, which is not there")
+    files = [secrets_root / folder / SHARED, own or secrets_root / folder / f".env.{environment}"]
     return [f for f in files if f.is_file()]
 
 
@@ -74,6 +77,23 @@ def folder_files(secrets_root: Path, folder: str, profile: str = "all",
     wanted = list(environments) if profile == "all" else [profile]
     files = [d / SHARED, *(d / f".env.{p}" for p in wanted)]
     return [f for f in files if f.is_file()]
+
+
+def injected_name(folder: str, environment: str) -> str:
+    """The one variable that names a secrets folder's env file for one environment from OUTSIDE the
+    repository (CI writes the secret store's value to a 0600 file in its temp dir and exports this):
+    STACK_KIT_ENV_FILE_<FOLDER>_<ENVIRONMENT>. When set, it is that environment's file."""
+    import re
+
+    norm = lambda s: re.sub(r"[^A-Za-z0-9]", "_", s).upper()
+    return f"STACK_KIT_ENV_FILE_{norm(folder)}_{norm(environment)}"
+
+
+def injected(folder: str, environment: str) -> Path | None:
+    import os
+
+    value = os.environ.get(injected_name(folder, environment), "")
+    return Path(value) if value else None
 
 
 #: The legacy homes `validate` refuses and `migrate` carries (ADR-001 amendment 13).

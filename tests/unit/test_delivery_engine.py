@@ -301,3 +301,10 @@ def test_a_floating_image_is_refused_and_a_digest_where_declared(project, tmp_pa
     with pytest.raises(DeliveryError, match="`latest` floats") as e:
         release.release(ctx_for(project, server(tmp_path)), "edge", packaged(project))
     assert e.value.code == 5
+
+
+def test_every_stack_service_rotates_its_logs(project, tmp_path):
+    t = server(tmp_path)
+    release.release(ctx_for(project, t), "edge", packaged(project))
+    svc = json.loads(t.read(f"{ROOT}/shop/staging/stack/compose.yml"))["services"]["edge"]
+    assert svc["logging"] == {"driver": "json-file", "options": {"max-size": "10m", "max-file": "5"}}

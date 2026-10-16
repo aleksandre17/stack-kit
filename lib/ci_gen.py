@@ -298,15 +298,18 @@ def render(ctx: ProjectContext) -> str:
             for mid in promoted:
                 folder = str(modules[mid].get("secretsModule") or mid)
                 env_secret = _secret_name("STACK_KIT_ENV", folder, env)
-                dest = f"{secrets_root}/{folder}/.env.{env}"
+                from lib.envfile import injected_name
+
+                var = injected_name(folder, env)
                 out += [
-                    f"      - name: {folder} .env.{env} from the secret store ({env_secret})",
+                    f"      - name: {folder} .env.{env} from the secret store ({env_secret}), outside the checkout",
                     "        env:",
                     f"          VALUES: ${{{{ secrets.{env_secret} }}}}",
                     "        run: |",
                     "          umask 077",
-                    f"          mkdir -p {_q(f'{secrets_root}/{folder}')}",
-                    f"          if [ -n \"$VALUES\" ]; then printf '%s\\n' \"$VALUES\" > {_q(dest)}; fi",
+                    f"          f=\"$RUNNER_TEMP/{folder}.env.{env}\"",
+                    "          if [ -n \"$VALUES\" ]; then printf '%s\\n' \"$VALUES\" > \"$f\"; "
+                    f"echo \"{var}=$f\" >> \"$GITHUB_ENV\"; fi",
                 ]
             for mid in promoted:
                 archive = f".stack-kit/artifacts/{mid}-*.tgz"
