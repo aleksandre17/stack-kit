@@ -9,7 +9,23 @@
     "acceptsGlobalCredentials": true,
     "commands": {
       "build": "ps1/build.ps1",
-      "test": "ps1/test.ps1"
+      "test": "ps1/test.ps1",
+      "audit": "py/audit.py"
+    },
+    "audit": {
+      "scanner": "osv-scanner",
+      "image": "ghcr.io/google/osv-scanner:v2.0.0",
+      "args": [
+        "scan",
+        "source"
+      ],
+      "lockfiles": [
+        "gradle.lockfile",
+        "*/gradle.lockfile",
+        "buildscript-gradle.lockfile",
+        "*/buildscript-gradle.lockfile"
+      ],
+      "unlocked": "enable Gradle dependency locking (dependencyLocking { lockAllConfigurations() }) and commit the lockfiles written by `gradlew dependencies --write-locks`"
     },
     "hybrid": {
       "script": "ps1/hybrid.ps1"

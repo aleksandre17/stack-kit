@@ -790,7 +790,7 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
 - The delivery against a real docker host (the layout's `unproven`); Windows/IIS delivery (`iis` pending).
 - ~~`lib/vscode_gen.py` and two compose-gen helpers still name tools~~ -- closed by amendment 16.1.
 - SQL Server's restore check is VERIFYONLY, not a throwaway restore; no fresh-chain migration replay.
-- No separate live-parity CI job; java-boot declares no dependency audit.
+- No separate live-parity CI job. (~~java-boot declares no dependency audit~~ -- closed by amendment 16.2.)
 - The image scanner's digest is the host's to pin; the kit ships no default scanner.
 - The kit's schemas are draft-07, not JSON Schema 2020-12; commit messages are not machine-checked.
 - Extension points: agent-kit's registry is mirrored by field names only; no shared schema file yet.
@@ -810,3 +810,15 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    driver that owns them. `test_one_home.py`'s owed list is empty. *Rejected:* a builder per launch
    kind registered by drivers in code (a second grammar beside the registry); keeping the string kinds
    as aliases (two homes for one launch -- a former kind is now a schema error naming the data form).
+2. **java-boot declares a dependency audit**: `audit` (`py/audit.py`) runs OSV-Scanner (OpenSSF's,
+   over the OSV database that aggregates GitHub, NVD-derived and ecosystem advisories) over the
+   module's Gradle dependency lockfiles -- the binary when it is on PATH, else its image
+   (`ghcr.io/google/osv-scanner`, a version tag the driver declares; a module's `audit.image` pins
+   a digest) through the local engine, so a CI runner needs no install. A finding fails the step; a
+   waiver is OSV-Scanner's own `osv-scanner.toml` with a reason; a module that locks nothing is
+   refused, since an unlocked graph resolves differently tomorrow. *Rejected:* the OWASP
+   Dependency-Check Gradle plugin (it must be added to the host's build -- the kit would edit
+   application code -- and it needs an NVD API key and a multi-minute database download per run);
+   a Gradle `dependencies` report parsed by the kit (a second resolver beside Gradle's).
+   *Unproven here:* no scanner runs in the suite (the command line is recorded); the image tag is
+   not digest-pinned by the kit.

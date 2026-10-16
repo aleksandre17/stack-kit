@@ -5,7 +5,7 @@ Gradle / Spring Boot modules (`"type": "java-boot"`). Everything below is a decl
 
 | | Declared |
 |---|---|
-| lifecycle | `build` (`ps1/build.ps1`, Gradle `build -x test`), `test` (`ps1/test.ps1`) |
+| lifecycle | `build` (`ps1/build.ps1`, Gradle `build -x test`), `test` (`ps1/test.ps1`), `audit` (`py/audit.py`: OSV-Scanner over the Gradle lockfiles -- the binary on PATH, else its image through the local engine; an unlocked module is refused, a finding fails, a waiver is `osv-scanner.toml` with a reason; the registry's `audit` declares scanner, image, lockfiles, a module's `audit` overrides -- pin a digest there) |
 | host run | `run` / `hybrid boot`: the boot jar when preferred, else `bootRun` (`ps1/hybrid.ps1`; `hybrid.gradleWrapper`, `hybrid.gradleProject`, `hybrid.springProfiles`) |
 | package | `build`, then `build/libs/*.jar` |
 | release | `container/Dockerfile`: the boot jar on a JRE of the module's `toolchain.version` (`artifactExclude` drops `*-plain.jar`), internal port 8080 (a module's `container.port` over it) |

@@ -73,6 +73,16 @@
       "container": { "type": "object", "description": "How a release of the driver's modules runs (ADR-001 amendment 13): a recipe `template` (driver-relative, rendered per module: {toolchain.version|...}, {artifact}, {port}, {entry}), or a `static` image serving it; `port`, `artifact`, `entry`, `healthcheck`, `serve`" },
       "dev": { "type": "object", "description": "Remote dev of the driver's modules: `image`, `command`, `build`, `port`, `caches` {name: mount}, `excludes`, `reactions` [{globs, do}]" },
       "generated": { "type": "array", "items": { "type": "string" }, "description": "Directories the driver's tools generate (never drafted from, never synced)" },
+      "audit": {
+        "type": "object",
+        "description": "A dependency audit's facts, read by the driver's own audit command (a module's `audit` over it): scanner, image, args, lockfiles, unlocked",
+        "properties": {
+          "scanner": { "type": "string" }, "image": { "type": "string" },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "lockfiles": { "type": "array", "items": { "type": "string" } }, "unlocked": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
       "configGen": { "type": "boolean" },
       "acceptsGlobalCredentials": { "type": "boolean" }
     },

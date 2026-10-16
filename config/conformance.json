@@ -269,12 +269,12 @@
     {
       "standard": "harvested (round 8)",
       "clause": "dependency audit",
-      "mechanism": "dependency audit",
+      "mechanism": "every kit driver declares its audit: the package manager's (node), dotnet list package --vulnerable (dotnet-aspnet), OSV-Scanner over the Gradle lockfiles (java-boot); CI runs it",
       "evidence": [
-        "tests/unit/test_cd.py::test_ci_audits_the_dependencies_of_every_driver_that_declares_how"
+        "tests/unit/test_cd.py::test_ci_audits_the_dependencies_of_every_driver_that_declares_how",
+        "tests/unit/test_java_audit.py::test_a_finding_fails_the_step_and_an_unlocked_module_is_refused"
       ],
-      "status": "partial",
-      "why": "java-boot declares no audit yet"
+      "status": "conformant"
     },
     {
       "standard": "harvested (round 8)",

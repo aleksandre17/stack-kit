@@ -243,6 +243,16 @@
             },
             "additionalProperties": false
           },
+          "audit": {
+            "type": "object",
+            "description": "The module's dependency audit over its driver's declaration (drivers/registry.json `audit`): scanner, image (pin a digest here), args, lockfiles, unlocked",
+            "properties": {
+              "scanner": { "type": "string" }, "image": { "type": "string" },
+              "args": { "type": "array", "items": { "type": "string" } },
+              "lockfiles": { "type": "array", "items": { "type": "string" } }, "unlocked": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
           "debug": {
             "type": "object",
             "description": "VS Code Run and Debug (optional; java-boot auto-detects *Application.java)",

@@ -245,4 +245,14 @@ def test_ci_runs_the_db_tests_beside_a_healthy_database_after_migrating_it(tmp_p
 def test_ci_audits_the_dependencies_of_every_driver_that_declares_how():
     text = _render(_host(Path(__import__("tempfile").mkdtemp()), None))
     assert "pwsh tools/stack-kit.ps1 mod web audit" in _job(text, "web")
-    assert " mod api audit" not in _job(text, "api"), "a driver that declares no audit has none (an optional step)"
+    assert "pwsh tools/stack-kit.ps1 mod api audit" in _job(text, "api"), "java-boot declares its audit (amendment 16.2)"
+    root = _host(Path(__import__("tempfile").mkdtemp()), None)
+    (root / "ops" / "drivers").mkdir(parents=True, exist_ok=True)
+    (root / "ops" / "drivers" / "registry.json").write_text(json.dumps(
+        {"bare": {"label": "x", "roles": ["api"], "commands": {"build": "b.py"}}}), encoding="utf-8")
+    mf = root / identity.MANIFEST_FILENAME
+    manifest = json.loads(mf.read_text(encoding="utf-8"))
+    manifest["drivers"] = {"registry": "ops/drivers/registry.json"}
+    manifest["modules"]["api"]["type"] = "bare"
+    mf.write_text(json.dumps(manifest), encoding="utf-8")
+    assert " mod api audit" not in _job(_render(root), "api"), "a driver that declares no audit has none (an optional step)"
