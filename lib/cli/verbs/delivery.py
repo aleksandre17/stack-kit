@@ -100,7 +100,7 @@ def _deploy(a: Args) -> int:
     if artifact and len(modules) > 1:
         print("  [deploy] --artifact names one module's archive: deploy one module with it", file=sys.stderr)
         return 2
-    archives: dict[str, Path] = {}
+    archives: dict[str, Path | None] = {}
     try:
         prov = package.provenance(root)
         if clean and prov["dirty"] and not artifact:
@@ -111,16 +111,15 @@ def _deploy(a: Args) -> int:
             if artifact:
                 archives[m] = Path(artifact).resolve()
             elif a.has("--plan") and not package.latest(root, m):
-                archives[m] = Path("(packaged at deploy)")
+                archives[m] = None  # planned as the package of this commit; nothing is built to plan
             else:
                 archives[m] = package.latest(root, m) or package_module(m)
     except package.PackageError as e:
         print(f"  [deploy] ERROR: {e}", file=sys.stderr)
         return 5 if "provenance" in str(e) or "commit" in str(e) else 1
     for m in modules:
-        if not archives[m].is_file():
-            print(f"[deploy] {m}: plan -- it is packaged first (`package {m}`), then released as below")
-            continue
+        if archives[m] is None:
+            print(f"[deploy] {m}: not packaged yet -- a deploy packages it first (`package {m}`), then:")
         code = remote.run(a, f"deploy {m}", lambda ctx, m=m: release.release(ctx, m, archives[m]), module=m)
         if code:
             return code

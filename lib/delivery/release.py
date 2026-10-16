@@ -80,8 +80,16 @@ def _start(ctx: Delivery, svc: list[Service], release: str, revision: str) -> li
     return [] if ctx.plan else running.wait_healthy(ctx, svc)
 
 
-def release(ctx: Delivery, module_id: str, archive: Path) -> int:
-    meta, trees = package.read(archive)
+def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
+    """`archive` None: a plan of a commit not packaged yet -- its id is this checkout's, its trees the
+    package's to come (nothing is built to plan)."""
+    if archive is None:
+        if not ctx.plan:
+            raise DeliveryError(f"{module_id}: no archive to release")
+        meta = {"module": module_id, **package.provenance(ctx.root)}
+        trees = {s.id: {"(the package of this commit)": b""} for s in module_services(ctx.manifest, module_id)}
+    else:
+        meta, trees = package.read(archive)
     if meta.get("module") != module_id:
         raise DeliveryError(f"{archive.name} is a package of {meta.get('module')!r}, not {module_id!r}")
     if meta.get("dirty") and ctx.flag("requireClean"):

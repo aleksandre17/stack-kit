@@ -14,6 +14,8 @@ from lib.identity import KIT_NAME, LEGACY_KIT_NAME
 GUIDES = {"INSTALL.md": "install", "ADOPT.md": "adoption", "REFERENCE.md": "reference",
           "GOLDEN-PATHS.md": "golden-paths"}
 DOCS = PKG / "docs"
+#: Derived, never written by hand: each held to its source by a drift test.
+GENERATED = {"OPERATIONS.md": "tests/unit/test_operations_doc.py"}
 
 
 def _front_matter(text: str) -> dict[str, str]:
@@ -25,7 +27,8 @@ def _front_matter(text: str) -> dict[str, str]:
 
 def test_docs_holds_the_decisions_and_exactly_the_four_guides():
     present = {p.name for p in DOCS.iterdir() if p.is_file()}
-    assert present == set(GUIDES), f"docs/ holds {sorted(present)}"
+    assert present == set(GUIDES) | set(GENERATED), f"docs/ holds {sorted(present)}"
+    assert all((PKG / drift).is_file() for drift in GENERATED.values())
     assert (DOCS / "decisions").is_dir()
 
 

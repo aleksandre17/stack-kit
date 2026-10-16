@@ -14,7 +14,7 @@ import pytest
 from lib import identity
 from lib.delivery import dev, running, sync
 from lib.delivery.transport import LocalTransport, TransportError
-from test_delivery_engine import ROOT, ctx_for, host, server
+from delivery_host import ROOT, ctx_for, host, server
 
 WS = f"{ROOT}/shop/dev/edge/edge/workspace"
 
