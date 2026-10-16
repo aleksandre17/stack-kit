@@ -17,6 +17,7 @@ question from the selected target, and the shells only ask it.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -552,6 +553,56 @@ def verify(r: Any, data: dict[str, Any], argv: list[str]) -> int:
     return 1
 
 
+def _environment(argv: list[str]) -> str:
+    if "--env" in argv and argv.index("--env") + 1 < len(argv):
+        return argv[argv.index("--env") + 1]
+    return identity.env("ENVIRONMENT") or "prod"
+
+
+def health(data: dict[str, Any], argv: list[str], *, attempts: int = 0, pause: float = 0.0) -> int:
+    """`targets --health [--target <name>] [--env dev|prod]`: every health URL the target declares for
+    the environment answers below 400, retried while a release starts. Exit 1 naming each that does
+    not; 2 when the target is pending; a target that declares none says so and passes nothing."""
+    import time
+    import urllib.error
+    import urllib.request
+
+    env = _environment(argv)
+    try:
+        name, t = select(data, identity.env("TARGET"), env)
+        reachable(name, t)
+    except TargetError as e:
+        print(f"[health] NOT VERIFIED: {e}")
+        return 2
+    urls = ((t.get("health") or {}).get(env) or {})
+    if not urls:
+        print(f"[health] target {name} ({env}) declares no health endpoint -- nothing checked (targets.{name}.health.{env})")
+        return 0
+    attempts = attempts or int(os.environ.get(identity.env_name("HEALTH_ATTEMPTS")) or 12)
+    pause = pause if attempts and pause else float(os.environ.get(identity.env_name("HEALTH_PAUSE")) or 5)
+    failed = []
+    for service, url in urls.items():
+        last = ""
+        for i in range(attempts):
+            try:
+                with urllib.request.urlopen(url, timeout=10) as resp:
+                    if resp.status < 400:
+                        print(f"[health] {service} {url} -> {resp.status}")
+                        break
+                    last = f"HTTP {resp.status}"
+            except urllib.error.HTTPError as e:
+                last = f"HTTP {e.code}"
+            except (urllib.error.URLError, OSError) as e:
+                last = str(getattr(e, "reason", e))
+            if i + 1 < attempts:
+                time.sleep(pause)
+        else:
+            failed.append(f"{service} {url}: {last} after {attempts} attempt(s)")
+    for f in failed:
+        print(f"[health] FAILED {f}")
+    return 1 if failed else 0
+
+
 def main(argv: list[str]) -> int:
     from lib.resolution import Resolver
 
@@ -572,6 +623,8 @@ def main(argv: list[str]) -> int:
         return 0
     if "--verify" in argv:
         return verify(r, data, argv)
+    if "--health" in argv:
+        return health(data, argv)
     defaults = data.get("defaults") or {}
     for name, t in (data.get("targets") or {}).items():
         marks = [env for env, n in defaults.items() if n == name]

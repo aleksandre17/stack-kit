@@ -90,6 +90,7 @@ function Show-Help {
 
     build | test | lint [module ...]   The step for every module (or those named), fail-fast
 
+    package <module> | unpack <module> <archive>   Build once: one archive per commit; the same bytes back
     targets [--plan]               Each declared deploy target (and with --plan every module's remote paths)
     --target <name>                On any deploy, remote or tunnel verb: the target to use (default: the environment's)
 
@@ -517,6 +518,36 @@ $globalCommands = @{
     "targets" = {
         $env:PYTHONPATH = "$PackageRoot"
         Invoke-StackKitPython (Join-Path $PackageRoot "lib\targets.py") @CliRest
+    }
+
+    "package" = {
+        # Build once (ADR-001 amendment 11): the driver's declared package step, recorded, then ONE
+        # archive of what it left, named by the commit, with its sha256 (lib/package.py).
+        $env:PYTHONPATH = "$PackageRoot"
+        $py = Get-StackKitPythonArgs
+        $shell = (Get-Process -Id $PID).Path
+        $self = Join-Path $PSScriptRoot "stack-kit.ps1"
+        $wanted = @($CliRest | ForEach-Object { $m = Resolve-CliAlias $_; if ($m) { $m } else { $_ } })
+        if ($wanted.Count -eq 0) { Write-Host "  Usage: stack-kit package <module> [<module> ...]" -ForegroundColor Red; exit 1 }
+        foreach ($mid in $wanted) {
+            $planJson = Invoke-StackKitPythonExe $py (Join-Path $PackageRoot "lib\package.py") plan $mid
+            if ($LASTEXITCODE -ne 0 -or -not $planJson) { exit 1 }
+            $plan = ($planJson | Select-Object -Last 1) | ConvertFrom-Json
+            $code = Invoke-RecordedStep -Kind "package" -Step "package" -ModuleId $mid -Action {
+                & $shell -NoProfile -ExecutionPolicy Bypass -File $self mod $mid $plan.command @($plan.args)
+            }
+            if ($code -ne 0) { Write-Host "  [$mid package] FAILED (exit $code)" -ForegroundColor Red; exit $code }
+            Invoke-StackKitPythonExe $py (Join-Path $PackageRoot "lib\package.py") pack $mid
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        }
+        exit 0
+    }
+
+    "unpack" = {
+        if ($CliRest.Count -ne 2) { Write-Host "  Usage: stack-kit unpack <module> <archive>" -ForegroundColor Red; exit 1 }
+        $env:PYTHONPATH = "$PackageRoot"
+        $mid = Resolve-CliAlias $CliRest[0]; if (-not $mid) { $mid = $CliRest[0] }
+        Invoke-StackKitPython (Join-Path $PackageRoot "lib\package.py") unpack $mid $CliRest[1]
     }
 
     "ci-gen" = {

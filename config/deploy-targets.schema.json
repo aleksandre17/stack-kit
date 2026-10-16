@@ -191,6 +191,27 @@
             "minimum": 1,
             "default": 5,
             "description": "Releases (or versioned artifacts) a unit keeps: the prune limit, and what verify holds"
+          },
+          "health": {
+            "type": "object",
+            "description": "Health URLs per environment and service, checked by `targets --health` after every deploy",
+            "properties": {
+              "dev": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^https?://"
+                }
+              },
+              "prod": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^https?://"
+                }
+              }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": false

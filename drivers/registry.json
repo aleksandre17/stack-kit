@@ -62,6 +62,9 @@
         "forwards": [
           "--no-build",
           "--skip-checks"
+        ],
+        "promotes": [
+          "--no-build"
         ]
       }
     },
@@ -125,6 +128,13 @@
             }
           ]
         }
+      ]
+    },
+    "package": {
+      "command": "build",
+      "artifacts": [
+        "build/libs/*.jar",
+        "*/build/libs/*.jar"
       ]
     }
   },
@@ -224,6 +234,9 @@
           ]
         }
       ]
+    },
+    "package": {
+      "pending": "its build is per environment (the API URL is compiled in): one artifact for dev and prod needs runtime config first"
     }
   },
   "node-api": {
@@ -305,6 +318,9 @@
           "none": "vite.config.*"
         }
       ]
+    },
+    "package": {
+      "pending": "its image is built on the server from the workspace context; build once needs an image registry or an uploaded image"
     }
   },
   "dotnet-aspnet": {
@@ -386,6 +402,17 @@
           "mentions": "dotnet.project"
         }
       }
+    },
+    "package": {
+      "command": "deploy",
+      "args": [
+        "artifact",
+        "-Output",
+        "{out}"
+      ],
+      "artifacts": [
+        "{out}"
+      ]
     }
   },
   "node-spa": {
@@ -440,6 +467,12 @@
         {
           "file": "angular.json"
         }
+      ]
+    },
+    "package": {
+      "command": "build",
+      "artifacts": [
+        "dist/**"
       ]
     }
   }

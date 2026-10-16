@@ -2,6 +2,16 @@
 
 ## 1.2.0-dev — unreleased
 
+### CD generated: build once, promote the same bytes (ADR-001 amendment 11)
+
+- `stack-kit package <module>` / `unpack <module> <archive>`: the driver's declared `package` step, one
+  archive per commit (+ sha256); drivers declare `package` (or `pending`) and a release's `promotes`.
+- `ci-gen` adds, on the default branch, package + SBOM + build-provenance attestation per module, and
+  `deploy-dev` -> `deploy-prod` (GitHub Environment per target, concurrency per target/env) that unpack
+  the same archive, deliver, and verify (`targets --health`, `targets --verify`); CI only, with the
+  reasons, without reachable targets or a promotable module. Run records uploaded per job.
+- `targets --health`: a target's declared `health` URLs per environment.
+
 ### The manifest is drafted from the tree (ADR-001 amendment 10)
 
 - Drivers declare `detect` (the evidence a directory is their module, and what they read from it);

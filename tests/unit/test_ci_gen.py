@@ -9,7 +9,7 @@ from lib import ci_gen
 from lib.modules import driver_registry
 from lib.project_context import ProjectContext
 
-SHA = re.compile(r"^      - uses: [\w.-]+/[\w.-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$")
+SHA = re.compile(r"^ +(?:- )?uses: [\w.-]+/[\w.-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$")
 
 
 def _render() -> tuple[str, dict]:

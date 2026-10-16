@@ -178,3 +178,25 @@ def test_a_dotnet_module_builds_its_project_and_declares_its_tests(tmp_path):
     assert (root / "fx" / "api" / "bin" / "Debug").is_dir()
     ran = _cli(root, "test")
     assert ran.returncode == 0 and "declared none" in ran.stdout, ran.stdout + ran.stderr
+
+
+def test_package_builds_once_and_leaves_one_archive_per_commit(tmp_path):
+    def module(root: Path, mid: str) -> dict:
+        d = root / "fx" / mid
+        d.mkdir(parents=True)
+        jar = "build/libs/app-boot.jar"
+        (d / "gradlew.bat").write_text(f"@mkdir build{chr(92)}libs 2>nul\r\n@echo jar> {jar.replace('/', chr(92))}\r\n", encoding="utf-8")
+        (d / "gradlew").write_text(f"#!/bin/sh\nmkdir -p build/libs && echo jar > {jar}\n", encoding="utf-8")
+        os.chmod(d / "gradlew", 0o755)
+        return {"type": "java-boot", "role": "api", "path": f"fx/{mid}", "secretsModule": mid}
+
+    root = _host(tmp_path, {"api": module})
+    git = ["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "c"], check=True)
+    ran = _cli(root, "package", "api")
+    assert ran.returncode == 0, ran.stdout + ran.stderr
+    archives = list((root / ".stack-kit" / "artifacts").glob("api-*.tgz"))
+    assert len(archives) == 1 and archives[0].with_suffix(".tgz.sha256").is_file()
+    assert [r["kind"] for r in _records(root) if r["module"] == "api"] == ["package"]

@@ -548,3 +548,60 @@ never drafted. **Owed:** the scaffold `init` writes for a new project (`apps/`, 
 `kits/stack-kit`) is not yet the `monorepo` profile it now declares. Moving the scaffold onto
 `platform/apps/<app>/{backend,frontend}` and `platform/kits/` changes every new host's paths, so it
 is its own change.
+
+## Amendment 11 — CD generated from the declarations: build once, promote the same bytes (2026-10-16, owner-delegated)
+
+The owner: stack-kit carries CI/CD mechanisms, not only CI. `ci-gen` now generates the delivery too,
+from the manifest and the deploy targets, with no hand-written workflow.
+
+1. **Build once.** A driver declares its `package` step (`{command, args, artifacts}`, `{out}` its
+   staging directory); `stack-kit package <module>` runs it (recorded) and archives what it left as one
+   file named by the commit, `.stack-kit/artifacts/<module>-<sha>.tgz`, with its sha256.
+   `stack-kit unpack` restores those bytes where the release reads them, and refuses an archive whose
+   sha256 differs or a member that would land outside the module. In CI the package step runs on the
+   default branch in the module's own job, beside an SBOM (`anchore/sbom-action`, SPDX) and a
+   build-provenance attestation (`actions/attest-build-provenance`), and is uploaded once.
+2. **Promote the same bytes.** A release rung that `promotes` (operands that deploy a packaged
+   artifact without building: `java-boot` `--no-build`) is the only kind CD deploys. `deploy-dev` runs
+   on the default branch after every promoted module's job; `deploy-prod` needs it and runs in a
+   GitHub Environment named after the prod target, so its protection rules (the owner's approval) gate
+   it. Each job downloads and unpacks the archive, delivers (`mod <id> deliver release --env <e>
+   --target <t> <promotes>`), and verifies (`targets --health`: the target's declared health URLs;
+   `targets --verify`: the tree). Prod never builds: no lifecycle step runs in a deploy job.
+3. **Parity.** Every step is the command a developer runs; the workflow only sequences them.
+4. **Secrets only from the CI store:** `STACK_KIT_SSH_KEY_<TARGET>` into ssh-agent,
+   `STACK_KIT_ENV_<FOLDER>_<ENV>` written as the module's env file (`umask 077`). Host keys are the
+   target's tracked `known_hosts` (the resolver's `ssh-args`). One concurrency group per target and
+   environment, never cancelled; the workflow-wide group cancels only pull-request runs, so a newer push
+   never stops a deploy halfway.
+5. **DORA.** Every package and deploy job uploads `.stack-kit/runs/runs.jsonl` as a
+   `stack-kit-runs-<job>` artifact (`if: always()`): the deployment events with commit, start, end and
+   exit, from which frequency, lead time and change failure rate are computed. GitHub Deployments are
+   also recorded by the Environment jobs themselves.
+6. **CI only, and why.** Without reachable `defaults.dev` and `defaults.prod` targets, or without a
+   module whose package and release can promote, no deploy job is generated, and the workflow's header
+   lists each reason (`no deploy targets are declared`, `target <t> (prod) is pending: ...`,
+   `<module> (<driver>): packaging is pending -- ...`). `ci-gen --check` stays the drift gate.
+
+**Declared per driver today:** `java-boot` packages its boot jars and promotes with `--no-build`;
+`dotnet-aspnet` packages its `dotnet publish` output (its delivery to a server -- IIS -- is pending);
+`node-spa` packages its `dist/` (its release is pending); `node-vite` packaging is pending (its build
+compiles the environment's API URL in -- one artifact needs runtime config); `node-api` packaging is
+pending (its image is built on the server). **Pending:** rollback on a failed verify by re-pointing
+`current` waits for the release delivery of amendment 9; a release's own health gate (java-boot)
+already rolls back to the previous artifact.
+
+Pinned and verified with `git ls-remote` on 2026-10-16: `anchore/sbom-action` v0.24.3 (an annotated
+tag; the pin is its peeled commit `66cbf4bc…`), `actions/attest-build-provenance` v4.2.2,
+`actions/upload-artifact` v7.0.2, `actions/download-artifact` v8.0.2 (lightweight tags).
+
+*Rejected:* building per environment (the bytes in prod would not be the bytes tested in dev);
+deploying from a job that also builds (a rebuild hides in a convenience); `workflow_run` chaining
+(two files to keep in step; one generated file is one drift gate).
+
+Proof: `tests/unit/test_cd.py` (the generated jobs, needs, environments, concurrency, secrets,
+commands and the absence of any build step in a deploy job; CI only with each reason; the archive's
+round trip, its sha256 and an escaping member refused; `--health` against a local HTTP server),
+`tests/acceptance/test_lifecycle.py` (`stack-kit package` through the real CLI).
+**Nothing has run on GitHub:** the workflow is proven as generated text and its commands as local
+runs, until the owner pushes it.
