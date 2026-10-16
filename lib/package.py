@@ -257,6 +257,15 @@ def pack(root: Path, manifest: dict, module_id: str) -> Path:
             if baked:
                 raise PackageError(f"{module_id}: the built app carries addresses -- they are runtime config, "
                                    f"not the bundle's (container.allowBaked lists any that must stay):\n  " + "\n  ".join(baked))
+        if service.kind == "static" and service.spec.get("serve"):
+            # A static server whose root holds no index.html answers 403 at `/` while its own health
+            # probe stays green -- refused here, naming where the build really put the app.
+            served = str(service.spec["serve"]).strip("/")
+            if f"{served}/index.html" not in tree:
+                found = sorted(rel.rsplit("/", 1)[0] for rel in tree if rel.endswith("/index.html"))
+                raise PackageError(f"{module_id}: service {service.id} serves {served}/, which holds no index.html "
+                                   f"(`/` would answer 403)" + (f"; the build put it under {', '.join(found)} -- declare "
+                                   f"modules.{module_id}.container.serve" if found else ""))
         added = recipe(root, manifest, service, tree)
         for rel, path in tree.items():
             members[f"{service.id}/{rel}"] = path.read_bytes()

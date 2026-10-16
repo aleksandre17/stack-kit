@@ -208,6 +208,14 @@ def test_a_static_release_is_hardened_and_proxies_its_api_same_origin(tmp_path, 
     (dist / "assets" / "app-1a2b3c4d.js").write_text("fetch('http://10.20.30.40:8080/api')", encoding="utf-8")
     with pytest.raises(package.PackageError, match="10.20.30.40"):
         package.pack(root, manifest, web)
+    (dist / "assets" / "app-1a2b3c4d.js").write_text("fetch('/api/x')", encoding="utf-8")
+    # The Angular application builder writes dist/<name>/browser/: a root without index.html is refused.
+    (dist / "shop" / "browser").mkdir(parents=True)
+    (dist / "index.html").rename(dist / "shop" / "browser" / "index.html")
+    with pytest.raises(package.PackageError, match="dist/shop/browser"):
+        package.pack(root, manifest, web)
+    manifest["modules"][web]["container"]["serve"] = "dist/shop/browser"
+    package.pack(root, manifest, web)
 
 
 def test_a_built_recipe_runs_unprivileged_and_probes_its_port_or_its_declared_path(tmp_path, monkeypatch):
