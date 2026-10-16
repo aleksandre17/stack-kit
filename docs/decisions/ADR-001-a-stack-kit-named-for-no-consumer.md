@@ -849,3 +849,8 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    array `required_by` (a second shape for one registry); deriving the registry at run time from
    other declarations as agent-kit does (stack-kit's points are declared nowhere else -- the file is
    their one home).
+5. **Non-interactive by construction.** `ssh_args` puts `-o BatchMode=yes` first for every target
+   (openssh keeps an option's first value, and a command-line option wins over a `-F` config); a
+   target whose `ssh.options` says otherwise is refused by name. The target template no longer
+   carries it -- one home. *Rejected:* a validate warning only (a deploy could still hang on a
+   prompt in CI).

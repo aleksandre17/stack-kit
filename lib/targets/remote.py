@@ -18,10 +18,20 @@ from lib.targets.declaration import TargetError, reachable
 
 
 def ssh_args(root: Path, name: str, target: dict[str, Any]) -> list[str]:
-    """The openssh options (`-o`/`-F`, valid for ssh, scp and rsync -e) that reach the target."""
+    """The openssh options (`-o`/`-F`, valid for ssh, scp and rsync -e) that reach the target.
+
+    Non-interactive by construction: `BatchMode=yes` comes first for every target (openssh takes the
+    first value of an option, and a command-line option over any `-F` config), so no password,
+    passphrase or host-key question can ever wait on a terminal; a target that declares otherwise
+    is refused."""
     t = reachable(name, target)
     ssh = t.get("ssh") or {}
-    out = ["-o", f"Port={int(t.get('port') or 22)}"]
+    for opt in ssh.get("options") or []:
+        key, _, value = str(opt).replace(" ", "=", 1).partition("=")
+        if key.strip().lower() == "batchmode" and value.strip().lower() != "yes":
+            raise TargetError(f"target {name}: ssh.options {opt!r} -- the kit reaches a target non-interactively "
+                              f"(BatchMode=yes always); use a key the agent or ssh.identity holds")
+    out = ["-o", "BatchMode=yes", "-o", f"Port={int(t.get('port') or 22)}"]
     out += ["-o", "StrictHostKeyChecking=accept-new" if ssh.get("hostKeys") == "accept-new" else "StrictHostKeyChecking=yes"]
     if ssh.get("knownHosts"):
         out += ["-o", f"UserKnownHostsFile={(root / ssh['knownHosts']).as_posix()}"]

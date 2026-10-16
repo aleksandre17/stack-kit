@@ -176,6 +176,16 @@ def test_ssh_is_strict_against_the_pinned_file_and_trusts_first_use_only_when_de
 
 # ── migration: the former homes, carried once, then gone ─────────────────────
 
+def test_every_target_is_reached_in_batch_mode_and_one_declaring_otherwise_is_refused(resolver):
+    for doc in (_doc(prod=PROD), _doc(prod={**PROD, "ssh": {"hostKeys": "accept-new", "config": "ops/config/ssh/config"}})):
+        args = resolver(doc).ssh_args()
+        assert args[:2] == ["-o", "BatchMode=yes"], "first: openssh keeps an option's first value"
+    for opt in ("BatchMode=no", "batchmode no"):
+        with pytest.raises(ValueError, match="non-interactively"):
+            resolver(_doc(prod={**PROD, "ssh": {"options": [opt]}})).ssh_args()
+    assert "BatchMode=yes" in resolver(_doc(prod={**PROD, "ssh": {"options": ["BatchMode=yes"]}})).ssh_args()
+
+
 def test_migrate_declares_deploy_env_as_a_target_and_invents_nothing(tmp_path):
     root = tmp_path / "m"
     secrets = root / "ops" / "config"

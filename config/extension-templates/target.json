@@ -7,7 +7,6 @@
     "knownHosts": "ops/deploy/known_hosts",
     "hostKeys": "pinned",
     "options": [
-      "BatchMode=yes",
       "ConnectTimeout=10"
     ]
   }

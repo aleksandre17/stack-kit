@@ -201,12 +201,11 @@
     {
       "standard": "SSH hardening",
       "clause": "no password auth, BatchMode",
-      "mechanism": "the target template declares BatchMode=yes; an identity is a key reference",
+      "mechanism": "BatchMode=yes first in every target's ssh options (a target declaring otherwise is refused); an identity is a key reference",
       "evidence": [
-        "tests/unit/test_extend.py::test_the_registry_has_the_shared_shape"
+        "tests/unit/test_targets.py::test_every_target_is_reached_in_batch_mode_and_one_declaring_otherwise_is_refused"
       ],
-      "status": "partial",
-      "why": "BatchMode is in the template a host makes, not enforced on every target"
+      "status": "conformant"
     },
     {
       "standard": "harvested (round 8)",
