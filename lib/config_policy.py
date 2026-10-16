@@ -20,7 +20,17 @@ import re
 from typing import Any
 
 PLACEHOLDER = re.compile(r"^(|change[_-]?me|todo|tbd|xxx+|__[A-Z0-9_]+__|\$\{[^}]*\}|<[^>]*>|your[_-].*)$", re.I)
+PENDING = re.compile(r"<<pending:\s*([^>]*)>>")  # an answer only the host gives (lib/envgen.py writes it)
 _LOCAL = re.compile(r"^https?://(localhost|127\.|0\.0\.0\.0|\[::1\])", re.I)
+
+
+def generate_bytes(row: dict[str, Any]) -> int:
+    """The bytes of randomness a key is generated with (0: not generated) -- one reader of both spellings."""
+    policy = row.get("policy") if isinstance(row.get("policy"), dict) else {}
+    if isinstance(policy.get("generate"), dict):
+        return int(policy["generate"].get("bytes") or 32)
+    m = re.fullmatch(r"random:(\d+)", str(row.get("generate") or ""))
+    return int(m.group(1)) if m else 0
 
 
 def env_name(row: dict[str, Any]) -> str:
@@ -55,7 +65,8 @@ def _required(policy: dict[str, Any], environment: str) -> bool:
 
 
 def problems(catalogue: dict[str, Any], values: dict[str, str], *, folder: str, environment: str) -> list[str]:
-    out: list[str] = []
+    out: list[str] = [f"{folder} ({environment}): {name} is pending -- {m.group(1).strip()}"
+                      for name, value in sorted(values.items()) if (m := PENDING.search(value))]
     rows = [r for r in catalogue.get("keys") or [] if isinstance(r, dict) and isinstance(r.get("policy"), dict)]
     by_key = {str(r["key"]): r for r in rows}
     where = f"{folder} ({environment})"
@@ -65,8 +76,8 @@ def problems(catalogue: dict[str, Any], values: dict[str, str], *, folder: str, 
             continue
         key = str(row["key"])
         found = _value(values, row)
-        if found is None or PLACEHOLDER.match(found[1].strip()):
-            if _required(policy, environment) and not policy.get("generate"):
+        if found is None or PLACEHOLDER.match(found[1].strip()) or PENDING.search(found[1]):
+            if _required(policy, environment) and not generate_bytes(row) and not (found and PENDING.search(found[1])):
                 out.append(f"{where}: {key} is required{' in ' + environment if isinstance(policy.get('required'), list) else ''}"
                            f" and {'is a placeholder' if found else 'is not set'}")
             continue

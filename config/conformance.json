@@ -315,6 +315,16 @@
       "status": "conformant"
     },
     {
+      "standard": "12-Factor",
+      "clause": "III config: env files generated from one catalogue",
+      "mechanism": "the committed .env.example a projection of config.keys (render, drift in validate); `extend env` makes the ignored .env.<env>: non-secret values, a SECRET pending (config reports, deploy refuses), a generated key fresh and never printed, a data source's `none` the unroutable sentinel",
+      "evidence": [
+        "tests/unit/test_envgen.py::test_the_env_example_is_a_projection_of_the_catalogue",
+        "tests/unit/test_envgen.py::test_config_reports_a_pending_secret_and_a_deploy_refuses_it"
+      ],
+      "status": "conformant"
+    },
+    {
       "standard": "harvested (round 8)",
       "clause": "edge TLS 1.2+, HSTS, headers, /healthz; internal CA, leaves, public truststore",
       "mechanism": "edge TLS 1.2+, HSTS, headers, /healthz; internal CA, leaves, public truststore",

@@ -882,3 +882,19 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    (it generates the LOCAL development stack; one verb per output keeps each honest); committing
    projections with the concrete release id (stale on every commit); rendering the compose as YAML
    (compose reads the JSON deploy writes; a second serialiser would make two byte forms).
+8. **Env files are the kit's job, from the one catalogue** (`lib/envgen.py`). Each secrets folder's
+   committed `.env.example` is a projection of `config.keys` -- every key of the folder (its
+   `policy.modules`, else every folder), its sensitivity, where it is required, a data source, a
+   generated key, a non-secret key's default and per-environment values, a secret's value always
+   empty -- written by `render` and held by validate's projection drift. `extend env <folder> --env
+   <id>` makes the ignored `.env.<id>` once (never overwritten, mode 600, refused when git would track
+   it): a PUBLIC or INTERNAL key's `environments.<id>` value, else its `default`; a SECRET as a
+   `<<pending: ...>>` marker, which `config` reports and a deploy refuses (exit 4); a generated key
+   (`policy.generate.bytes`, or its shorthand `generate: "random:<bytes>"` -- one reader,
+   `config_policy.generate_bytes`) a fresh value, never printed, and never shipped in a deploy's env
+   file (the server makes its own once, umask 077, given as `<NAME>_FILE`); a data source the
+   environment declares `none` the sentinel `Server=none.invalid;Database=none`, which the isolation
+   check never counts as shared. A SECRET with a per-environment value other than `none` is a
+   committed secret and refused. *Rejected:* `env` as a registry point (an ignored, machine-local
+   file is no host extension of the kit: nothing to commit or upgrade 3-way); keeping hand-written
+   examples beside the catalogue (two homes drift).

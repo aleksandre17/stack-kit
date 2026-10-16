@@ -329,6 +329,7 @@ extend the kit through a declared point: a host file or entry from its template,
 stack-kit extend --list
 stack-kit extend <point> [<name>] [--plan]
 stack-kit extend module [--approve <who>]   (draft the modules from the tree)
+stack-kit extend env <folder> --env <id> [--plan]   (an ignored env file from the configuration catalogue)
 stack-kit extend --upgrade [--plan]
 stack-kit extend --init [--root <dir>] [--plan]
 ```
@@ -341,8 +342,9 @@ stack-kit extend --init [--root <dir>] [--plan]
 | `--init` | every point init requires, then each infra service the manifest selects |
 | `--root <dir>` | the host root (init, before a manifest exists) |
 | `--approve <who>` | module: write the draft, recording who approved it |
+| `--env <id>` | env: the environment whose ignored env file is made |
 
-A point's file is made only on demand, never overwritten; the answers only the host can give are <<pending: ...>> markers that validate shows (an error where the manifest's `extend.profile` requires the point). A file where a point lives that no point declares is reported. The kit copy is never edited.
+A point's file is made only on demand, never overwritten; the answers only the host can give are <<pending: ...>> markers that validate shows (an error where the manifest's `extend.profile` requires the point). A file where a point lives that no point declares is reported. The kit copy is never edited. `extend env` makes a folder's ignored .env.<env> from the configuration catalogue: non-secret values filled, a SECRET pending (config reports it, a deploy refuses it), a generated key a fresh value never printed.
 
 Exit codes: 0, 1, 2.
 

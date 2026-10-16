@@ -157,6 +157,7 @@ def rendered(root: Path, manifest: dict[str, Any], unrenderable: list[str] | Non
             out[container_path(manifest, s)] = header(recipe_sources(root, manifest, s)).encode("utf-8") + recipe(root, manifest, s)
         except (ValueError, KeyError, OSError) as e:
             said.append(f"{s.id}: {e}")
+    out.update(_env_examples(root, manifest, said))
     if (manifest.get("deploy") or {}).get("targets"):
         try:
             envs = catalogs.ids("environments", manifest)
@@ -171,6 +172,25 @@ def rendered(root: Path, manifest: dict[str, Any], unrenderable: list[str] | Non
             except (ValueError, KeyError, OSError) as e:
                 said.append(f"{env} stack: {e}")
     return out
+
+
+def _env_examples(root: Path, manifest: dict[str, Any], said: list[str]) -> dict[str, bytes]:
+    """Each secrets folder's .env.example, generated from the configuration catalogue (lib/envgen.py)."""
+    from lib import catalogs, config_policy, envgen
+    from lib.project_context import ProjectContext
+
+    try:
+        catalogue = config_policy.catalogue_of(root, manifest)
+    except ValueError as e:
+        said.append(f"config.keys: {e}")
+        return {}
+    if not catalogue:
+        return {}
+    ctx = ProjectContext(root=root, manifest=manifest)
+    rel = str((manifest.get("config") or {}).get("keys"))
+    envs = catalogs.ids("environments", manifest)
+    return {(ctx.secrets_root / folder / ".env.example").relative_to(root).as_posix():
+            envgen.example(catalogue, rel, folder, envs).encode("utf-8") for folder in ctx.list_secrets_module_folders()}
 
 
 def write(root: Path, manifest: dict[str, Any], *, plan: bool = False) -> list[str]:

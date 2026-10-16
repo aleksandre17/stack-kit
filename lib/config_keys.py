@@ -178,6 +178,12 @@ def check(root: Path, manifest: dict[str, Any]) -> Verdict:
             verdict.failures.append(f"{rel}: {r['key']} is SECRET and declares no rotation")
         if r.get("sensitivity") == "SECRET" and r.get("default") not in (None, ""):
             verdict.failures.append(f"{rel}: {r['key']} is SECRET and declares a default -- a committed secret")
+        per_env = r.get("environments") if isinstance(r.get("environments"), dict) else {}
+        if r.get("sensitivity") == "SECRET" and any(v != "none" for v in per_env.values()):
+            verdict.failures.append(f"{rel}: {r['key']} is SECRET and declares a per-environment value -- a committed "
+                                    f"secret (only `none`, for a data source)")
+        if any(v == "none" for v in per_env.values()) and not r.get("dataSource"):
+            verdict.failures.append(f"{rel}: {r['key']} declares `none` for an environment but is no `dataSource`")
     known = {(str(k.get("key")), str(k.get("file")).replace("\\", "/")): str(k.get("tracking"))
              for k in catalogue.get("knownExposures") or [] if isinstance(k, dict)}
     for file, where, key in exposures(root, rows, skip={rel}):

@@ -39,6 +39,16 @@
           "type": {
             "type": "string"
           },
+          "generate": {
+            "type": "string",
+            "pattern": "^random:[0-9]+$",
+            "description": "random:<bytes> -- the same declaration as policy.generate.bytes: a fresh value written into an ignored env file by `extend env`, and made on the server once (given as <NAME>_FILE); never printed"
+          },
+          "environments": {
+            "type": "object",
+            "description": "A non-secret key's value per environment ({dev: ..., prod: ...}); `none` for a data source the environment has none of (the kit writes an unroutable sentinel)",
+            "additionalProperties": { "type": ["string", "number", "boolean"] }
+          },
           "dataSource": {
             "type": "boolean",
             "description": "The key names a store (a connection string or URL): each environment's value is reduced to its server and database and compared -- two environments that share one are refused unless declared (lib/data_sources.py)"

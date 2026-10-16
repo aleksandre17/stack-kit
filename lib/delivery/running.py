@@ -79,6 +79,8 @@ def env_file(ctx: Delivery, service: Service) -> bytes:
     folder = service.secrets_folder
     values = envfile.merged(envfile.run_files(ctx.secrets_root, folder, ctx.environment,
                                               catalogs.ids("environments", ctx.manifest))) if folder else {}
+    for name in generated(ctx, service):  # made on the server, given as <NAME>_FILE: a local value never ships
+        values.pop(name, None)
     return "".join(f"{k}={v}\n" for k, v in sorted(values.items())).encode("utf-8")
 
 
@@ -98,13 +100,15 @@ def generated(ctx: Delivery, service: Service) -> dict[str, int]:
     """{env name: bytes} of the catalogue keys generated on the server for this service's folder
     (`policy.generate`): the value is made there, once, and never leaves it."""
     from lib import config_policy
+    from lib.envgen import generate_bytes
 
     out: dict[str, int] = {}
     for row in (config_policy.catalogue_of(ctx.root, ctx.manifest).get("keys") or []):
-        policy = row.get("policy") if isinstance(row, dict) else None
-        if isinstance(policy, dict) and policy.get("generate") and (not policy.get("modules")
-                                                                    or service.secrets_folder in policy["modules"]):
-            out[config_policy.env_name(row)] = int((policy["generate"] or {}).get("bytes") or 32)
+        if not isinstance(row, dict) or not generate_bytes(row):
+            continue
+        policy = row.get("policy") if isinstance(row.get("policy"), dict) else {}
+        if not policy.get("modules") or service.secrets_folder in policy["modules"]:
+            out[config_policy.env_name(row)] = generate_bytes(row)
     return out
 
 

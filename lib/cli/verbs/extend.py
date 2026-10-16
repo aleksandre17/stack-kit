@@ -43,6 +43,17 @@ def _extend(a: Args) -> int:
             return 0
         else:
             point_id, name = a.positional[0], (a.positional[1] if len(a.positional) > 1 else "")
+            if point_id == "env":  # an ignored env file, generated from the catalogue (lib/envgen.py)
+                from lib import envgen
+
+                try:
+                    said = envgen.make(root, manifest, name, a.value("--env"), plan=plan)
+                except (envgen.EnvGenError, ValueError) as e:
+                    print(f"  [extend] {e}", file=sys.stderr)
+                    return 1
+                for line in said:
+                    print(f"  {line}")
+                return 0
             if point_id == "module" and not name:  # the draft from the tree (`init --plan`)
                 return tools.python_script("lib/draft.py", ["--approve", a.value("--approve")] if a.value("--approve") else ["--plan"])
             said = extend.make(root, manifest, point_id, name, plan=plan)
@@ -56,14 +67,18 @@ def _extend(a: Args) -> int:
 
 VERB = Verb("extend", "extend the kit through a declared point: a host file or entry from its template, pending answers shown, template upgrades merged",
             ["extend --list", "extend <point> [<name>] [--plan]", "extend module [--approve <who>]   (draft the modules from the tree)",
+             "extend env <folder> --env <id> [--plan]   (an ignored env file from the configuration catalogue)",
              "extend --upgrade [--plan]", "extend --init [--root <dir>] [--plan]"],
             _extend, options=[Option("--list", "every point: purpose, where the host file goes, status (unused | drafted | answered)"),
                               Option("--plan", "print what would be made or merged; nothing is written"),
                               Option("--upgrade", "merge each changed template 3-way into the host's file; a conflict is reported, never written"),
                               Option("--init", "every point init requires, then each infra service the manifest selects"),
                               Option("--root", "the host root (init, before a manifest exists)", "dir"),
-                              Option("--approve", "module: write the draft, recording who approved it", "who")],
+                              Option("--approve", "module: write the draft, recording who approved it", "who"),
+                              Option("--env", "env: the environment whose ignored env file is made", "id")],
             exits=(0, 1, 2), examples=["extend --list", "extend infra-service postgres --plan", "extend catalog-environments staging"],
             details="A point's file is made only on demand, never overwritten; the answers only the host can give are "
                     "<<pending: ...>> markers that validate shows (an error where the manifest's `extend.profile` requires "
-                    "the point). A file where a point lives that no point declares is reported. The kit copy is never edited.")
+                    "the point). A file where a point lives that no point declares is reported. The kit copy is never edited. "
+                    "`extend env` makes a folder's ignored .env.<env> from the configuration catalogue: non-secret values "
+                    "filled, a SECRET pending (config reports it, a deploy refuses it), a generated key a fresh value never printed.")
