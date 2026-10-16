@@ -56,6 +56,9 @@ class Rule:
     id: str
     pattern: re.Pattern[str]
     paths: re.Pattern[str] | None = None
+    #: A declared gate decides what is a placeholder in its own pattern (agent-kit's gates refuse by a
+    #: lookahead); its groups name what it matched, not a value -- so no second placeholder test.
+    declared: bool = False
 
     def holds(self, path: str) -> bool:
         return self.paths is None or bool(self.paths.search(path))
@@ -99,7 +102,7 @@ def rules(root: Path, manifest: dict[str, Any]) -> list[Rule]:
         for gate in gates:
             try:
                 rule = Rule(str(gate["id"]), re.compile(str(gate["forbids"]), re.M),
-                            re.compile(str(gate["paths"])) if gate.get("paths") else None)
+                            re.compile(str(gate["paths"])) if gate.get("paths") else None, declared=True)
             except (KeyError, TypeError, re.error) as e:
                 raise ScanError(f"security.secretPatterns: {rel}: a gate is not one ({e})") from e
             why = _calibrated(rule, gate)
@@ -149,7 +152,7 @@ def scan_text(path: str, text: str, known: set[str] | None = None, active: list[
         for r in held:
             for m in r.pattern.finditer(line):
                 value = _value_of(r.id, m).strip("'\"")
-                if r.id != "private-key" and PLACEHOLDER.match(value):
+                if not r.declared and r.id != "private-key" and PLACEHOLDER.match(value):
                     continue
                 found.append(Finding(path, n, r.id))
                 break

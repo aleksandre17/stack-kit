@@ -61,3 +61,17 @@ def test_validate_names_an_allowance_for_a_rule_the_declared_set_lacks(tmp_path)
     assert not errors and warnings and "built-in set is not used" in warnings[0]
     missing = {"security": {"secretPatterns": "nowhere.json"}}
     assert "is not there" in s.pattern_problems(root, missing)[0][0]
+
+
+def test_a_declared_gate_that_groups_the_key_name_still_finds_the_value(tmp_path):
+    # agent-kit's connection-string gate captures the KEY ("Password") and refuses placeholders by a
+    # lookahead; the scan must not read the group as the value and call "Password" a placeholder.
+    gate = {"id": "no-connection-string-password", "paths": ".*",
+            "forbids": "(?i)[;\"'>]\s*(password|pwd)\s*=\s*(?!__[A-Z0-9_]+__)[^;\"'\s]+",
+            "because": "a fixture", "instead": "a placeholder",
+            "proves": {"path": "a.json", "text": "\"d\": \"Server=x;Password=hunter2;\""},
+            "admits": {"path": "a.json", "text": "\"d\": \"Server=x;Password=__DB_PASSWORD__;\""}}
+    root, manifest = _repo(tmp_path, {"a.json": "\"d\": \"Server=x;Password=hunter2;\"",
+                                      "b.json": "\"d\": \"Server=x;Password=__DB_PASSWORD__;\""},
+                           {"schema_version": 1, "gates": [gate]})
+    assert [(f.path, f.rule) for f in s.tree(root, manifest)] == [("a.json", "no-connection-string-password")]
