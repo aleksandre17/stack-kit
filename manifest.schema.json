@@ -572,7 +572,8 @@
       "type": "object",
       "description": "Configuration carries its sensitivity (ADR-001 decision 5)",
       "properties": {
-        "keys": { "type": "string", "minLength": 1, "description": "Project-relative path of the key catalogue (shape: config/config-keys.schema.json); validate refuses a SECRET with a committed value" }
+        "keys": { "type": "string", "minLength": 1, "description": "Project-relative path of the key catalogue (shape: config/config-keys.schema.json); validate refuses a SECRET with a committed value" },
+        "sharedDataSources": {"type": "array", "description": "Data sources two environments share on purpose (lib/data_sources.py): each with the key ('*' for any), the environments and the reason; an undeclared sharing is refused by a deploy", "items": {"type": "object", "required": ["key", "environments", "reason"], "properties": {"key": {"type": "string", "minLength": 1}, "environments": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 1}}, "reason": {"type": "string", "minLength": 1}}, "additionalProperties": false}}
       },
       "additionalProperties": false
     },

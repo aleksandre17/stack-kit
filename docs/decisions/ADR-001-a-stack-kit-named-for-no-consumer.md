@@ -854,3 +854,16 @@ kept), and an undeclared file where a point lives is reported. Folded in, not ke
    target whose `ssh.options` says otherwise is refused by name. The target template no longer
    carries it -- one home. *Rejected:* a validate warning only (a deploy could still hang on a
    prompt in CI).
+6. **Isolation by data source** (found on a real host: its dev and prod runtime configs named the same
+   server and databases, and the isolation check compared only places). A catalogued key may be a
+   `dataSource`; each environment's value of it is read where the application reads it -- the
+   module's env files for that environment, the shared `.env` included, and its declared runtime
+   config files -- and reduced to its identity (server with port or instance, database), parsed from
+   ADO.NET, libpq, URL and JDBC forms (`lib/data_sources.py`). Two environments with one identity are
+   refused by a deploy of either (exit 4) and reported by `validate` (a warning: the deploy is the
+   gate), unless `config.sharedDataSources` or a target's `sharedDataSources` declares it with a
+   reason. A finding names the key, the environments and the files, and an 8-hex fingerprint --
+   never a value, a host or a database name. A host under `.invalid` is the kit's "no store here"
+   sentinel, never shared. *Rejected:* comparing whole values (two spellings of one database would
+   pass, and a whole value is a credential); resolving hosts to addresses (a network read in
+   validate, and DNS differs by vantage point).

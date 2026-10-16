@@ -289,6 +289,37 @@
               },
               "additionalProperties": false
             }
+          },
+          "sharedDataSources": {
+            "type": "array",
+            "description": "Data sources two environments share on purpose (lib/data_sources.py): each with the key ('*' for any), the environments and the reason; an undeclared sharing is refused by a deploy",
+            "items": {
+              "type": "object",
+              "required": [
+                "key",
+                "environments",
+                "reason"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "environments": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            }
           }
         },
         "additionalProperties": false

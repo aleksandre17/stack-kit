@@ -353,9 +353,10 @@
     {
       "standard": "harvested (round 8)",
       "clause": "environment isolation, checked",
-      "mechanism": "environment isolation, checked",
+      "mechanism": "each environment its own places (the layout) and its own stores: catalogued data-source keys compared by server and database across environments, an undeclared sharing refused by a deploy and reported by validate",
       "evidence": [
-        "tests/unit/test_targets.py::test_a_layout_that_lets_two_environments_share_a_place_is_refused"
+        "tests/unit/test_targets.py::test_a_layout_that_lets_two_environments_share_a_place_is_refused",
+        "tests/unit/test_data_sources.py::test_a_deploy_into_an_environment_that_shares_a_store_is_refused_and_prints_no_value"
       ],
       "status": "conformant"
     },

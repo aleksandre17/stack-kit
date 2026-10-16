@@ -108,6 +108,21 @@ def registry_problems(registry: dict[str, Any], manifest: dict[str, Any]) -> lis
     return out
 
 
+def _shared_data_sources(ctx: ProjectContext) -> list[str]:
+    """Environments that read one store through a data-source key (a deploy refuses them)."""
+    from lib import catalogs, config_policy, data_sources
+    from lib import targets as deploy_targets
+
+    catalogue = config_policy.catalogue_of(ctx.root, ctx.manifest)
+    if not catalogue:
+        return []
+    try:
+        declared = (deploy_targets.load(ctx.root, ctx.manifest) or {}) if (ctx.manifest.get("deploy") or {}).get("targets") else {}
+    except ValueError:
+        declared = {}
+    return data_sources.shared(ctx.root, ctx.manifest, catalogue, catalogs.ids("environments", ctx.manifest), targets=declared)
+
+
 def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str]:
     errs: list[str] = []
     warnings: list[str] = []
@@ -256,6 +271,7 @@ def validate_manifest(
 
     errs.extend(f"config: {f}" for f in runtime_config_problems(ctx.root, ctx.manifest))
     warnings.extend(f"config: {k}" for k in keys.known)
+    warnings.extend(f"config: {s}" for s in _shared_data_sources(ctx))
     # Deploy targets are declared configuration (amendment 9): refused shapes and secrets; notices.
     from lib import targets as deploy_targets
 

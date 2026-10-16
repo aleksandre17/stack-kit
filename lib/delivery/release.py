@@ -142,6 +142,9 @@ def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
     policy = config_policy_problems(ctx, svc)
     if policy:
         raise DeliveryError("refused by the env-value policy (config.keys):\n  " + "\n  ".join(policy), 4)
+    shared = shared_data_sources(ctx)
+    if shared:
+        raise DeliveryError("refused: environments share a data source:\n  " + "\n  ".join(shared), 4)
     for line in preflight.all_checks(ctx, [s.id for s in svc]):
         ctx.out(f"[preflight] {line}")
     for kind in ("stack", "infra", "backups"):
@@ -191,6 +194,17 @@ def config_policy_problems(ctx: Delivery, svc: list[Service]) -> list[str]:
                                                   catalogs.ids("environments", ctx.manifest)))
         out += config_policy.problems(catalogue, values, folder=folder, environment=ctx.environment)
     return out
+
+
+def shared_data_sources(ctx: Delivery) -> list[str]:
+    """Another environment that reads this one's store through a data-source key, undeclared."""
+    from lib import catalogs, config_policy, data_sources
+
+    catalogue = config_policy.catalogue_of(ctx.root, ctx.manifest)
+    if not catalogue:
+        return []
+    return data_sources.shared(ctx.root, ctx.manifest, catalogue, catalogs.ids("environments", ctx.manifest),
+                               only=ctx.environment, targets={"targets": {ctx.target_name: ctx.target}})
 
 
 def images_floating(ctx: Delivery, svc: list[Service], trees: dict[str, dict[str, bytes]]) -> list[str]:

@@ -39,6 +39,10 @@
           "type": {
             "type": "string"
           },
+          "dataSource": {
+            "type": "boolean",
+            "description": "The key names a store (a connection string or URL): each environment's value is reduced to its server and database and compared -- two environments that share one are refused unless declared (lib/data_sources.py)"
+          },
           "sensitivity": {
             "type": "string",
             "enum": [
