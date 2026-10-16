@@ -108,7 +108,8 @@ copy kits\stack-kit\scaffold\ops\config\deploy.env.example ops\config\deploy.env
 
 | File | Typical keys |
 |---|---|
-| `ops/config/deploy.env` | `DEPLOY_SERVER=user@host`, `DEPLOY_PROJECT`, `COMPOSE_PROJECT_NAME`, `DOCKER_NETWORK`, `DEPLOY_SERVER_BASE`, `DEPLOY_SSH_IDENTITY_FILE`, `DEPLOY_SSH_CONFIG_FILE`, `DEPLOY_SSH_OPTIONS` |
+| `ops/deploy/targets.json` (tracked) | the deploy targets: `host`, `user`, `port`, `root`, `runtime`, `ssh` (identity reference, pinned `known_hosts`), `layout`; per machine `targets.local.json` (ignored). [REFERENCE.md#manifest](REFERENCE.md#manifest) `deploy` |
+| `ops/config/deploy.env` | `DEPLOY_PROJECT`, `COMPOSE_PROJECT_NAME`, `DOCKER_NETWORK`. Its former `DEPLOY_SERVER`, `DEPLOY_SERVER_BASE`, `DEPLOY_SSH_*` are read until 2.0.0 when no target is declared; `migrate --apply` declares them as one |
 | `ops/config/<ui>/.env.dev` | `VITE_API_URL=http://localhost:8090` |
 | `ops/config/<ui>/.env.deploy` | `DEPLOY_HOST_PORT=5177`, `DEPLOY_PATH`, `DEPLOY_LAYOUT=structured` |
 | `ops/config/<api>/.env.dev` | `API_PORT=8090`, the module's keys |

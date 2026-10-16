@@ -18,7 +18,7 @@ node_docker_up() {
     echo '=== Deploy [$container] \$(date) ===' >> '$srv_log'/deploy.log
     cd '$rp'
     if docker compose version >/dev/null 2>&1; then DC='docker compose'; else DC=docker-compose; fi
-    \$DC -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE up --build -d 2>&1 | tee -a '$srv_log'/deploy.log
+    IMAGE_REVISION='${IMAGE_REVISION:-}' \$DC ${COMPOSE_PROJECT:+-p '$COMPOSE_PROJECT'} -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE up --build -d 2>&1 | tee -a '$srv_log'/deploy.log
   "
 
   deploy_log "  ... waiting for $container to become healthy"
@@ -62,10 +62,10 @@ node_docker_up() {
         set -e
         cd '$rp'
         if docker compose version >/dev/null 2>&1; then DC='docker compose'; else DC=docker-compose; fi
-        \$DC -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE down 2>/dev/null || true
+        \$DC ${COMPOSE_PROJECT:+-p '$COMPOSE_PROJECT'} -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE down 2>/dev/null || true
         cur=\$(docker inspect --format='{{.Config.Image}}' '$container' 2>/dev/null || echo '${container}:latest')
         docker tag '${container}:previous' \"\$cur\" 2>/dev/null || true
-        \$DC -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE up -d 2>&1 | tee -a '$srv_log'/deploy.log
+        IMAGE_REVISION='${IMAGE_REVISION:-}' \$DC ${COMPOSE_PROJECT:+-p '$COMPOSE_PROJECT'} -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE up -d 2>&1 | tee -a '$srv_log'/deploy.log
       "
       deploy_log "  [ROLLBACK] $container restored to previous image"
     else

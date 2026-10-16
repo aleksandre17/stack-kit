@@ -196,8 +196,10 @@ class ProjectContext:
                 if k.strip() == "DEPLOY_PROJECT" and v.strip():
                     slug = v.strip().strip("\"'").lower().replace("_", "-")
                     break
-        base = server_base or "/home/deploy"
-        return f"{base.rstrip('/')}/{slug}/{secrets_folder}"
+        # No invented base (ADR-001 amendment 9): a target's root, or the operator's, is declared.
+        if not server_base:
+            raise ValueError(f"no remote base for '{secrets_folder}': declare a deploy target's `root`")
+        return f"{server_base.rstrip('/')}/{slug}/{secrets_folder}"
 
     def list_secrets_module_folders(self) -> list[str]:
         seen: set[str] = set()

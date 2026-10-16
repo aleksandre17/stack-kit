@@ -65,6 +65,9 @@
     "folder": ".vscode",
     "cliScript": "tools/stack-kit.ps1"
   },
+  "deploy": {
+    "targets": "ops/deploy/targets.json"
+  },
   "commands": {
     "build": "pwsh ops/cli/stack-kit.ps1 build",
     "test": "pwsh ops/cli/stack-kit.ps1 test",

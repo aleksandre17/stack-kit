@@ -29,7 +29,13 @@ pwsh ops/cli/stack-kit.ps1 validate          # the manifest, its tree, its secre
 pwsh ops/cli/stack-kit.ps1 build             # every module, fail-fast (also: test, lint)
 pwsh ops/cli/stack-kit.ps1 <alias> run       # one module on this machine, development configuration
 pwsh ops/cli/stack-kit.ps1 ci-gen --force    # after a module is added: CI follows the manifest
+pwsh ops/cli/stack-kit.ps1 targets --plan    # where every deploy goes (ops/deploy/targets.json)
 ```
+
+Deploys go to the **targets** declared in `ops/deploy/targets.json` (tracked, no secrets): host,
+user, port, an absolute root, the runtime, the ssh identity *reference* and the pinned host keys
+(`ops/deploy/known_hosts`), and the remote layout. The kit holds no server, ssh option or remote
+directory of its own; `init` writes the file with one `pending` target to fill in.
 
 Vendoring at another path, launchers for cmd.exe and bash, and prerequisites:
 **[docs/INSTALL.md](docs/INSTALL.md)**. Taking an existing repository onto the kit:

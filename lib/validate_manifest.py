@@ -219,7 +219,16 @@ def validate_manifest(
 
     keys = config_keys(ctx.root, ctx.manifest)
     errs.extend(f"config: {f}" for f in keys.failures)
+    from lib.config_keys import runtime_config_problems
+
+    errs.extend(f"config: {f}" for f in runtime_config_problems(ctx.root, ctx.manifest))
     warnings.extend(f"config: {k}" for k in keys.known)
+    # Deploy targets are declared configuration (amendment 9): refused shapes and secrets; notices.
+    from lib import targets as deploy_targets
+
+    errs.extend(f"deploy: {p}" for p in deploy_targets.problems(ctx.root, ctx.manifest))
+    warnings.extend(f"deploy: {n}" for n in deploy_targets.notices(ctx.root, ctx.manifest))
+    warnings.extend(f"deploy: {n}" for n in deploy_targets.legacy_notices(ctx.secrets_root, ctx.manifest))
     # A development run reads development configuration only (amendment 8): what it lost is named.
     from lib.migrate_manifest import run_env_notices
 

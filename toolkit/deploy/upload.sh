@@ -30,6 +30,7 @@ upload_service() {
   fi
 
   if [ "$ENVIRONMENT" = "prod" ]; then
+    stack_kit_confined "$rp" || return 1
     ssh -n "$SERVER" "
       cp '$rp'/app.jar '$rp'/versions/app-$DEPLOY_VERSION.jar
       ls -t '$rp'/versions/app-*.jar 2>/dev/null | tail -n +$((VERSIONS_KEEP+1)) | xargs rm -f

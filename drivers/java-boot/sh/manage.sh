@@ -259,11 +259,13 @@ case "$ACTION" in
             manage_prune_deployed_images
             for s in "${SERVICES[@]}"; do
                 d="$(remote_path "$s")"
+                stack_kit_confined "$d" || exit 1
                 ssh "$SERVER" "docker run --rm -v \"$d:/target\" alpine find /target -mindepth 1 -delete 2>/dev/null || true"
                 ssh "$SERVER" "rm -rf \"$d\""
             done
         else
             d="$(remote_path "$SVC")"
+            stack_kit_confined "$d" || exit 1
             ssh "$SERVER" "bash -c 'cd \"$d\" && $COMPOSE down -v --rmi local 2>/dev/null; true'"
             ssh "$SERVER" "docker run --rm -v \"$d:/target\" alpine find /target -mindepth 1 -delete 2>/dev/null || true"
             ssh "$SERVER" "rm -rf \"$d\""

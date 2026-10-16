@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "stack-kit deploy targets (tracked, non-secret)",
+  "description": "Named deploy targets a host declares in the file its manifest names (`deploy.targets`), merged under a gitignored `<name>.local.json` beside it. No secret is ever a value here: an identity is a reference (ADR-001 amendment 9).",
+  "type": "object",
+  "required": [
+    "schema",
+    "targets"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "defaults": {
+      "type": "object",
+      "description": "The target an environment deploys to when no --target is given",
+      "properties": {
+        "dev": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prod": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "runtime"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "pending": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Declared, not reachable yet, and why: printed by validate and targets, refused by every deploy"
+          },
+          "runtime": {
+            "enum": [
+              "docker-compose",
+              "static",
+              "iis"
+            ],
+            "description": "What runs the deployed module there"
+          },
+          "host": {
+            "type": "string",
+            "minLength": 1
+          },
+          "user": {
+            "type": "string",
+            "minLength": 1
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "default": 22
+          },
+          "root": {
+            "type": "string",
+            "pattern": "^(/|[A-Za-z]:[/\\\\])",
+            "description": "The absolute remote base every layout path is rendered under"
+          },
+          "ssh": {
+            "type": "object",
+            "properties": {
+              "identity": {
+                "type": "string",
+                "pattern": "^(agent|env:[A-Za-z_][A-Za-z0-9_]*|file:[^\\s]+)$",
+                "description": "A reference, never a key: `agent` (the running ssh-agent), `env:VAR` (a variable naming the key file), `file:<repo path>` (an ignored key file)"
+              },
+              "knownHosts": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A tracked file of this target's pinned host keys (default: the machine's own known_hosts, still strict)"
+              },
+              "hostKeys": {
+                "enum": [
+                  "pinned",
+                  "accept-new"
+                ],
+                "default": "pinned",
+                "description": "accept-new is trust on first use, only when declared"
+              },
+              "config": {
+                "type": "string",
+                "minLength": 1,
+                "description": "An ssh config file (ssh -F)"
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z]+=\\S+$"
+                },
+                "description": "Further `-o Key=Value` options; host-key checking is `hostKeys`'s alone"
+              }
+            },
+            "additionalProperties": false
+          },
+          "layout": {
+            "type": "object",
+            "description": "Path templates over the kit's default (config/deploy-layout.default.json); every rendered path must lie under `project`",
+            "properties": {
+              "project": {
+                "type": "string",
+                "minLength": 1
+              },
+              "environment": {
+                "type": "string",
+                "minLength": 1
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "logs": {
+                "type": "string",
+                "minLength": 1
+              },
+              "releases": {
+                "type": "string",
+                "minLength": 1
+              },
+              "current": {
+                "type": "string",
+                "minLength": 1
+              },
+              "runtime": {
+                "type": "string",
+                "minLength": 1
+              },
+              "workspace": {
+                "type": "string",
+                "minLength": 1
+              },
+              "stack": {
+                "type": "string",
+                "minLength": 1
+              },
+              "stackEnv": {
+                "type": "string",
+                "minLength": 1
+              },
+              "infra": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "ports": {
+            "type": "object",
+            "description": "Host ports each service publishes, per environment: unique per host across every target and environment (validate), and refused at deploy when another compose project publishes one",
+            "properties": {
+              "dev": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                }
+              },
+              "prod": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "keep": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 5,
+            "description": "Releases (or versioned artifacts) a unit keeps: the prune limit, and what verify holds"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

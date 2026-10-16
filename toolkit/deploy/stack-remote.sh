@@ -15,13 +15,16 @@ export STACK_KIT_PROJECT_ROOT
 
 ENV_FLAG="--prod"
 EXTRA=()
-for arg in "$@"; do
-  case "$arg" in
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  case "${args[$i]}" in
     --dev)  ENV_FLAG="--dev" ;;
     --prod) ENV_FLAG="--prod" ;;
-    *)      EXTRA+=("$arg") ;;
+    --target) export STACK_KIT_TARGET="${args[$((i + 1))]:-}"; i=$((i + 1)) ;;
+    *)      EXTRA+=("${args[$i]}") ;;
   esac
 done
+export STACK_KIT_ENVIRONMENT="${ENV_FLAG#--}"
 
 ENV_NAME="prod"
 [[ "$ENV_FLAG" == "--dev" ]] && ENV_NAME="dev"

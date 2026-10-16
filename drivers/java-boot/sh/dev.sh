@@ -100,6 +100,7 @@ echo ""
 
 case "$SUB" in
   bootstrap)
+    stack_kit_remote_preflight || exit 1
     echo "  [1/4] rsync source"
     dev_rsync_to_workspace "$SERVICE" || exit 1
     ssh -n "$SERVER" "chmod +x '$RP/gradlew' 2>/dev/null || true"

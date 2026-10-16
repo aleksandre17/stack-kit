@@ -17,7 +17,11 @@ OPS_BUILD_TMP_PREFIX="$(stack_kit_deploy_env_value OPS_BUILD_TMP_PREFIX "ops-bui
 DOCKER_NETWORK="$(stack_kit_docker_network)"
 
 # Optional module overrides (ops.config.sh)
-: "${VERSIONS_KEEP:=5}"
+# The compose project a deploy runs under: `{project}-{environment}` on a declared target (one
+# project's environments never share containers, networks or volumes); compose's default without one.
+COMPOSE_PROJECT="$(_stack_kit_resolve compose-project "${ENVIRONMENT:-}" 2>/dev/null || true)"
+# The releases a unit keeps: the target's `keep` (what `targets --verify` holds), else 5.
+: "${VERSIONS_KEEP:=$(_stack_kit_resolve target-keep 2>/dev/null || echo 5)}"
 : "${HEALTH_RETRIES:=24}"
 : "${CRED_PATTERNS:=*.p12 *.jks *.keystore *.pem *.crt *credentials*.json *service-account*.json}"
 

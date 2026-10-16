@@ -230,6 +230,19 @@ def slugify(text: str) -> str:
     return s or "app"
 
 
+#: The deploy.env keys a declared target answers instead (ADR-001 amendment 9): the server, its base,
+#: a folder's remote directory, the layout switches, and the ssh settings `ssh-args` now owns.
+TARGET_KEYS = frozenset({"DEPLOY_SERVER", "DEPLOY_SERVER_BASE", "DEPLOY_PATH", "DEPLOY_LAYOUT",
+                         "DEPLOY_PATH_MODE", "DEPLOY_SSH_CONFIG_FILE", "DEPLOY_SSH_IDENTITY_FILE",
+                         "DEPLOY_SSH_OPTIONS"})
+#: The remote-path kinds a delivery script asks for, and the layout place each is: a container's
+#: (runtime), a static module's and a compose deploy's directory are all the service's unit; a
+#: module's base is its environment's tree. `compose-dev`/`compose-prod` name the environment.
+REMOTE_KINDS = {"module": "environment", "runtime": "unit", "static": "unit", "compose": "unit",
+                "compose-dev": "unit", "compose-prod": "unit", "workspace": "workspace", "logs": "logs",
+                "unit": "unit", "project": "project"}
+
+
 class Resolver:
     """The environment's answers for one project root."""
 
@@ -239,6 +252,151 @@ class Resolver:
             raise FileNotFoundError(f"project root not found ({identity.MANIFEST_FILENAME} required)")
         self.root = Path(self.ctx["root"])
         self.secrets_root = Path(self.ctx["secretsRoot"])
+        self._target: tuple[str, dict] | None | bool = False
+
+    @property
+    def manifest(self) -> dict:
+        return load_manifest(self.root)
+
+    # ── deploy targets (ADR-001 amendment 9): declared, selected, never inferred ──
+
+    def target(self) -> tuple[str, dict] | None:
+        """(name, target) of the selected declared target -- `--target` (STACK_KIT_TARGET), else the
+        environment's default (STACK_KIT_ENVIRONMENT, default prod), else the only one -- or None when
+        the host declares none (the deprecated deploy.env path)."""
+        if self._target is False:
+            from lib import targets
+
+            data = targets.load(self.root, self.manifest)
+            self._target = None if data is None else targets.select(
+                data, identity.env("TARGET"), identity.env("ENVIRONMENT"))
+        return self._target  # type: ignore[return-value]
+
+    def _target_answer(self, key: str, folder: str = "") -> str | None:
+        """A deploy.env key, answered by the selected target; None when no target is declared."""
+        chosen = self.target()
+        if chosen is None or key not in TARGET_KEYS:
+            return None
+        from lib import targets
+
+        name, t = chosen
+        if key == "DEPLOY_SERVER":
+            return targets.server(name, t)
+        if key == "DEPLOY_SERVER_BASE":
+            return str(targets.reachable(name, t)["root"]).rstrip("/")
+        if key == "DEPLOY_PATH":
+            if not folder:
+                return ""
+            env = identity.env("ENVIRONMENT") or "prod"
+            kind = "infra" if folder == "infra" else "environment"
+            return targets.render(t, kind, project=self.project_slug(), environment=env, folder=folder,
+                                  infra_slug=self.infra_slug())
+        if key == "DEPLOY_LAYOUT":
+            return "structured"
+        if key == "DEPLOY_PATH_MODE":
+            return "base"
+        return ""  # DEPLOY_SSH_*: the target's ssh is `ssh-args`'
+
+    def remote_path(self, folder: str, kind: str, container: str, environment: str = "prod",
+                    service: str = "") -> str:
+        """Where one deploy unit of a module lives on the target: the target's layout over the kit's
+        default; without a declared target, the deprecated DEPLOY_PATH/DEPLOY_LAYOUT reading."""
+        if kind not in REMOTE_KINDS:
+            raise ValueError(f"no remote kind '{kind}' (kinds: {', '.join(REMOTE_KINDS)})")
+        if kind.startswith("compose-"):
+            environment = kind.split("-", 1)[1]
+        chosen = self.target()
+        if chosen is not None:
+            from lib import targets
+
+            name, t = chosen
+            targets.reachable(name, t)
+            return targets.render(t, REMOTE_KINDS[kind], project=self.project_slug(), folder=folder,
+                                  container=container, environment=environment, service=service or container)
+        if kind.startswith("compose-"):
+            kind = "compose"
+        from lib import deploy_paths
+
+        # A folder without its own DEPLOY_PATH inherits the deploy-base folder's (workers the API's).
+        inherit = self.ctx.get("deployBaseSecretsFolder", "")
+        base = (self.env_value(folder, "DEPLOY_PATH").rstrip("/")
+                or (self.env_value(inherit, "DEPLOY_PATH").rstrip("/") if inherit and inherit != folder else "")
+                or self.deploy_base(folder))
+        layout = self.env_value(folder, "DEPLOY_LAYOUT")
+        mode = self.env_value(folder, "DEPLOY_PATH_MODE") or "base"
+        if kind == "module":
+            return base
+        if kind in ("runtime", "workspace"):
+            return deploy_paths.resolve_backend_deploy_path(base=base, container_name=container, kind=kind,
+                                                            layout=layout or "flat", path_mode=mode)
+        front = "static" if kind == "static" else f"compose-{environment}"
+        return deploy_paths.resolve_module_deploy_path(base=base, container_name=container, kind=front,
+                                                       layout=layout or "structured", path_mode=mode)
+
+    def ssh_args(self) -> list[str]:
+        """The openssh options every ssh, scp and rsync of a deploy takes: the target's (port, strict
+        host keys against its pinned file, its identity reference, options); without a target, the
+        deprecated DEPLOY_SSH_CONFIG_FILE / DEPLOY_SSH_IDENTITY_FILE / DEPLOY_SSH_OPTIONS."""
+        chosen = self.target()
+        if chosen is not None:
+            from lib import targets
+
+            return targets.ssh_args(self.root, *chosen)
+        out: list[str] = []
+        for key, flag in (("DEPLOY_SSH_CONFIG_FILE", "-F"), ("DEPLOY_SSH_IDENTITY_FILE", "-i")):
+            value = self.deploy_env_value(key)
+            if value:
+                path = Path(value) if Path(value).is_absolute() else Path(self.ctx["monorepoRoot"]) / value
+                if path.is_file():
+                    out += [flag, path.as_posix()]
+        out += self.deploy_env_value("DEPLOY_SSH_OPTIONS").split()
+        return out
+
+    def compose_project(self, environment: str = "") -> str:
+        """The compose project a deploy runs under: `{project}-{environment}` on a declared target;
+        "" without one (the deprecated path keeps compose's own default)."""
+        if self.target() is None:
+            return ""
+        from lib import targets
+
+        return targets.compose_project(self.project_slug(), environment or identity.env("ENVIRONMENT") or "prod")
+
+    def remote_preflight(self, services: list[str]) -> str:
+        """The server-side preflight of a deploy (ownership marker, foreign ports); "" without a target."""
+        chosen = self.target()
+        if chosen is None:
+            return ""
+        from lib import targets
+
+        name, t = chosen
+        targets.reachable(name, t)
+        return targets.preflight(t, project=self.project_slug(), environment=identity.env("ENVIRONMENT") or "prod",
+                                 repository=targets.repository_identity(self.root), services=services)
+
+    def confined(self, path: str) -> bool:
+        """Whether a remote path lies inside this project's directory on the target (no target: the
+        deprecated path has no project directory to hold, and is not judged)."""
+        chosen = self.target()
+        if chosen is None:
+            return True
+        from lib import targets
+
+        project_dir = targets.render(chosen[1], "project", project=self.project_slug())
+        import posixpath
+
+        return targets._under(posixpath.normpath(path), project_dir) and posixpath.normpath(path) != project_dir
+
+    def module_deploy_units(self) -> list[tuple[str, str, str]]:
+        """(module, secrets folder, container) for every module -- what `targets --plan` renders."""
+        from lib.compose_identity import load_deploy_env, resolve_module_service_name
+
+        deploy = load_deploy_env(self.secrets_root)
+        out = []
+        for mid, cfg in (self.manifest.get("modules") or {}).items():
+            if isinstance(cfg, dict):
+                out.append((mid, str(cfg.get("secretsModule") or mid),
+                            resolve_module_service_name(mid, self.manifest, deploy, self.root.name)))
+        return out
 
     def folders(self) -> list[str]:
         return [f for f in self.ctx.get("secretsFolders", "").split("\n") if f]
@@ -247,7 +405,11 @@ class Resolver:
         return envfile.folder_files(self.secrets_root, folder, profile)
 
     def env_value(self, folder: str, key: str, default: str = "") -> str:
-        """The last non-empty value of `key` across the folder's env files, as compose would apply it."""
+        """The last non-empty value of `key` across the folder's env files, as compose would apply it
+        -- except a deploy key a declared target answers (TARGET_KEYS): the target is its one home."""
+        answered = self._target_answer(key, folder)
+        if answered is not None:
+            return answered or default
         return envfile.merged(self.env_files(folder)).get(key, default)
 
     def run_env(self, folder: str, environment: str = "dev") -> dict[str, str]:
@@ -255,7 +417,11 @@ class Resolver:
         return envfile.merged(envfile.run_files(self.secrets_root, folder, environment))
 
     def deploy_env_value(self, key: str, default: str = "") -> str:
-        """An operator's process environment first, then the shared deploy.env."""
+        """A declared target's answer for a deploy key; else an operator's process environment, then
+        the shared deploy.env (the deprecated home of the server, ADR-001 amendment 9)."""
+        answered = self._target_answer(key)
+        if answered is not None:
+            return answered or default
         return os.environ.get(key) or envfile.parse(self.secrets_root / "deploy.env").get(key) or default
 
     def _any_folder(self, key: str) -> str:
@@ -277,6 +443,11 @@ class Resolver:
                 or f"{self.compose_slug()}-net")
 
     def server_base(self) -> str:
+        """The target's root. Without a declared target (deprecated): DEPLOY_SERVER_BASE, else the
+        `/home/<user>` of DEPLOY_SERVER -- an inference kept only until a host declares its targets,
+        and gone at 2.0.0 (`migrate --apply` writes the root it finds, and invents none)."""
+        if self.target() is not None:
+            return self.deploy_env_value("DEPLOY_SERVER_BASE")
         base = self.deploy_env_value("DEPLOY_SERVER_BASE") or self._any_folder("DEPLOY_SERVER_BASE")
         if base:
             return base
@@ -288,6 +459,8 @@ class Resolver:
         return slugify(self.env_value("infra", "INFRA_SLUG") or Path(self.ctx["monorepoRoot"]).name)
 
     def infra_deploy_path(self) -> str:
+        if self.target() is not None:
+            return self.env_value("infra", "DEPLOY_PATH")
         from lib.deploy_paths import resolve_infra_deploy_path
 
         return resolve_infra_deploy_path(deploy_path=self.env_value("infra", "DEPLOY_PATH") or None,
@@ -296,7 +469,10 @@ class Resolver:
                                          consumer_slug=self.infra_slug())
 
     def deploy_base(self, folder: str) -> str:
-        """A folder's remote base: its DEPLOY_PATH, else {server base}/{project slug}/{folder}."""
+        """A folder's remote base: the target's module directory; without a target (deprecated), its
+        DEPLOY_PATH, else {server base}/{project slug}/{folder}."""
+        if self.target() is not None:
+            return self.env_value(folder, "DEPLOY_PATH")
         explicit = self.env_value(folder, "DEPLOY_PATH").rstrip("/")
         if explicit:
             return explicit

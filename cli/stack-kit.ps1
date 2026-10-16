@@ -5,6 +5,36 @@
 param([string]$Command = "help", [string[]]$CliRest = @())
 $CliRest = @($CliRest) + @($args)
 
+# Where a deploy goes is a declared target (ADR-001 amendment 9): `--target <name>` selects one, and
+# is taken out of the operands; otherwise the environment asked for (--env, --dev/--prod,
+# -Environment) selects that environment's default target. Both reach the resolver as variables,
+# so every script below -- bash or PowerShell, however deep -- resolves the same target.
+# A value an earlier run set from a flag is that run's, never this one's: a launcher run in the
+# operator's own session would otherwise deploy the next command to the last command's target.
+# A variable the operator set themselves (no marker) is theirs and is kept.
+foreach ($name in @("TARGET", "ENVIRONMENT")) {
+    if ([Environment]::GetEnvironmentVariable("STACK_KIT_${name}_FROM_FLAG")) {
+        [Environment]::SetEnvironmentVariable("STACK_KIT_$name", $null)
+        [Environment]::SetEnvironmentVariable("STACK_KIT_${name}_FROM_FLAG", $null)
+    }
+}
+$kept = [System.Collections.ArrayList]@()
+for ($i = 0; $i -lt $CliRest.Count; $i++) {
+    $a = [string]$CliRest[$i]
+    if ($a -eq "--target" -and $i + 1 -lt $CliRest.Count) {
+        $env:STACK_KIT_TARGET = [string]$CliRest[++$i]; $env:STACK_KIT_TARGET_FROM_FLAG = "1"; continue
+    }
+    $asked = $null
+    if (($a -eq "--env" -or $a -eq "-Environment") -and $i + 1 -lt $CliRest.Count -and [string]$CliRest[$i + 1] -in @("dev", "prod")) {
+        $asked = [string]$CliRest[$i + 1]
+    }
+    if ($a -eq "--dev") { $asked = "dev" }
+    if ($a -eq "--prod") { $asked = "prod" }
+    if ($asked) { $env:STACK_KIT_ENVIRONMENT = $asked; $env:STACK_KIT_ENVIRONMENT_FROM_FLAG = "1" }
+    [void]$kept.Add($a)
+}
+$CliRest = [string[]]@($kept)
+
 
 
 $PackageRoot = Split-Path $PSScriptRoot -Parent
@@ -51,6 +81,9 @@ function Show-Help {
     init | validate | migrate | vscode-gen | config-gen | ci-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout | hybrid | dev
 
     build | test | lint [module ...]   The step for every module (or those named), fail-fast
+
+    targets [--plan]               Each declared deploy target (and with --plan every module's remote paths)
+    --target <name>                On any deploy, remote or tunnel verb: the target to use (default: the environment's)
 
     mod <moduleId> <command> ...   A command its driver declares (listed per module below)
     mod <moduleId> deliver <rung> [--env dev|prod] [--plan]   A rung of its driver's delivery ladder
@@ -471,6 +504,11 @@ $globalCommands = @{
     "build" = { Invoke-LifecycleStep -Step "build" -Only $CliRest }
     "test" = { Invoke-LifecycleStep -Step "test" -Only $CliRest }
     "lint" = { Invoke-LifecycleStep -Step "lint" -Only $CliRest }
+
+    "targets" = {
+        $env:PYTHONPATH = "$PackageRoot"
+        Invoke-StackKitPython (Join-Path $PackageRoot "lib\targets.py") @CliRest
+    }
 
     "ci-gen" = {
         $env:PYTHONPATH = "$PackageRoot"

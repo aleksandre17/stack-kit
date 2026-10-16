@@ -2,6 +2,31 @@
 
 ## 1.2.0-dev — unreleased
 
+### Where a deploy goes is declared (ADR-001 amendment 9)
+
+- **Deploy targets:** manifest `deploy.targets` names `ops/deploy/targets.json` (tracked, no secrets;
+  schema `config/deploy-targets.schema.json`), merged under a gitignored `targets.local.json`. Per
+  target `host`, `user`, `port`, `root`, `runtime`, `ssh` (identity reference, pinned `knownHosts`,
+  `hostKeys`), `layout`, `ports`, `keep`, `pending`; `defaults` per environment. `--target <name>` on
+  any verb.
+- The resolver answers the server, ssh options (`ssh-args`; `StrictHostKeyChecking=yes`) and every
+  remote path (`remote-path`) from the selected target; the shells only ask it.
+- **Default remote layout** (`config/deploy-layout.default.json`): `{root}/{project}/{environment}/`
+  with `modules/{service}/`, `stack/`, `infra/`; any template overridable per target.
+- **Isolation:** every path refused outside `{root}/{project}/`; an ownership marker
+  (`.stack-kit-project`) written or checked before any write; compose project `{project}-{environment}`;
+  declared ports unique per host and checked against other compose projects at deploy; removes and
+  prunes confined; node-vite staging moved inside the module's directory.
+- `stack-kit targets [--plan|--verify]`: each target; the whole tree; read-only drift over ssh (exit
+  1 drift, 2 not verifiable).
+- `modules.<id>.runtimeConfig[]` declared and validated (no secret).
+- Deploy provenance: `IMAGE_REVISION` into compose; a prod deploy from a dirty checkout is refused.
+- **Deprecated:** `deploy.env` `DEPLOY_SERVER`, `DEPLOY_SERVER_BASE`, `DEPLOY_PATH`, `DEPLOY_LAYOUT`,
+  `DEPLOY_PATH_MODE`, `DEPLOY_SSH_*` (read until 2.0.0 on a host without targets; `validate` names
+  them; `migrate --apply` declares them as a target). `/home/deploy` is no longer a fallback.
+- Pending: the release/`current` delivery, `stack/` compose, runtime-config upload, namespaced
+  container/network/volume names (need a docker host to prove).
+
 ### A new project works with no setup of its own (ADR-001 amendment 8)
 
 - **Breaking: a run on this machine reads one environment.** `run` / `hybrid boot` read the

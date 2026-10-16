@@ -368,6 +368,7 @@ elseif ($Command -eq "delete") {
     Write-Host ""
 
     LogSection "Full cleanup on server"
+    Assert-StackKitConfined $DEPLOY_PATH  # a nuke removes only this project's own directory
     $remoteScript = @"
 set -euo pipefail
 echo '[remote] === Step 1: Stop container ==='

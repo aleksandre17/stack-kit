@@ -68,6 +68,8 @@ def derived_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     if declared("adapters.nginx.template"):
         rows.append(_row(declared("adapters.nginx.template"), "file", "module-source",
                          "adapters.nginx.template"))
+    if declared("deploy.targets"):
+        rows.append(_row(declared("deploy.targets"), "file", "configuration", "deploy.targets"))
     if declared("config.keys"):
         rows.append(_row(declared("config.keys"), "file", "configuration", "config.keys"))
     if declared("vscode.cliScript"):

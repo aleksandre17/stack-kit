@@ -199,8 +199,8 @@ def _spelled_fields(text: str) -> list[str]:
     code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
     found = []
     for top in TOP_LEVEL_FIELDS:
-        # `drivers.ps1` is a file, not the `drivers.` field: a script extension is never a field name.
-        for m in re.finditer(rf"(?<![\w.:$/\\-]){re.escape(top)}\.(?!(?:ps1|sh|py|json|md)\b)[A-Za-z]", code):
+        # `drivers.ps1` / `deploy.env` are files, not the `drivers.` / `deploy.` fields: an extension never names a field.
+        for m in re.finditer(rf"(?<![\w.:$/\\-]){re.escape(top)}\.(?!(?:ps1|sh|py|json|md|env)\b)[A-Za-z]", code):
             found.append(code[m.start():m.start() + 40].split()[0])
     for m in re.finditer(rf"{READERS}\s+[\"']?[A-Za-z]", code):
         found.append(code[m.start():m.end() + 30].split("\n")[0])

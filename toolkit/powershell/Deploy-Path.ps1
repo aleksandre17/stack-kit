@@ -29,32 +29,15 @@ function Get-DeployPathMode {
 }
 
 function Resolve-ModuleDeployPath {
+    # The resolver's answer (`remote-path`): the selected target's layout, or the deprecated
+    # DEPLOY_PATH/DEPLOY_LAYOUT reading when no target is declared (ADR-001 amendment 9).
     param(
         [Parameter(Mandatory = $true)][string]$ContainerName,
         [Parameter(Mandatory = $true)][ValidateSet("static", "compose-dev", "compose-prod")][string]$Kind
     )
-    $base = Get-DeployPathBase
-    if (-not $base) { throw "DEPLOY_PATH or DEPLOY_SERVER_BASE required in secrets" }
-
-    $layout = Get-DeployLayout
-    $pathMode = Get-DeployPathMode
-
-    if ($pathMode -eq "full") {
-        if ($base -match "/$([regex]::Escape($ContainerName))$") { return $base }
-        return $base
-    }
-
-    if ($layout -eq "structured") {
-        switch ($Kind) {
-            "static" { return "$base/static/$ContainerName" }
-            "compose-dev" { return "$base/compose/dev/$ContainerName" }
-            "compose-prod" { return "$base/compose/prod/$ContainerName" }
-        }
-    }
-
-    # flat / legacy: single tree per service under base
-    if ($base -match "/$([regex]::Escape($ContainerName))$") { return $base }
-    return "$base/$ContainerName"
+    $answer = Invoke-KitResolver -Arguments @('remote-path', $OpsSecretsModule, $Kind, $ContainerName) | Select-Object -First 1
+    if (-not $answer) { throw "no remote path for $ContainerName ($Kind): declare a deploy target (deploy.targets)" }
+    return [string]$answer
 }
 
 function Get-DeployPathCandidates {

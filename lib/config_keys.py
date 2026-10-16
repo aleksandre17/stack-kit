@@ -117,33 +117,40 @@ def exposures(root: Path, rows: list[dict[str, Any]], skip: set[str]) -> list[tu
     secrets = [r for r in rows if r.get("sensitivity") == "SECRET"]
     if not secrets:
         return []
-    by_env = {n: r["key"] for r in secrets for n in env_names(r)}
     found: list[tuple[str, str, str]] = []
     for rel in _tracked(root):
-        kind = _kind(rel)
-        if kind is None or rel in skip:
+        if _kind(rel) is None or rel in skip:
             continue
+        found += file_exposures(root, rel, secrets)
+    return found
+
+
+def file_exposures(root: Path, rel: str, secrets: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
+    """(file, where, key) for every SECRET given a real value in one structured file (env, JSON, YAML)."""
+    kind = _kind(rel)
+    by_env = {n: r["key"] for r in secrets for n in env_names(r)}
+    try:
+        text = (root / rel).read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return []
+    found: list[tuple[str, str, str]] = []
+    if kind == "env":
+        for n, line in enumerate(text.splitlines(), 1):
+            m = _ENV_LINE.match(line)
+            if m and m.group(1) in by_env and _is_value(m.group(2)):
+                found.append((rel, f"line {n}", by_env[m.group(1)]))
+    elif kind == "json":
         try:
-            text = (root / rel).read_text(encoding="utf-8-sig", errors="replace")
-        except OSError:
-            continue
-        if kind == "env":
-            for n, line in enumerate(text.splitlines(), 1):
-                m = _ENV_LINE.match(line)
-                if m and m.group(1) in by_env and _is_value(m.group(2)):
-                    found.append((rel, f"line {n}", by_env[m.group(1)]))
-        elif kind == "json":
-            try:
-                data = json.loads(text)
-            except ValueError:
-                continue
-            for r in secrets:
-                if _is_value(_json_at(data, _path(r["key"]))):
-                    found.append((rel, ":".join(_path(r["key"])), r["key"]))
-        else:
-            for r in secrets:
-                for n in _yaml_hits(text, _path(r["key"])):
-                    found.append((rel, f"line {n}", r["key"]))
+            data = json.loads(text)
+        except ValueError:
+            return []
+        for r in secrets:
+            if _is_value(_json_at(data, _path(r["key"]))):
+                found.append((rel, ":".join(_path(r["key"])), r["key"]))
+    elif kind == "yaml":
+        for r in secrets:
+            for n in _yaml_hits(text, _path(r["key"])):
+                found.append((rel, f"line {n}", r["key"]))
     return found
 
 
@@ -181,3 +188,41 @@ def check(root: Path, manifest: dict[str, Any]) -> Verdict:
             verdict.failures.append(f"{file} ({where}): SECRET {key} has a committed value -- rotate it, then "
                                     f"move it to its allowed source; the value is not printed")
     return verdict
+
+
+def runtime_config_problems(root: Path, manifest: dict[str, Any]) -> list[str]:
+    """A module's runtime config (`modules.<id>.runtimeConfig`) is a file the application reads, and
+    never a secret (ADR-001 amendment 9): its `from` must be there, and it may not carry a catalogued
+    SECRET -- a structured file (JSON, YAML, env) is held by the exposure gate like every tracked
+    file; any other (env.js, nginx.conf) may not even name one, nor hold key material."""
+    out: list[str] = []
+    rel = ((manifest.get("config") or {}).get("keys") or "")
+    secrets: list[dict[str, Any]] = []
+    if rel and (root / rel).is_file():
+        try:
+            catalogue = json.loads((root / rel).read_text(encoding="utf-8-sig"))
+            secrets = [r for r in catalogue.get("keys") or [] if isinstance(r, dict) and r.get("sensitivity") == "SECRET"]
+        except ValueError:
+            pass
+    for mid, cfg in (manifest.get("modules") or {}).items():
+        for i, item in enumerate((cfg or {}).get("runtimeConfig") or [] if isinstance(cfg, dict) else []):
+            where = f"modules.{mid}.runtimeConfig[{i}]"
+            src = root / str(item.get("from") or "")
+            if not src.is_file():
+                out.append(f"{where}.from: {item.get('from')} is not there")
+                continue
+            text = src.read_text(encoding="utf-8", errors="replace")
+            if "PRIVATE KEY" in text:
+                out.append(f"{where}: {item['from']} holds private key material -- a runtime file never carries a secret")
+            src_rel = src.relative_to(root).as_posix()
+            if _kind(src_rel) is None:
+                for row in secrets:
+                    names = {row["key"], row["key"].split(":")[-1], *env_names(row)}
+                    hit = sorted(n for n in names if n and n in text)
+                    if hit:
+                        out.append(f"{where}: {item['from']} names SECRET {row['key']} ({', '.join(hit)}) -- "
+                                   f"a secret reaches the app through its env file or the store")
+            else:
+                out += [f"{where}: {item['from']} carries SECRET {key} at {at} -- it reaches the app through its "
+                        f"env file or the store" for _rel, at, key in file_exposures(root, src_rel, secrets)]
+    return out

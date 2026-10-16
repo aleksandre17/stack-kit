@@ -209,7 +209,8 @@ elseif ($Mode -eq "remote") {
     $remoteModuleDir = "$DEPLOY_PATH/context/$relModule"
 
     $ARCHIVE = "${APP_NAME}_deploy_${Environment}.tar.gz"
-    $stagingDir = "$SERVER_BASE/deploy-staging"
+    # Staged inside the module's own directory: nothing of one project lands in a place another shares.
+    $stagingDir = "$DEPLOY_PATH/.staging"
     $ARCHIVE_TMP = Join-Path (Split-Path $WORKSPACE_ROOT -Parent) $ARCHIVE
 
     LogBanner "$APP_NAME - Deploy: remote ($Environment)" @{
@@ -220,6 +221,7 @@ elseif ($Mode -eq "remote") {
         API       = $VITE_API_URL
     }
 
+    Invoke-StackKitRemotePreflight -Services @($APP_NAME)
     LogSection "[1/5] Archive workspace"
     if (Test-Path $ARCHIVE_TMP) { Remove-Item $ARCHIVE_TMP -Force }
     Push-Location $WORKSPACE_ROOT

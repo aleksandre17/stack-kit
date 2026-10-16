@@ -57,6 +57,104 @@ def carry_host_shapes(manifest: dict[str, Any], *, apply: bool = False) -> list[
     return changes
 
 
+#: Where `migrate` declares a host's targets: beside ops/, never under the secrets root (which ignores
+#: everything it does not whitelist -- a targets file is reviewable configuration, so it is tracked).
+TARGETS_FILE = "ops/deploy/targets.json"
+TARGET_NAME = "prod"
+
+
+def carry_deploy_targets(root: Path, secrets_root: Path, manifest: dict[str, Any], *,
+                         apply: bool = False) -> tuple[list[str], dict[str, Any] | None]:
+    """deploy.env's server, base and ssh settings, declared as one target (ADR-001 amendment 9).
+    Nothing is invented: a base that was inferred is written as what it was, and said; a value that
+    looks like a key or a password is refused and named, never written. The env files are not edited."""
+    import re as _re
+
+    from lib import envfile, targets
+
+    if targets.declared_file(manifest):
+        return [], None
+    deploy = envfile.parse(secrets_root / "deploy.env")
+    server = deploy.get("DEPLOY_SERVER", "")
+    if not server:
+        return [], None
+    changes: list[str] = []
+    m = _re.match(r"^(?:ssh://)?([^@]+)@([^:/]+)(?::(\d+))?$", server)
+    if not m:
+        return [f"deploy.env DEPLOY_SERVER: not user@host -- declare {TARGETS_FILE} by hand"], None
+    user, host, port = m.group(1), m.group(2), int(m.group(3) or 22)
+    target: dict[str, Any] = {"runtime": "docker-compose", "host": host, "user": user}
+    if port != 22:
+        target["port"] = port
+    if deploy.get("DEPLOY_SERVER_BASE"):
+        target["root"] = deploy["DEPLOY_SERVER_BASE"].rstrip("/")
+    else:
+        target["root"] = f"/home/{user}"
+        changes.append(f"targets.{TARGET_NAME}.root: /home/{user} -- was INFERRED from DEPLOY_SERVER's user; "
+                       f"the kit infers no more: confirm or correct it")
+    ssh: dict[str, Any] = {}
+    if deploy.get("DEPLOY_SSH_IDENTITY_FILE"):
+        ssh["identity"] = f"file:{deploy['DEPLOY_SSH_IDENTITY_FILE']}"
+    if deploy.get("DEPLOY_SSH_CONFIG_FILE"):
+        ssh["config"] = deploy["DEPLOY_SSH_CONFIG_FILE"]
+    tokens = deploy.get("DEPLOY_SSH_OPTIONS", "").split()
+    options, i = [], 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok in ("-o", "-p") and i + 1 < len(tokens):
+            value, i = tokens[i + 1], i + 2
+            if tok == "-p":
+                target["port"] = int(value)
+                continue
+            key, _, val = value.partition("=")
+            if key.lower() == "stricthostkeychecking":
+                if val.lower() in ("accept-new", "no", "off"):
+                    ssh["hostKeys"] = "accept-new"
+                    changes.append(f"targets.{TARGET_NAME}.ssh.hostKeys: accept-new (was StrictHostKeyChecking={val}) "
+                                   f"-- trust on first use, now declared; pin the key in ssh.knownHosts to remove it")
+            elif key.lower() == "userknownhostsfile":
+                ssh["knownHosts"] = val
+            elif key.lower() == "port":
+                target["port"] = int(val)
+            else:
+                options.append(value)
+            continue
+        changes.append(f"deploy.env DEPLOY_SSH_OPTIONS: '{tok}' is not `-o Key=Value` -- carry it by hand")
+        i += 1
+    if options:
+        ssh["options"] = options
+    if ssh:
+        target["ssh"] = ssh
+    if targets._SECRET_TEXT.search(json.dumps(target)):
+        return [f"deploy.env: a value looks like private key material -- refused, nothing written"], None
+    for secretish in sorted(k for k in deploy if _re.search(r"(?i)PASS|SECRET|TOKEN|PRIVATE", k) and k.startswith("DEPLOY_SSH")):
+        changes.append(f"deploy.env {secretish}: a secret is never a target value -- not carried; keep it in "
+                       f"the secret store and reference it (ssh.identity env:VAR)")
+    for folder in sorted({str(c.get("secretsModule") or mid) for mid, c in (manifest.get("modules") or {}).items()
+                          if isinstance(c, dict)}):
+        explicit = envfile.merged(envfile.folder_files(secrets_root, folder)).get("DEPLOY_PATH", "")
+        if explicit:
+            changes.append(f"{folder}: DEPLOY_PATH={explicit} -- a target places every module under "
+                           f"{{root}}/{{project}}/{{environment}}/modules/; move what is deployed there, or "
+                           f"override targets.{TARGET_NAME}.layout (inside the project's directory) by hand")
+        layout = envfile.merged(envfile.folder_files(secrets_root, folder)).get("DEPLOY_LAYOUT", "")
+        if layout and layout != "structured":
+            changes.append(f"{folder}: DEPLOY_LAYOUT={layout} -- declare it as targets.{TARGET_NAME}.layout "
+                           f"(e.g. \"runtime\": \"{{module}}/{{container}}\") by hand")
+    document = {"schema": 1, "defaults": {"prod": TARGET_NAME, "dev": TARGET_NAME}, "targets": {TARGET_NAME: target}}
+    changes.insert(0, f"deploy.targets: (add) -> {TARGETS_FILE}  (target '{TARGET_NAME}': {user}@{host}:"
+                      f"{target.get('port', 22)}, from deploy.env)")
+    if apply:
+        manifest.setdefault("deploy", {})["targets"] = TARGETS_FILE
+        out = root / TARGETS_FILE
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if not out.exists():
+            out.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
+    changes.append("deploy.env DEPLOY_SERVER / DEPLOY_SERVER_BASE / DEPLOY_SSH_* are ignored once the target "
+                   "is declared -- remove them (migrate does not edit env files)")
+    return changes, document
+
+
 def run_env_notices(secrets_root: Path, manifest: dict[str, Any]) -> list[str]:
     """What a development run no longer fills from `.env.prod` (amendment 8), per secrets folder, by
     key NAME. Not a change `migrate` can make: the development values are the owner's to write."""
@@ -145,6 +243,8 @@ def main() -> int:
         mf = moved_to
     changes += migrate_manifest(manifest, apply=apply)
     changes += carry_host_shapes(manifest, apply=apply)
+    carried, _document = carry_deploy_targets(root, ProjectContext.discover(root).secrets_root, manifest, apply=apply)
+    changes += carried
     words = host_words(root, skip={mf, root / MANIFEST_FILENAME})
     for line in words:
         print(f"  restate (yours to edit): {line}")

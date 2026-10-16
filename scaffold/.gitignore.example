@@ -26,3 +26,5 @@ frontend/logs/*
 !frontend/logs/.gitignore
 backend/logs/*
 !backend/logs/.gitignore
+# A deploy target's per-machine override (ops/deploy/targets.json is tracked)
+ops/deploy/*.local.json

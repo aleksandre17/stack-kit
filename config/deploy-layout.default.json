@@ -1,0 +1,21 @@
+{
+  "$comment": "The kit's ONE default remote layout (ADR-001 amendment 9): one root on the server; one directory per project directly under it; inside a project, one disjoint tree per environment; inside an environment, one directory per deployed service (its `unit`) and the stack's own configuration. A target overrides any template (`layout`). Value placeholders: {root} the target's absolute root, {project} the project slug, {environment} dev|prod, {service} the compose service, {container} its container, {folder} the module's secrets folder, {infraSlug} the infra stack's slug. `{@kind}` is another template of this file. Every rendered path must lie under `project` (the resolver refuses one that escapes). `pending` names the places declared ahead of the delivery that fills them.",
+  "project": "{root}/{project}",
+  "environment": "{@project}/{environment}",
+  "unit": "{@environment}/modules/{service}",
+  "logs": "{@unit}/logs",
+  "releases": "{@unit}/releases",
+  "current": "{@unit}/current",
+  "runtime": "{@unit}/runtime",
+  "workspace": "{@project}/dev/modules/{service}/workspace",
+  "stack": "{@environment}/stack",
+  "stackEnv": "{@stack}/env/{service}.env",
+  "infra": "{@environment}/infra",
+  "pending": {
+    "releases": "a release per version and a `current` pointer replace the unit's versions/ folder once the delivery is proven against a docker host",
+    "current": "see releases",
+    "runtime": "runtime config (modules.<id>.runtimeConfig) is declared and validated; its upload and read-only mount are proven against a docker host first",
+    "stack": "one compose file per environment, and the env files beside it, replace each unit's own once proven against a docker host",
+    "stackEnv": "see stack"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "defaults": { "prod": "prod", "dev": "prod" },
+  "targets": {
+    "prod": {
+      "description": "The production server. Declare host, user and root, pin its host key in known_hosts, then remove `pending`.",
+      "pending": "no server declared yet: set host, user, root (absolute) and ssh.knownHosts",
+      "runtime": "docker-compose",
+      "port": 22,
+      "ssh": { "identity": "agent", "knownHosts": "ops/deploy/known_hosts" }
+    }
+  }
+}

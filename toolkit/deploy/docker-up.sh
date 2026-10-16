@@ -13,7 +13,7 @@ docker_up() {
     echo '=== Deploy [$container] \$(date) ===' >> '$srv_log'/deploy.log
     cd '$rp'
     if docker compose version >/dev/null 2>&1; then DC='docker compose'; else DC=docker-compose; fi
-    \$DC -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE up --build -d 2>&1 | tee -a '$srv_log'/deploy.log
+    IMAGE_REVISION='${IMAGE_REVISION:-}' \$DC ${COMPOSE_PROJECT:+-p '$COMPOSE_PROJECT'} -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE up --build -d 2>&1 | tee -a '$srv_log'/deploy.log
   "
 
   deploy_log "  ... waiting for $container to become healthy"
@@ -57,7 +57,7 @@ docker_up() {
         cp '$prev_jar' '$rp'/app.jar
         cd '$rp'
         if docker compose version >/dev/null 2>&1; then DC='docker compose'; else DC=docker-compose; fi
-        \$DC -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE up --build -d 2>&1 | tee -a '$srv_log'/deploy.log
+        IMAGE_REVISION='${IMAGE_REVISION:-}' \$DC ${COMPOSE_PROJECT:+-p '$COMPOSE_PROJECT'} -f docker-compose.${ENVIRONMENT}.yml --env-file ./$ENV_FILE up --build -d 2>&1 | tee -a '$srv_log'/deploy.log
       "
       deploy_log "  [ROLLBACK] $container restored"
     else

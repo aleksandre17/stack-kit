@@ -18,7 +18,7 @@ from typing import Any
 SUPPORTED = {
     "$id", "$schema", "title", "description", "default",
     "type", "enum", "const", "required", "properties", "additionalProperties",
-    "items", "minItems", "minLength", "pattern", "minimum", "oneOf",
+    "items", "minItems", "minLength", "pattern", "minimum", "maximum", "oneOf",
 }
 
 _TYPES = {
@@ -70,6 +70,8 @@ def validate(instance: Any, schema: dict[str, Any], path: str = "(root)") -> lis
     numeric = isinstance(instance, (int, float)) and not isinstance(instance, bool)
     if "minimum" in schema and numeric and instance < schema["minimum"]:
         errors.append(f"{path}: {instance!r} is below the minimum {schema['minimum']!r}")
+    if "maximum" in schema and numeric and instance > schema["maximum"]:
+        errors.append(f"{path}: {instance!r} is above the maximum {schema['maximum']!r}")
 
     if isinstance(instance, str):
         if "minLength" in schema and len(instance) < schema["minLength"]:

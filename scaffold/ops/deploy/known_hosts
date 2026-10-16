@@ -1,0 +1,4 @@
+# This repository's pinned SSH host keys, one line per target host (tracked, not secret).
+# Read the key from the server itself or its administrator -- never accept one from the network
+# unverified -- e.g. on the server: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+# Line form: [host]:port ssh-ed25519 AAAA...   (port 22: host ssh-ed25519 AAAA...)

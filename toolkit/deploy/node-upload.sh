@@ -39,7 +39,7 @@ node_upload_service() {
     rsync -az --delete \
       --exclude '.git' --exclude 'node_modules' --exclude '**/node_modules' \
       --exclude 'dist' --exclude '**/dist' --exclude '.idea' --exclude '.vscode' \
-      -e ssh "$NODE_WORKSPACE_DIR/" "$SERVER:$rp/context/" 2>&1
+      -e "${RSYNC_RSH:-ssh}" "$NODE_WORKSPACE_DIR/" "$SERVER:$rp/context/" 2>&1
     scp "$dockerfile_src" "$SERVER:$rp/Dockerfile" 2>&1
     scp "$SECRETS_DIR/$ENV_FILE" "$SERVER:$rp/$ENV_FILE" 2>&1
   } | ssh "$SERVER" "cat >> '$srv_log'/upload.log"

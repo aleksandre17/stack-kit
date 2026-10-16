@@ -1,6 +1,8 @@
 #!/bin/bash
-# SSH helpers for stack-kit deploy — optional project-local keys under ops/config/ssh/
-# Source after stack_kit_monorepo_root / stack_kit_deploy_env_value are available.
+# SSH for stack-kit deploys -- a SHIM over the resolver (ADR-001 amendment 9): the options every
+# ssh, scp and rsync takes are the selected deploy target's (`resolve_cli.py ssh-args`: port, strict
+# host keys against the target's pinned file, its identity reference, its options), or -- without a
+# declared target -- the deprecated DEPLOY_SSH_* of deploy.env. No option is decided here.
 
 stack_kit_resolve_repo_path() {
   local p="$1"
@@ -12,26 +14,9 @@ stack_kit_resolve_repo_path() {
   echo "$(stack_kit_monorepo_root)/$p"
 }
 
-# Print extra openssh args: -F config, -i identity (one line, eval-safe with array)
+# The openssh arguments of the selected target, one per line.
 stack_kit_ssh_extra_args() {
-  local cfg id root opts=""
-  root="$(stack_kit_monorepo_root)"
-  cfg="$(stack_kit_deploy_env_value DEPLOY_SSH_CONFIG_FILE "")"
-  id="$(stack_kit_deploy_env_value DEPLOY_SSH_IDENTITY_FILE "")"
-  [[ -n "$cfg" ]] && cfg="$(stack_kit_resolve_repo_path "$cfg")"
-  [[ -n "$id" ]] && id="$(stack_kit_resolve_repo_path "$id")"
-  if [[ -n "$cfg" && -f "$cfg" ]]; then
-    printf '%s\n' "-F" "$cfg"
-  fi
-  if [[ -n "$id" && -f "$id" ]]; then
-    printf '%s\n' "-i" "$id"
-  fi
-  local extra
-  extra="$(stack_kit_deploy_env_value DEPLOY_SSH_OPTIONS "")"
-  if [[ -n "$extra" ]]; then
-    # shellcheck disable=SC2086
-    printf '%s\n' $extra
-  fi
+  _stack_kit_resolve ssh-args
 }
 
 stack_kit_ssh() {
@@ -50,12 +35,36 @@ stack_kit_scp() {
   command scp "${_extra[@]}" "$@"
 }
 
-# When deploy.env sets SSH options, prefer stack_kit_ssh/stack_kit_scp in toolkit scripts.
+# The server-side preflight of a deploy (resolve_cli.py remote-preflight): claim the project's
+# directory with its ownership marker, or refuse one another project owns, and refuse a declared
+# host port another compose project publishes. Run before a deploy writes anything; nothing to run
+# without a declared target.
+stack_kit_remote_preflight() {
+  local script
+  script="$(_stack_kit_resolve remote-preflight "$@")" || return 1
+  [[ -n "$script" ]] || return 0
+  printf '%s\n' "$script" | ssh "$SERVER" bash -s
+}
+
+# A remote path a remove or prune may touch: inside this project's directory on the target.
+stack_kit_confined() {
+  _stack_kit_resolve confined "$1" >/dev/null || {
+    echo "  REFUSED: $1 is outside this project's directory on the target" >&2
+    return 1
+  }
+}
+
+# Every ssh/scp of a sourced toolkit script goes through the target's options, and rsync's
+# transport is the same ssh (RSYNC_RSH).
 stack_kit_ssh_maybe_alias() {
-  if [[ -n "$(stack_kit_deploy_env_value DEPLOY_SSH_CONFIG_FILE "")" ]] \
-    || [[ -n "$(stack_kit_deploy_env_value DEPLOY_SSH_IDENTITY_FILE "")" ]] \
-    || [[ -n "$(stack_kit_deploy_env_value DEPLOY_SSH_OPTIONS "")" ]]; then
-    ssh() { stack_kit_ssh "$@"; }
-    scp() { stack_kit_scp "$@"; }
-  fi
+  local -a _extra=()
+  while IFS= read -r _line; do
+    [[ -n "$_line" ]] && _extra+=("$_line")
+  done < <(stack_kit_ssh_extra_args)
+  [[ ${#_extra[@]} -gt 0 ]] || return 0
+  ssh() { stack_kit_ssh "$@"; }
+  scp() { stack_kit_scp "$@"; }
+  local rsh="ssh" a
+  for a in "${_extra[@]}"; do rsh+=" $(printf '%q' "$a")"; done
+  export RSYNC_RSH="$rsh"
 }

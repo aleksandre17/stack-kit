@@ -419,3 +419,87 @@ Proof: `tests/acceptance/test_lifecycle.py` (real `npm run`, a stand-in Gradle w
 `tests/unit/test_handwriting.py` (byte order marks). Each new test was mutation-checked. **Still
 owed:** the container rung; remote Windows/IIS delivery; `node-spa` release; the generated workflow
 has not yet run on GitHub's runners (pwsh on Linux reading the kit's backslash paths is unproven).
+
+## Amendment 9 — where a deploy goes is declared; the kit holds no server (2026-10-16, owner-delegated)
+
+The owner's point, verified in code: the server, the ssh settings and the remote directories were
+values the kit held or guessed (`/home/<user>` from `DEPLOY_SERVER`, a `/home/deploy` fallback, a
+fixed remote tree, `StrictHostKeyChecking=accept-new` in the scaffold), and lived only in a
+gitignored `deploy.env`: one server per repository, no named environments, nothing reviewable. A
+second host, gesotat-system, keeps a hand-written deploy script hardcoding its server and tree --
+what a host must never need again. The design follows the field (Kamal's deploy.yml, Capistrano's
+stages, an Ansible inventory), as a desired-state cycle: declare, validate, plan, apply, verify.
+
+1. **Declared targets.** The manifest names a tracked, non-secret file (`deploy.targets`, schema
+   `config/deploy-targets.schema.json`); a gitignored `<name>.local.json` beside it is merged over it
+   per machine. A target is `host`, `user`, `port`, an absolute `root`, a `runtime` (`docker-compose`,
+   `static`, `iis` -- the Windows/IIS case has its place while its delivery stays pending), `ssh`
+   (`identity`: `agent` | `env:VAR` | `file:<ignored path>`, a reference never a key; `knownHosts`;
+   `hostKeys` `pinned` | `accept-new`), a `layout`, `ports`, `keep`, or `pending` with its reason.
+   `--target <name>` selects one, else `defaults.<environment>`. A value set by the flag never
+   outlives the run (a launcher run in the operator's session would otherwise deploy the next
+   command to the last one's target). The file lives in `ops/deploy/`, beside `ops/config/`, not under
+   it: the secrets tree ignores what it does not whitelist, and a targets file is tracked by design.
+2. **One home.** The resolver answers every server, ssh and remote-path question from the selected
+   target: `DEPLOY_SERVER`, `DEPLOY_SERVER_BASE` and a folder's `DEPLOY_PATH` asked of it are the
+   target's, `ssh-args` (`-o Port`, `StrictHostKeyChecking=yes` against the pinned file, the identity
+   reference, `-F`, options; one list for ssh, scp and rsync through `RSYNC_RSH`), `remote-path`.
+   The bash and PowerShell shims only ask it; the bash copy of the path rules is gone. *Rejected:*
+   per-script target reading (thirty-five files, thirty-five homes).
+3. **The layout is the owner's tree, as one default template** (`config/deploy-layout.default.json`):
+   one root; one directory per project under it; inside, one disjoint tree per environment
+   (`{root}/{project}/{environment}/`), each with `modules/{service}/` (the service's unit: `logs`,
+   and declared ahead `releases`, `current`, `runtime`), `stack/` (stack config: `env/{service}.env`)
+   and `infra/`; `dev/modules/{service}/workspace` for remote dev. A target overrides any template.
+4. **Isolation is a guarantee, enforced in the resolver.** (a) Every rendered path is normalised and
+   refused unless it lies under `{root}/{project}/`, and the project directory under the root:
+   `validate` refuses a layout that escapes, and every deploy's `remote-path` does too. (b) Before a
+   deploy writes anything it runs `remote-preflight` on the server: it writes
+   `{root}/{project}/.stack-kit-project` (slug and repository, the origin as host/path) or refuses a
+   directory another project owns, naming both. (c) Compose runs as `-p {project}-{environment}`;
+   declared host ports are unique per host across every target and environment (`validate`), and the
+   preflight refuses one another compose project publishes, naming it. (d) A remove or prune is
+   refused outside the project's directory (`confined`), and `node-vite`'s staging moved from the
+   server-wide `{base}/deploy-staging` into the module's own directory. Layout migration and scoped
+   cleanup -- tools for the old trees -- refuse a host with targets.
+5. **Verify.** `targets --verify` reads what is under `{root}/{project}/` over ssh, read-only, and
+   reports drift against the declared tree: an undeclared path (reported, never deleted), a missing
+   declared one, an absent or foreign marker, more releases or versioned artifacts than `keep`, a
+   `current` that points at nothing. Exit 1 on drift; 2 when nothing could be verified (pending,
+   unreachable, no ssh client) -- never a pass by default.
+6. **Runtime config is declared and never secret.** `modules.<id>.runtimeConfig[]`
+   `{from, to, environments}`: `to` stays inside the unit's `runtime/`; a structured `from` (JSON,
+   YAML, env) may carry no catalogued SECRET value, and any other (env.js, nginx.conf) may not even
+   name one, whether tracked or not (`config.keys`).
+7. **Provenance.** Every java-boot and node-api deploy carries `IMAGE_REVISION` (the caller's, else
+   `git describe --tags --always --dirty`) into compose, and a production deploy from a checkout with
+   uncommitted or untracked files is refused (`toolkit/deploy/provenance.sh`) -- the one thing
+   gesotat-system's script did that the kit's java-boot delivery did not.
+8. **Migration.** A host on `deploy.env` keeps working, read until 2.0.0, and `validate` names each
+   deprecated key. `migrate --apply` declares its server, base and ssh settings as a target in
+   `ops/deploy/targets.json`. A root it once inferred is written as what it was, and said; a value
+   that looks like a key or a password is refused, never written; `StrictHostKeyChecking=accept-new`
+   becomes the declared `hostKeys: accept-new`. The scaffold ships `ops/deploy/` (one `pending` target,
+   a `known_hosts` to fill, a README) and no longer suggests trust on first use.
+
+*Rejected:* inferring nothing at once on the deprecated path (working hosts would break mid-migration;
+the inference is kept only there, named, and gone at 2.0.0); a per-folder absolute `paths` override
+(it could point anywhere, so isolation would be a convention again); an ownership check by slug alone
+(two repositories that choose one slug would share a directory).
+
+**Declared ahead, pending, and why:** the docker-side delivery of the tree -- a release per version
+with a `current` pointer (rollback by re-pointing, replacing `versions/`), one `stack/` compose per
+environment with `stack/env/`, runtime-config upload and read-only mount, and container, network and
+volume names namespaced by the compose project. Each changes the contract between the generated
+compose file and the running containers, and is proven only against a docker host, as the container
+rung is. Until then each unit holds the driver's current anatomy (compose file, env file, artifact,
+`logs/`, `versions/`), which already gives the environment split and per-project isolation of files.
+
+Proof: `tests/unit/test_targets.py` (declaration, selection, layout, escape refused everywhere,
+ports, ssh, migration, runtime config), `tests/acceptance/test_targets_shells.py` (bash and
+PowerShell through the resolver; the flag does not outlive its run; provenance),
+`tests/acceptance/test_targets_remote.py` (a local directory stands in for the server, with stand-in
+`docker` and `ssh` on PATH: the marker claims or refuses, a foreign port is refused, `--verify` reports
+each kind of drift and exits 1, and 2 when pending or unreachable). **Not proven against a real
+server:** sshd, docker's compose-project port labels, `find` on busybox. A dangling-`current` check
+is written and its test skips where the machine cannot create a symlink (this one).

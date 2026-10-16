@@ -46,7 +46,7 @@ dev_to_rsync_path() {
 dev_workspace_path_for() {
   local s="$1" cname
   cname="$(container_name_for "$s")"
-  resolve_backend_deploy_path "$cname" "workspace"
+  resolve_backend_deploy_path "$cname" "workspace" "$s"
 }
 
 dev_assert_structured_layout() {

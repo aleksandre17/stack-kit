@@ -15,6 +15,11 @@
     resolve_cli.py slugify <text>
     resolve_cli.py alias <alias>            (also: resolve_cli.py <alias>, the former form)
     resolve_cli.py driver-types              (id<TAB>roles<TAB>label per line)
+    resolve_cli.py remote-path <folder> <kind> <container> [dev|prod] [service]   (kind: module, runtime,
+                   workspace, static, compose, compose-dev, compose-prod -- from the selected target)
+    resolve_cli.py ssh-args                  (one openssh argument per line, for ssh, scp and rsync -e)
+    resolve_cli.py target                    (the selected target's name; empty when none is declared)
+    resolve_cli.py compose-project [dev|prod] | target-keep | remote-preflight [service...] | confined <path>
     resolve_cli.py driver-command <module|alias> <command>
     resolve_cli.py stack-steps [dev|prod] [flag...]   (module<TAB>command<TAB>args... per line)
     resolve_cli.py stack-health              (module<TAB>url<TAB>expect per line; expect '-' = status only)
@@ -141,7 +146,8 @@ VERBS = {"context", "notice", "slugify", "alias", "env-files", "env-value", "run
          "infra-deploy-path", "deploy-base", "infra-tunnel-forwards", "infra-compose-files",
          "infra-compose-args", "infra-sync-paths", "infra-services",
          "driver-types", "driver-command", "stack-steps", "stack-health", "stack-endpoints",
-         "compose-names", "compose-service"}
+         "compose-names", "compose-service", "remote-path", "ssh-args", "target",
+         "compose-project", "target-keep", "remote-preflight", "confined"}
 
 
 def _answer(r, verb: str, args: list[str]) -> list[str] | None:
@@ -155,6 +161,27 @@ def _answer(r, verb: str, args: list[str]) -> list[str] | None:
         return [r.deploy_env_value(args[0], args[1] if len(args) == 2 else "")]
     if verb == "deploy-base" and len(args) == 1:
         return [r.deploy_base(args[0])]
+    if verb == "remote-path" and 3 <= len(args) <= 5:
+        return [r.remote_path(args[0], args[1], args[2], args[3] if len(args) > 3 else "prod",
+                              args[4] if len(args) > 4 else "")]
+    if verb == "ssh-args" and not args:
+        return r.ssh_args()
+    if verb == "target" and not args:
+        chosen = r.target()
+        return [chosen[0] if chosen else ""]
+    if verb == "compose-project" and len(args) <= 1:
+        return [r.compose_project(args[0] if args else "")]
+    if verb == "target-keep" and not args:
+        from lib import targets
+
+        chosen = r.target()
+        return [str(targets.keep(chosen[1]) if chosen else 5)]
+    if verb == "remote-preflight":
+        return [r.remote_preflight(args)]
+    if verb == "confined" and len(args) == 1:
+        if not r.confined(args[0]):
+            raise ValueError(f"{args[0]} is outside this project's directory on the target -- refused")
+        return [args[0]]
     if verb == "infra-tunnel-forwards" and not args:
         return ["\t".join((f["local"], f["remote"], f["service"], f["env"])) for f in r.infra_tunnel_forwards()]
     lists = {"infra-compose-files": r.infra_compose_files, "infra-compose-args": r.infra_compose_args,

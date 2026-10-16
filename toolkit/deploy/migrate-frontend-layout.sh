@@ -22,6 +22,11 @@ stack_kit_ssh_maybe_alias
 
 STACK_KIT_PROJECT_ROOT="$(stack_kit_find_project_root "$(pwd)" 2>/dev/null || echo "$(cd "$PKG_ROOT/../../.." && pwd)")"
 export STACK_KIT_PROJECT_ROOT
+if [[ -n "$(_stack_kit_resolve target 2>/dev/null)" ]]; then
+  echo "  REFUSED: layout migration and cleanup are for a host without deploy targets; a declared target's" >&2
+  echo "  layout is its own -- see: stack-kit targets --plan / --verify" >&2
+  exit 1
+fi
 
 OPS_MODULE_ID="$(stack_kit_module_id_for_role ui)"
 [[ -n "$OPS_MODULE_ID" ]] || OPS_MODULE_ID="$(stack_kit_module_id_for_deploy_kind static)"

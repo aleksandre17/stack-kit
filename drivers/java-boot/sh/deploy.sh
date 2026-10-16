@@ -102,6 +102,8 @@ if [ "$SKIP_CHECKS" = "0" ]; then
   bash "$(dirname "$0")/check.sh" $check_args || exit 1
 fi
 
+deploy_require_provenance "$ENVIRONMENT" || exit 1
+stack_kit_remote_preflight $([[ "$SERVICE" == "all" ]] || echo "$SERVICE") || exit 1
 DEPLOY_VERSION="$(date +%Y%m%d-%H%M%S)"
 echo ""
 echo "  Deploy [$SERVICE] → $DEPLOY_SUMMARY [$ENVIRONMENT]"

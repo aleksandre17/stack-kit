@@ -373,6 +373,20 @@
             },
             "additionalProperties": false
           },
+          "runtimeConfig": {
+            "type": "array",
+            "description": "Files the application itself reads at run time (appsettings.Production.json, an SPA's env.js, an nginx conf): `from` a host path, `to` a path inside the unit's runtime/ (relative, no ..), for the `environments` listed. Never a secret: values that are arrive through the env files or the store (ADR-001 amendment 9). Their upload and read-only mount are pending",
+            "items": {
+              "type": "object",
+              "required": ["from", "to", "environments"],
+              "properties": {
+                "from": { "type": "string", "minLength": 1 },
+                "to": { "type": "string", "pattern": "^(?!/)(?![A-Za-z]:)(?!(.*/)?[.][.](/|$)).+$" },
+                "environments": { "type": "array", "minItems": 1, "items": { "enum": ["dev", "prod"] } }
+              },
+              "additionalProperties": false
+            }
+          },
           "toolchain": {
             "type": "object",
             "description": "The module's toolchain as CI sets it up (its driver's `ci.setup`): `version` (dotnet SDK e.g. 8.0.x, Node e.g. 22, Java e.g. 17; default: the driver's)",
@@ -553,6 +567,14 @@
           "description": "Directories the declaration is exhaustive at ('.' is the root): every tracked child must be covered by a row",
           "items": { "type": "string", "pattern": "^(\\.|[^/].*/)$" }
         }
+      },
+      "additionalProperties": false
+    },
+    "deploy": {
+      "type": "object",
+      "description": "Where deploys go: `targets` names the tracked, non-secret targets file (schema config/deploy-targets.schema.json); a gitignored `<name>.local.json` beside it is merged over it per machine (ADR-001 amendment 9)",
+      "properties": {
+        "targets": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

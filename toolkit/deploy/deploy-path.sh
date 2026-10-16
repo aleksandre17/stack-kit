@@ -28,45 +28,25 @@ deploy_path_load_config() {
   esac
 }
 
-# resolve_backend_deploy_path <container_name> [runtime|workspace]
+# resolve_backend_deploy_path <container_name> [runtime|workspace] [service]
+# The resolver's answer (`remote-path`): the selected target's layout, or the deprecated
+# DEPLOY_PATH/DEPLOY_LAYOUT reading when no target is declared (ADR-001 amendment 9).
 resolve_backend_deploy_path() {
-  local container="$1" kind="${2:-runtime}"
-  deploy_path_load_config
-  [[ -n "$DEPLOY_PATH_BASE" ]] || {
-    echo "ERROR: DEPLOY_PATH or DEPLOY_SERVER_BASE required in secrets" >&2
-    return 1
-  }
-
-  if [[ "$DEPLOY_PATH_MODE" == "full" ]]; then
-    if [[ "$DEPLOY_PATH_BASE" == */"$container" ]]; then
-      echo "$DEPLOY_PATH_BASE"
-    else
-      echo "$DEPLOY_PATH_BASE"
-    fi
+  local container="$1" kind="${2:-runtime}" service="${3:-}"
+  local answer
+  if answer="$(_stack_kit_resolve remote-path "$OPS_SECRETS_MODULE" "$kind" "$container" "${ENVIRONMENT:-prod}" "$service")" \
+    && [[ -n "$answer" ]]; then
+    echo "$answer"
     return 0
   fi
-
-  if [[ "$DEPLOY_LAYOUT" == "structured" ]]; then
-    if [[ "$kind" == "workspace" ]]; then
-      echo "$DEPLOY_PATH_BASE/workspace/$container"
-    else
-      echo "$DEPLOY_PATH_BASE/runtime/$container"
-    fi
-    return 0
-  fi
-
-  if [[ "$DEPLOY_PATH_BASE" == */"$container" ]]; then
-    echo "$DEPLOY_PATH_BASE"
-  else
-    echo "$DEPLOY_PATH_BASE/$container"
-  fi
+  return 1
 }
 
 # Full remote path for a compose service (JAR deploy uses runtime/)
 remote_path_for_service() {
   local s="$1" cname
   cname="$(container_name_for "$s")"
-  resolve_backend_deploy_path "$cname" "runtime"
+  resolve_backend_deploy_path "$cname" "runtime" "$s"
 }
 
 # Legacy name: returns full deploy path (not just container segment)

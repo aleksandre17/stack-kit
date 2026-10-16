@@ -3,6 +3,9 @@
 
 deploy_log() { echo "$1"; }
 
+# shellcheck source=provenance.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/provenance.sh"
+
 # shellcheck source=modules.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/modules.sh"
 # shellcheck source=deploy-path.sh
