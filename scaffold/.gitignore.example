@@ -1,30 +1,5 @@
-# The extension point init-gitignore: merged into the repo root .gitignore by init
+# The extension point init-gitignore: merged into the repo root .gitignore by init.
+# The secrets root carries its own .gitignore (init-ops-config-gitignore); each tier's logs folder its own.
 
-# Secrets (real values)
-secrets/*
-!secrets/.gitignore
-!secrets/README.md
-!secrets/*.example
-!secrets/*/.gitignore
-!secrets/*/*.example
-!secrets/profiles/
-!secrets/profiles/**
-!secrets/ssh/
-!secrets/ssh/README.md
-!secrets/ssh/.gitignore
-!secrets/ssh/*.example
-
-# Deploy runtime
-deploy/.env
-deploy/*.log
-
-# Accidental stack-kit layout output
-/-OutFile
-
-# Module logs
-frontend/logs/*
-!frontend/logs/.gitignore
-backend/logs/*
-!backend/logs/.gitignore
 # A deploy target's per-machine override (ops/deploy/targets.json is tracked)
 ops/deploy/*.local.json

@@ -98,7 +98,8 @@ def test_merged_over_the_hosts_manifest_the_draft_changes_nothing_declared(tmp_p
     assert _leaves(existing).items() <= _leaves(merged).items(), "a declared field changed"
     assert added == ['+ commands.test-api: "pwsh ops/cli/stack-kit.ps1 mod api test"',
                      '+ commands.test-web: "pwsh ops/cli/stack-kit.ps1 mod web test"',
-                     '+ commands.lint: "pwsh ops/cli/stack-kit.ps1 lint"', '+ layout: {"profile": "monorepo"}'], added
+                     '+ commands.lint: "pwsh ops/cli/stack-kit.ps1 lint"',
+                     '+ commands.validate: "pwsh ops/cli/stack-kit.ps1 validate"', '+ layout: {"profile": "monorepo"}'], added
 
 
 def test_a_multi_service_gradle_build_is_one_java_boot_module(tmp_path):

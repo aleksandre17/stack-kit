@@ -8,8 +8,7 @@
 !**/.env.example
 !profiles/
 !profiles/**
-!frontend/nginx.env.example
-!frontend/embed.env.example
+!**/*.example
 !ssh/
 !ssh/README.md
 !ssh/.gitignore

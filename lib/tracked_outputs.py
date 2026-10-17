@@ -94,7 +94,7 @@ def _markers(entry: dict[str, Any]) -> list[str]:
 def outside_modules(files: list[str], bases: dict[str, str], types: dict[str, str],
                     registry: dict[str, Any], root: "Path | None" = None) -> list[str]:
     """Every output a project outside every module tracks: a directory a used toolchain writes, in a
-    directory beside a project file only that toolchain's driver names (a `*.csproj` -- a class library
+    directory beside a project file only that toolchain's driver names (a class library
     too); where the file is one several drivers name, only where the driver's whole detection holds --
     a `package.json` alone is not a web app, and a committed `dist/` beside it (a JavaScript action) is
     not its output."""
@@ -102,7 +102,7 @@ def outside_modules(files: list[str], bases: dict[str, str], types: dict[str, st
 
     toolchains = [(typ, [o for o in (registry.get(typ) or {}).get("outputs") or [] if o.endswith("/")],
                    _markers(registry.get(typ) or {})) for typ in sorted(set(types.values()))]
-    # A marker one driver alone names (a *.csproj, a pom.xml) is that toolchain's project whatever it
+    # A marker one driver alone names is that toolchain's project whatever it
     # builds -- a class library writes bin/ too; one several drivers name (package.json) proves nothing
     # alone, so there the driver's whole detection must hold.
     named: dict[str, int] = {}

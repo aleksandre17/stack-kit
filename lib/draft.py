@@ -163,6 +163,31 @@ def detect(root: Path, registry: dict[str, Any], files: list[str]) -> list[dict[
     return claimed
 
 
+def secret_patterns(root: Path, files: list[str]) -> list[str]:
+    """The taken secrets policy a scan should read (`security.secretPatterns`): every document of the
+    edit-gate contract, recognised by its shape, that lies under a `secrets` directory (a host's own law
+    gates elsewhere are not secret patterns) and whose gates the scan believes -- a taken copy under
+    `.agents/taken/` before any other copy of it."""
+    from lib import secret_scan
+
+    found = []
+    for rel in files:
+        if not rel.endswith(".json") or "secrets" not in rel.split("/")[:-1]:
+            continue
+        p = root / rel
+        if not p.is_file() or p.stat().st_size > 1_000_000:
+            continue
+        if not secret_scan.calibration_document(p.read_text(encoding="utf-8", errors="replace")):
+            continue
+        try:
+            secret_scan.rules(root, {"security": {"secretPatterns": rel}})
+        except secret_scan.ScanError:
+            continue
+        found.append(rel)
+    taken = [r for r in found if r.startswith(".agents/taken/")]
+    return sorted(taken or found)
+
+
 def _profile_fits(root: Path, name: str) -> bool:
     path = PROFILES / f"{name}.json"
     if not path.is_file():
@@ -197,8 +222,12 @@ def draft(root: Path, existing: dict[str, Any] | None = None) -> dict[str, Any]:
         "secrets": existing.get("secrets") or "ops/config",
         "modules": modules,
         "cli": {"aliases": {mid: mid for mid in modules}},
-        "commands": {step: f"pwsh {launcher} {step}" for step in ("build", "test", "lint")},
+        # `validate` proves the manifest's own declarations (agent-kit's module map names it as that proof)
+        "commands": {step: f"pwsh {launcher} {step}" for step in ("build", "test", "lint", "validate")},
     }
+    patterns = secret_patterns(root, files)
+    if patterns:  # the one list of secret shapes both kits read: the taken secrets policy
+        out["security"] = {"secretPatterns": patterns[0] if len(patterns) == 1 else patterns}
     if _profile_fits(root, "monorepo"):
         out["layout"] = {"profile": "monorepo"}
     return out

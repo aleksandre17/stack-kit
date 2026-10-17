@@ -13,9 +13,9 @@ If your **java-boot** API needs GCP:
      GOOGLE_APPLICATION_CREDENTIALS: /app/google-credentials.json
    ```
 
-2. Place real JSON at `ops/config/backend/google-credentials.json` (gitignored).
+2. Place real JSON at `<secrets root>/<module's secrets folder>/google-credentials.json` (gitignored).
 
-3. Set vars in `ops/config/backend/.env.*` (e.g. `GCP_PROJECT_ID`).
+3. Set vars in that folder's `.env.*` (e.g. `GCP_PROJECT_ID`).
 
 4. `.\tools\stack-kit.ps1 compose-gen`
 

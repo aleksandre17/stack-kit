@@ -1,4 +1,4 @@
-﻿# stack-kit init — full project bootstrap (scaffold + seed secrets + compose-gen + checklist)
+﻿# stack-kit init -- full project bootstrap (scaffold + seed secrets + compose-gen + checklist)
 param(
     [string]$ProjectRoot = "",
     [string]$PackageRoot = "",
@@ -41,7 +41,7 @@ $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 
 function Write-Step([string]$msg) {
     Write-Host ""
-    Write-Host "  ▸ $msg" -ForegroundColor Cyan
+    Write-Host "  > $msg" -ForegroundColor Cyan
 }
 
 function Copy-IfMissing {
@@ -64,7 +64,7 @@ function Copy-IfMissing {
     $parent = Split-Path $tg -Parent
     if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
     Copy-Item -LiteralPath $ex -Destination $tg -Force
-    Write-Host "  [OK]   $TargetRel  ←  $ExampleRel" -ForegroundColor Green
+    Write-Host "  [OK]   $TargetRel  <-  $ExampleRel" -ForegroundColor Green
 }
 
 function Merge-GitIgnore {
@@ -104,9 +104,9 @@ function Show-Checklist {
     . (Join-Path $PackageRoot "lib\modules.ps1")
 
     Write-Host ""
-    Write-Host "  ═══════════════════════════════════════════════════════" -ForegroundColor DarkCyan
+    Write-Host "  =======================================================" -ForegroundColor DarkCyan
     Write-Host "  Fill in (search for YOUR_ / example.com / empty values)" -ForegroundColor Yellow
-    Write-Host "  ═══════════════════════════════════════════════════════" -ForegroundColor DarkCyan
+    Write-Host "  =======================================================" -ForegroundColor DarkCyan
 
     # The host's own modules name what is left to fill in, and the CI it already had is named beside
     # the one ci-gen wrote (lib/init_checklist.py: one reading, tested).
@@ -129,10 +129,10 @@ function Show-Checklist {
 }
 
 Write-Host ""
-Write-Host "  stack-kit init → $ProjectRoot" -ForegroundColor White
+Write-Host "  stack-kit init -> $ProjectRoot" -ForegroundColor White
 Write-Host "  package: $PackageRoot" -ForegroundColor DarkGray
 
-# ── 1. The points init lays down (config/extension-points.json, required_by init) ──
+# -- 1. The points init lays down (config/extension-points.json, required_by init) --
 # The scaffold is the template store of the extension points; init is `extend` of every point
 # init requires, then of each infra service the manifest selects. Nothing is overwritten.
 Write-Step "Extension points required by init (scaffold, manifest, launchers, infra services)"
@@ -157,7 +157,7 @@ $env:STACK_KIT_PROJECT_ROOT = $ProjectRoot
 $env:STACK_KIT_KIT_ROOT = $PackageRoot
 . (Join-Path $PackageRoot "lib\project.ps1")
 
-# ── 3. Seed ops/config (manifest modules via ci_prepare) ─────────
+# -- 3. Seed ops/config (manifest modules via ci_prepare) ---------
 if (-not $SkipSeed) {
     Write-Step "Seed ops/config (manifest modules)"
     $py = Get-StackKitPythonArgs
@@ -182,13 +182,13 @@ if (-not $SkipSeed) {
     }
 }
 
-# ── 4. .gitignore merge ──────────────────────────────────────────
+# -- 4. .gitignore merge ------------------------------------------
 if (-not $SkipGitIgnore) {
     Write-Step "Merge .gitignore rules"
     Merge-GitIgnore
 }
 
-# ── 5. compose-gen ───────────────────────────────────────────────
+# -- 5. compose-gen -----------------------------------------------
 $env:STACK_KIT_PROJECT_ROOT = $ProjectRoot
 $env:STACK_KIT_KIT_ROOT = $PackageRoot
 
@@ -196,7 +196,7 @@ if (-not $SkipComposeGen) {
     Write-Step "Generate docker-compose files (compose-gen)"
     $py = Get-StackKitPythonArgs
     if (-not $py) {
-        Write-Host "  [warn] Python not found — run later: stack-kit compose-gen" -ForegroundColor Yellow
+        Write-Host "  [warn] Python not found -- run later: stack-kit compose-gen" -ForegroundColor Yellow
     } else {
         $buildPy = Join-Path $PackageRoot "compose\build.py"
         Invoke-StackKitPythonExe $py $buildPy
@@ -208,7 +208,7 @@ if (-not $SkipComposeGen) {
     }
 }
 
-# ── 6. VS Code Run and Debug (.vscode) ───────────────────────────
+# -- 6. VS Code Run and Debug (.vscode) ---------------------------
 Write-Step "VS Code launch.json + tasks.json (vscode-gen)"
 $py = Get-StackKitPythonArgs
 if ($py) {
@@ -217,10 +217,10 @@ if ($py) {
     Invoke-StackKitPythonExe $py $vscodePy
     if ($LASTEXITCODE -eq 0) { Write-Host "  [OK]   .vscode (missing files only; use stack-kit vscode-gen --force)" -ForegroundColor Green }
 } else {
-    Write-Host "  [warn] Python not found — run: stack-kit vscode-gen" -ForegroundColor Yellow
+    Write-Host "  [warn] Python not found -- run: stack-kit vscode-gen" -ForegroundColor Yellow
 }
 
-# ── 6b. CI workflow (ci-gen) ─────────────────────────────────────
+# -- 6b. CI workflow (ci-gen) -------------------------------------
 Write-Step "CI workflow: a job per module, lint/build/test through the launcher (ci-gen)"
 $py = Get-StackKitPythonArgs
 if ($py) {
@@ -231,7 +231,7 @@ if ($py) {
     Write-Host "  [warn] Python not found - run: stack-kit ci-gen" -ForegroundColor Yellow
 }
 
-# ── 7. nginx-gen (optional) ──────────────────────────────────────
+# -- 7. nginx-gen (optional) --------------------------------------
 if (-not $SkipNginxGen) {
     $mf = Join-Path $ProjectRoot "stack-kit.json"
     if (Test-Path $mf) {

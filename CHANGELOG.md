@@ -20,6 +20,16 @@ path, a class library's build output went unflagged, and a compose `build:` was 
   `obj/`); a file several drivers name (`package.json`) still needs the driver's whole detection.
 - `validate` reads a compose `build:` block in any field order (`args`, `target`, ...), as a flow
   mapping, and in the short form `build: ./dir`.
+- `init --plan` drafts `security.secretPatterns` when the tree holds a taken secrets policy (a document of
+  the edit-gate contract, by its shape, under a `secrets` directory, whose gates the scan believes; a
+  copy under `.agents/taken/` first), and `commands.validate` beside `test` -- absent fields only.
+- The secrets root's `.gitignore` keeps every `*.example` (a ui module named `web` lost its examples) and
+  is laid in the declared secrets root, not always `ops/config`.
+- The root `.gitignore` scaffold no longer carries another host's directories (`secrets/*`,
+  `deploy/.env`, `frontend/logs/*`, `backend/logs/*`) nor the junk `/-OutFile`.
+- Kit-laid docs (`ops/compose/stack/README.md`, `ops/config/profiles/*.md`) name the secrets root and a
+  module's secrets folder, never `ops/config/backend` or `apps/backend/worker`.
+- `init` prints ASCII only: its banner and checklist no longer garble in a non-UTF-8 console.
 
 ## 2.5.0 — 2026-10-17
 

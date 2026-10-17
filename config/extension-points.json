@@ -383,8 +383,8 @@
     },
     {
       "id": "init-ops-config-gitignore",
-      "purpose": "laid down by init: ops/config/.gitignore",
-      "host_path": "ops/config/.gitignore",
+      "purpose": "laid down by init: the secrets root's .gitignore (real values ignored, every *.example kept)",
+      "host_path": "{secrets|ops/config}/.gitignore",
       "template": "scaffold/ops/config/.gitignore",
       "schema": null,
       "cardinality": "one",
