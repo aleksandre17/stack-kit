@@ -218,7 +218,7 @@ def test_ci_runs_the_db_tests_beside_a_healthy_database_after_migrating_it(tmp_p
     api, web = _job(text, "api"), _job(text, "web")
     assert "services:" in api and "image: 'postgres:16-alpine'" in api and "--health-cmd" in api and "pg_isready" in api
     assert "DATABASE_URL: 'postgres://postgres:ci@localhost:5432/postgres'" in api
-    assert api.index("name: migrate") < api.index("name: build")
+    assert api.index("name: 'migrate") < api.index("name: 'build'")
     assert "services:" not in web and "DATABASE_URL" not in web
 
 

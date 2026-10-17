@@ -78,6 +78,15 @@ def _q(value: str) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
 
+_STEP_NAME = re.compile(r"^(\s*- name: )(?!')(.+)$")
+
+
+def _named(line: str) -> str:
+    """A step's name, quoted: a plain scalar ends at `: ` or ` #`, which a name in words may carry."""
+    m = _STEP_NAME.match(line)
+    return m.group(1) + _q(m.group(2)) if m else line
+
+
 def launcher(manifest: dict[str, Any]) -> str:
     """The host launcher a developer runs: the manifest's, else the convention's."""
     return str((manifest.get("vscode") or {}).get("cliScript") or default_field("vscode.cliScript"))
@@ -363,7 +372,7 @@ def render(ctx: ProjectContext) -> str:
                 *_runs_upload(f"deploy-{env}", pins),
             ]
             previous = [job]
-    return "\n".join(out) + "\n"
+    return "\n".join(_named(line) for line in out) + "\n"
 
 
 def _dispatch(manifest: dict[str, Any], cd: bool) -> list[str]:

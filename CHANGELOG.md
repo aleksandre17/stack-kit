@@ -1,6 +1,17 @@
 # Changelog — stack-kit
 
-## Unreleased
+## 2.5.1 — 2026-10-17
+
+### Fixed
+
+- `ci-gen` quotes every step name. A name in words may carry `: ` ("package (build once: one archive
+  per commit)"), which ends a plain YAML scalar: GitHub refused the whole workflow before any job
+  started, so every run failed in 0 s. A test holds every step name a quoted scalar.
+
+The section below was written after the 2.5.0 heading and shipped in the commit tagged v2.5.0; it is
+recorded here, where it was found to stand.
+
+## 2.5.0 addendum — found by the fourth audit
 
 Found by the fourth audit: the secret scan could be blinded by a fake `gates` key or by a tracked key
 path, a class library's build output went unflagged, and a compose `build:` was read in one order only.

@@ -73,3 +73,11 @@ def test_the_workflow_token_is_read_only_but_where_a_package_is_attested():
     jobs = re.split(r"\n  (?=[A-Za-z0-9_-]+:\n)", text.split("jobs:\n", 1)[1])
     widened = [j for j in jobs if "id-token: write" in j]
     assert widened and all("attestations: write" in j and "name: package" in j for j in widened)
+
+
+def test_every_step_name_is_a_quoted_scalar_so_the_workflow_parses():
+    # A name in words may carry `: ` ("build once: one archive"), which ends a plain YAML scalar and
+    # makes GitHub refuse the whole workflow before a job starts.
+    text, _ = _render()
+    names = [line for line in text.splitlines() if re.match(r"^\s*- name: ", line)]
+    assert names and all(re.match(r"^\s*- name: '(?:[^']|'')*'$", line) for line in names), names
