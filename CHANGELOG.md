@@ -1,5 +1,14 @@
 # Changelog — stack-kit
 
+## 2.5.2 — 2026-10-17
+
+### Fixed
+
+- The launcher hands back Python as an argv on every platform. PowerShell unrolls a one-element array
+  on `return`: where no `py` launcher stands (Linux, a CI runner) a lone `python3` came back as a
+  string, `[0]` took its first letter, and every `mod` step failed with "The term 'p' is not
+  recognized". Windows hid it: `py -3` is two elements. A test holds both lone interpreters.
+
 ## 2.5.1 — 2026-10-17
 
 ### Fixed

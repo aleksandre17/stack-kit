@@ -3,12 +3,12 @@
 function Get-StackKitPythonArgs {
     if (Get-Command py -ErrorAction SilentlyContinue) {
         & py -3 -c "import sys" 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) { return @("py", "-3") }
+        if ($LASTEXITCODE -eq 0) { return , @("py", "-3") }
     }
     foreach ($candidate in @("python3", "python")) {
         if (-not (Get-Command $candidate -ErrorAction SilentlyContinue)) { continue }
         & $candidate -c "import sys" 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) { return @($candidate) }
+        if ($LASTEXITCODE -eq 0) { return , @($candidate) }
     }
     return $null
 }
