@@ -6,6 +6,7 @@ schemas, the templates and the layout; a host only declares its modules, targets
 
 | Page | What it explains |
 |---|---|
+| [setup.md](setup.md) | setting a project up: the pipeline in order, the blueprint of a host, alone or with agent-kit |
 | [overview.md](overview.md) | the manifest, modules, drivers, roles and tiers, the CLI |
 | [server-layout.md](server-layout.md) | where everything lands on a server, and how projects never touch each other |
 | [configuration.md](configuration.md) | the configuration catalogue, env files, secrets, data sources |

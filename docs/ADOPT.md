@@ -240,3 +240,9 @@ bash ops/ci/integration-stack.sh      # optional, needs Docker
 | `compose-gen` fails | install Python; run from the host root |
 | GENERATED drift in CI | `stack-kit compose-gen`, commit |
 | `Git Bash required` | install Git for Windows (a driver command written in bash) |
+
+## On Windows: a deep checkout
+
+Windows limits a path to 260 characters. The kit keeps its own paths under 80 (a test holds it), so a
+host vendored under a long folder still checks out; a host whose own paths are deep sets
+`git config --global core.longpaths true` once.

@@ -30,7 +30,39 @@ Both found by an independent audit of the first adopting host.
   independent review: the files were the deploy user's, and the app, running as `app`, could not
   read its key.
 
+### Added -- a foreign project comes in with nothing hand-written
+
+Found by adopting two foreign projects from zero (Maven + Vite, Gradle + Angular), stack-kit alone and
+beside agent-kit; both now reach a green `validate` with no file written by hand.
+
+- `java-boot` is built by Gradle or Maven: `pom.xml` is detected, the build uses the module's wrapper
+  (`mvnw`, `gradlew`), else the tool on the PATH, else it is refused by name; the release jar follows
+  the tool (`target/*.jar`); `validate` names a missing wrapper (driver field `buildTools`).
+- The draft reads what a driver declares it can (`reads` with `value` and `capture`): a Spring app's
+  `server.port` and its actuator's `/actuator/health` become the module's `container.port` and
+  `healthPath`, and the local compose asks what the app serves.
+- `init` declares each module's own test command (`commands.test-<module>`) beside `test`.
+- `docs/guide/setup.md`: the pipeline step by step, the blueprint of a host, alone or with agent-kit.
+  `docs/OPERATIONS.md` gains the drivers and the extension points, generated from their declarations.
+
 ### Fixed
+- The kits never refuse each other: the secret scan reads a document of agent-kit's edit-gate contract
+  (`gates[]` with `proves`/`admits`) by its shape, wherever it lies, as calibration -- a host that took
+  agent-kit's secrets policy no longer fails `validate`.
+- `init` lays files only for the tiers a module lives in (no `apps/backend/` for a project with no
+  backend), composes each tier's local service from the module's own declaration (paths inside the
+  repository for a module at the root), writes no local service whose recipe is not there and says
+  so, declares no embedded worker nobody declared, and writes `ops.modules` beside the api module it
+  lists or not at all; `validate` refuses a compose file that builds from a missing Dockerfile.
+- `extend driver <name>` brings its `build` and `test` scripts as declared points, its entry names
+  them, and a project registry at the default place is read without `drivers.registry` ("unknown
+  driver" until the pointer was found by hand); the targets file `init` lays is read the same way.
+- `init`'s checklist names the host's own modules (no scaffold folder names) and the CI workflow the
+  repository already had, now running beside the generated one.
+- The deep fixture path that broke a Windows checkout under a long folder is short (a test holds every
+  tracked path under 80 characters).
+- A build refused for a missing tool says so in one line, not as a script's stack.
+- The schema validator reads `patternProperties`.
 
 - The dotnet-aspnet driver handed a generated secret as `<NAME>_FILE`, which ASP.NET Core does not
   read: the app kept whatever value it found elsewhere.
