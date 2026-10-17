@@ -89,7 +89,9 @@ flowchart LR
   `.stack-kit/local/<m>/<service>/` from what the package step left (`dist/`), and compose builds
   the same recipe a deploy builds. The package step must have run first.
 - **dotnet-aspnet, node-api** declare no `compose.templates`, so the local stack has no service for
-  them. Use path 1 or path 5.
+  them, even when the module has a `Dockerfile.dev`: `compose-gen` prints `skip modules.<m> (<driver>)
+  has no local dev service: its driver declares no compose template for role <role> ...` and goes on.
+  Use path 1 or path 5.
 
 ## 3. A release: `package`, then `deploy`
 

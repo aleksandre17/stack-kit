@@ -63,10 +63,19 @@ def _resolve_dockerfiles(module_path: Path, module_id: str, role: str, driver_ty
 
 def missing_recipe(ctx: ProjectContext, module_id: str, profile: str) -> str:
     """Why a module's local service cannot be built here ("" when it can): it builds from a Dockerfile in
-    the module that is not there. A module that runs its release image (`compose.fromRelease`) builds from
-    the release tree `stage` writes, and is never missing one here."""
+    the module that is not there, or its driver declares no compose template for its role and profile
+    (never a crash in compose-gen). A module that runs its release image (`compose.fromRelease`) builds
+    from the release tree `stage` writes, and is never missing one here."""
+    from lib.modules import driver_capability
+
     cfg = (ctx.manifest.get("modules") or {}).get(module_id) or {}
     driver_type = str(cfg.get("type") or "")
+    role = str(cfg.get("role") or "")
+    declared = ((driver_capability(driver_type, "compose", {}) or {}).get("templates") or {}).get(role) or {}
+    if not declared.get(profile):  # a driver that declares no local service for this role
+        return (f"modules.{module_id} ({driver_type}) has no local {profile} service: its driver declares no compose "
+                f"template for role {role or '-'} -- build and test it with `mod {module_id} build`/`test`, or run it "
+                f"remotely with `dev up {module_id}`")
     if from_release(driver_type):
         return ""
     df_dev, df_prod, _suffix = _resolve_dockerfiles(ctx.module_path(module_id), module_id, str(cfg.get("role") or ""), driver_type)

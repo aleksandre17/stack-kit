@@ -200,3 +200,24 @@ def test_a_modules_own_port_and_health_path_win_over_the_roles(mini_project: Pro
                                        compose_dir=mini_project.root / "apps" / "retrieval-service",
                                        fmt_global=fmt, fmt_extra={})
     assert "/actuator/health" in body and ":-8181}" in body, body
+
+
+def test_a_driver_with_no_local_template_is_skipped_with_its_reason_never_a_crash(tmp_path):
+    # Found by an audit: dotnet-aspnet and node-api declare no compose templates, so a module of theirs
+    # with a Dockerfile.dev made compose-gen raise "no template".
+    from manifest_compose import build_manifest_stack_services, missing_recipe
+
+    manifest = {"version": 2, "modules": {"api": {"type": "dotnet-aspnet", "role": "api", "path": "api"},
+                                          "edge": {"type": "node-api", "role": "api", "path": "edge"}}}
+    for mid in ("api", "edge"):
+        (tmp_path / mid).mkdir()
+        (tmp_path / mid / "Dockerfile.dev").write_text("FROM x", encoding="utf-8")
+    ctx = ProjectContext(root=tmp_path, manifest=manifest)
+    for mid in ("api", "edge"):
+        why = missing_recipe(ctx, mid, "dev")
+        assert "declares no compose template for role api" in why and f"dev up {mid}" in why, why
+    fmt = {"compose_slug": "demo", "network_key": "demo-net", "network_name": "demo-net",
+           "health_interval": "15s", "health_retries": "5", "health_start": "60s"}
+    body = build_manifest_stack_services(ctx=ctx, profile="dev", compose_dir=tmp_path, fmt_global=fmt,
+                                         fmt_extra={}, features={}, compose_cat={"templates": {}}, stack_cat={})
+    assert "Dockerfile.dev" not in body, "both are skipped, and composing the stack never raises"

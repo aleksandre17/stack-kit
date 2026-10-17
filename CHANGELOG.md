@@ -29,6 +29,8 @@ path, a class library's build output went unflagged, and a compose `build:` was 
   `deploy/.env`, `frontend/logs/*`, `backend/logs/*`) nor the junk `/-OutFile`.
 - Kit-laid docs (`ops/compose/stack/README.md`, `ops/config/profiles/*.md`) name the secrets root and a
   module's secrets folder, never `ops/config/backend` or `apps/backend/worker`.
+- `compose-gen` skips a module whose driver declares no compose template for its role (dotnet-aspnet,
+  node-api), with the reason, instead of failing with "no template" when the module has a `Dockerfile.dev`.
 - `init` prints ASCII only: its banner and checklist no longer garble in a non-UTF-8 console.
 
 ## 2.5.0 — 2026-10-17
