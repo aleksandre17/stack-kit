@@ -90,6 +90,7 @@ def _start(ctx: Delivery, svc: list[Service], release: str, revision: str,
     for rid, group in each.items():
         running.build_missing(ctx, group, rid)
         scan.scan(ctx, group, rid)
+        running.hand_over_secrets(ctx, group, rid)  # before up: the app reads its secret as the uid it runs as
     migrate(ctx, svc)
     running.up(ctx, [s.id for s in svc])
     return [] if ctx.plan else running.wait_healthy(ctx, svc)

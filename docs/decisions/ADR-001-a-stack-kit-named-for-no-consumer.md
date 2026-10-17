@@ -1129,6 +1129,12 @@ reported the tree clean over seven committed secrets and would have hidden a new
    (`generatedSecrets.reads`: glob, pattern, how); `validate` refuses a module given a generated
    secret when nothing in its sources matches, naming the line that would read it. A driver that
    declares no `reads` is warned about, never passed silently.
+2b. *The file is the runtime's.* A driver declares the uid its image runs as (`generatedSecrets.uid`);
+   before `up`, the release hands each generated file to it (0400) with the service's own image, run
+   as root with only `chown`/`chmod` and no network. The deploy user keeps the directory (0711): it sees
+   which files exist and reads none. *Rejected:* world-readable files (any host user reads the key);
+   running the service as the deploy user (the image's own unprivileged user is the one it was built
+   and tested as).
 3. *A known exposure is a key in a file.* A finding is known only on the line carrying a tracked key;
    a new secret in the same file is a finding. Known findings are counted and named -- `scan` says
    "known is not clean" instead of "no credential-shaped value".

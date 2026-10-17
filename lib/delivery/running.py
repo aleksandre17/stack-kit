@@ -136,6 +136,30 @@ def generate_secrets(ctx: Delivery, service: Service) -> list[str]:
     return made
 
 
+def hand_over_secrets(ctx: Delivery, services: list[Service], release: str) -> list[str]:
+    """Give each generated secret to the user its runtime runs as, where the driver declares one
+    (`generatedSecrets.uid`): the files are made by the deploy user (umask 077), and an image that runs
+    as another uid -- ASP.NET's `app`, 1654 -- could not read them, so the app would refuse to start.
+
+    The service's own image, run once as root with only `chown`/`chmod`, hands each file over (0400, that
+    uid); the directory stays the deploy user's at 0711, so the next release still sees which files exist
+    without being able to read one: never read back, by construction. Idempotent."""
+    handed = []
+    for service in services:
+        uid = (service.spec.get("generatedSecrets") or {}).get("uid")
+        if uid is None or not generated(ctx, service):
+            continue
+        base = posixpath.join(ctx.places.of("runtime", service), "generated")
+        image = naming.remote_image(ctx.project, ctx.environment, service.id, release)
+        ctx.run(["chmod", "0711", base])
+        owner = f"{int(uid)}:{int(uid)}"
+        ctx.run(ctx.engine("run", "--rm", "--user", "0", "--network", "none", "--entrypoint", "sh",
+                           "-v", f"{base}:/secrets", image, "-c",
+                           f"chown {owner} /secrets/* && chmod 0400 /secrets/*"))
+        handed.append(service.id)
+    return handed
+
+
 def place_files(ctx: Delivery, service: Service) -> list[str]:
     """The env file (mode 600), the runtime config and the credential files of a service, each written
     only when it differs; returns the credential names the stack mounts."""

@@ -354,7 +354,7 @@ def test_a_runtime_that_reads_a_directory_of_secrets_is_given_the_directory(proj
         encoding="utf-8")
     m = manifest_of(project)
     m["config"] = {"keys": "ops/config/keys.json"}
-    m["modules"]["edge"].setdefault("container", {})["generatedSecrets"] = {"directoryEnv": "KeyPerFile__Directory"}
+    m["modules"]["edge"].setdefault("container", {})["generatedSecrets"] = {"directoryEnv": "KeyPerFile__Directory", "uid": 1654}
     (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
     commit(project, "a runtime that reads a directory\n")
     t = server(tmp_path)
@@ -363,6 +363,14 @@ def test_a_runtime_that_reads_a_directory_of_secrets_is_given_the_directory(proj
     assert svc["environment"]["KeyPerFile__Directory"] == "/run/stack-kit/generated"
     assert "Jwt__Key_FILE" not in svc["environment"]
     assert f"{ROOT}/shop/staging/edge/edge/runtime/generated:/run/stack-kit/generated:ro" in svc["volumes"]
+    # Found by a review: the files are the deploy user's (umask 077) and the image runs as another uid, so
+    # the app could not read its key. They are handed to the declared uid by the image itself, before up.
+    execs = [" ".join(e[1]) for e in t.log if e[0] == "exec"]
+    handed = [x for x in execs if "chown 1654:1654 /secrets/*" in x]
+    assert len(handed) == 1 and "--user 0" in handed[0] and "--network none" in handed[0]
+    assert any(x.startswith("chmod 0711 ") and x.endswith("/runtime/generated") for x in execs)
+    up = next(i for i, x in enumerate(execs) if " up -d" in x)
+    assert execs.index(handed[0]) < up, "the secret is handed over before the service starts"
 
 
 def test_a_dotnet_driver_declares_that_it_reads_a_directory_of_secrets():

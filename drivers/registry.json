@@ -642,6 +642,7 @@
       "entry": "{dotnet.project|app.csproj|:stem}.dll",
       "generatedSecrets": {
         "directoryEnv": "KeyPerFile__Directory",
+        "uid": 1654,
         "reads": {
           "glob": "**/*.cs",
           "pattern": "AddKeyPerFile\\(",

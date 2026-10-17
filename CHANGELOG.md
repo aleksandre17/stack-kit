@@ -12,6 +12,12 @@ Both found by an independent audit of the first adopting host.
   reading it looks like in code. dotnet-aspnet declares `KeyPerFile__Directory` and `AddKeyPerFile(`.
 - `validate` refuses a module given a generated secret its code never reads (`config: modules.<id>:
   ... the secret would be made and ignored`), and warns where a driver declares no `reads`.
+- `generatedSecrets.uid`: the user a runtime's image runs as. Before the service starts, the release
+  hands each generated file to that uid (0400) with the service's own image, run once as root with
+  only `chown`/`chmod` and no network; the directory stays the deploy user's at 0711, so a file's
+  presence is seen and its value never read back. dotnet-aspnet declares 1654 (`app`). Found by an
+  independent review: the files were the deploy user's, and the app, running as `app`, could not
+  read its key.
 
 ### Fixed
 
