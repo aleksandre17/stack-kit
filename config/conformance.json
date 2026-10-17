@@ -520,6 +520,83 @@
       "evidence": [],
       "status": "non-goal",
       "why": "cost exceeds benefit"
+    },
+    {
+      "standard": "Continuous Delivery (Humble and Farley 2010)",
+      "clause": "Build once; promote the same artifact through every environment",
+      "mechanism": "package builds a module's archive once (locally or in CI); deploy ships those bytes; the server builds only a thin runtime image, never compiling",
+      "evidence": [
+        "tests/unit/test_cd.py::test_build_once_and_promote_the_same_bytes_dev_then_prod"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "Continuous Delivery (Humble and Farley 2010)",
+      "clause": "Every release kept; rollback a pointer move, judged before it moves",
+      "mechanism": "releases/<commit> and `current`; a rollback (explicit or on failed health) never returns to a release that cannot run",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_a_good_rollback_moves_current_only_after_the_stack_runs_it_healthy",
+        "tests/unit/test_delivery_engine.py::test_an_automatic_rollback_never_returns_to_a_release_that_cannot_run"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "OWASP Secrets Management Cheat Sheet",
+      "clause": "Detect secrets in the tree and its history; never print them",
+      "mechanism": "scan secrets (tree and history); a known leak held by its value's fingerprint, never its key or a substring; a calibration document's specimens alone exempt; validate and deploy refuse",
+      "evidence": [
+        "tests/unit/test_secret_audit4.py::test_the_fingerprinted_value_itself_is_known_and_a_value_containing_it_is_not",
+        "tests/unit/test_secret_calibration.py::test_a_settings_file_that_merely_has_gates_is_still_scanned",
+        "tests/unit/test_secret_gates.py::test_a_deploy_refuses_a_checkout_that_tracks_a_credential_before_any_target_is_opened"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "OWASP Secrets Management Cheat Sheet",
+      "clause": "Generate secrets where they are used; least privilege on read",
+      "mechanism": "a generated key is made on the server once, never read back, handed to the uid its runtime runs as (0400), and checked to be read by the app's own code",
+      "evidence": [
+        "tests/unit/test_delivery_engine.py::test_a_generated_secret_is_made_on_the_server_once_and_never_read_back",
+        "tests/unit/test_delivery_engine.py::test_a_runtime_that_reads_a_directory_of_secrets_is_given_the_directory",
+        "tests/unit/test_delivery_engine.py::test_a_release_whose_built_output_never_reads_its_generated_secret_is_refused"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "CIS Docker Benchmark",
+      "clause": "4.1 Run containers as a non-root user",
+      "mechanism": "every driver's release image runs as an unprivileged user and declares the uid its generated secrets are handed to",
+      "evidence": [
+        "tests/unit/test_secret_audit3.py::test_every_runtime_given_a_generated_secret_declares_the_uid_it_runs_as"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "OWASP Top 10 CI/CD Security Risks (2022)",
+      "clause": "CICD-SEC-1 Insufficient flow control: no deploy before the scan",
+      "mechanism": "the generated CI's first deploy job needs the secret scan; later environments need the earlier deploy",
+      "evidence": [
+        "tests/unit/test_cd.py::test_build_once_and_promote_the_same_bytes_dev_then_prod"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "ISO/IEC/IEEE 29119 (risk-based testing)",
+      "clause": "Each module proved by its own tests",
+      "mechanism": "init declares commands.test-<module> beside commands.test, for agent-kit's areas to prove a change by its own module",
+      "evidence": [
+        "tests/unit/test_draft.py::test_each_module_is_given_its_own_test_command_beside_every_modules"
+      ],
+      "status": "conformant"
+    },
+    {
+      "standard": "Docs as Code (Write the Docs)",
+      "clause": "Reference tables rendered from their sources and tested",
+      "mechanism": "help --markdown renders OPERATIONS.md's verb, driver and extension-point tables from the registry",
+      "evidence": [
+        "tests/unit/test_operations_doc.py::test_the_operations_doc_is_what_the_registry_renders"
+      ],
+      "status": "conformant"
     }
   ]
 }
