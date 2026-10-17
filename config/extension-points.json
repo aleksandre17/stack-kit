@@ -212,6 +212,26 @@
       "merges_into": "registry"
     },
     {
+      "id": "driver-build",
+      "purpose": "a project driver's `build` step (its entry's commands.build)",
+      "host_path": "ops/drivers/<name>/ps1/build.ps1",
+      "template": "config/extension-templates/driver-build.ps1",
+      "schema": null,
+      "cardinality": "many",
+      "required_by": null,
+      "merges_into": "instance"
+    },
+    {
+      "id": "driver-test",
+      "purpose": "a project driver's `test` step (its entry's commands.test)",
+      "host_path": "ops/drivers/<name>/ps1/test.ps1",
+      "template": "config/extension-templates/driver-test.ps1",
+      "schema": null,
+      "cardinality": "many",
+      "required_by": null,
+      "merges_into": "instance"
+    },
+    {
       "id": "ci-actions",
       "purpose": "the project's own CI action pins (full SHAs)",
       "host_path": "{ci.actions|ops/ci/actions.json}",

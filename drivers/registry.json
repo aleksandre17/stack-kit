@@ -1,6 +1,6 @@
 {
   "java-boot": {
-    "label": "JVM — Gradle / Spring Boot (multi-module JAR deploy)",
+    "label": "JVM — Spring Boot, built by Gradle or Maven (JAR deploy)",
     "roles": [
       "api",
       "worker"
@@ -60,6 +60,12 @@
               "settings.gradle"
             ],
             "capture": "rootProject\\.name\\s*=\\s*[\"']([^\"']+)[\"']"
+          },
+          {
+            "file": [
+              "pom.xml"
+            ],
+            "capture": "<artifactId>([^<]+)</artifactId>"
           }
         ]
       },
@@ -133,6 +139,9 @@
             },
             {
               "file": "settings.gradle.kts"
+            },
+            {
+              "file": "pom.xml"
             }
           ]
         },
@@ -153,16 +162,53 @@
             {
               "file": "*/build.gradle.kts",
               "matches": "org\\.springframework\\.boot"
+            },
+            {
+              "file": "pom.xml",
+              "matches": "spring-boot"
+            },
+            {
+              "file": "*/pom.xml",
+              "matches": "spring-boot"
             }
           ]
         }
-      ]
+      ],
+      "reads": {
+        "java.build": {
+          "name": "pom.xml",
+          "value": "maven"
+        },
+        "java.artifact": {
+          "name": "pom.xml",
+          "value": "target/*.jar"
+        },
+        "container.port": {
+          "name": [
+            "src/main/resources/application.properties",
+            "src/main/resources/application.yml",
+            "src/main/resources/application.yaml"
+          ],
+          "capture": "(?ms)^\\s*server\\.port\\s*[=:]\\s*(\\d+)|^server:\\s*\\n(?:[ \\t]+[^\\n]*\\n)*?[ \\t]+port:\\s*(\\d+)"
+        },
+        "container.healthPath": {
+          "name": [
+            "pom.xml",
+            "build.gradle",
+            "build.gradle.kts"
+          ],
+          "matches": "spring-boot-starter-actuator",
+          "value": "/actuator/health"
+        }
+      }
     },
     "package": {
       "command": "build",
       "artifacts": [
         "build/libs/*.jar",
-        "*/build/libs/*.jar"
+        "*/build/libs/*.jar",
+        "target/*.jar",
+        "*/target/*.jar"
       ]
     },
     "compose": {
@@ -189,7 +235,7 @@
     "container": {
       "template": "container/Dockerfile",
       "port": 8080,
-      "artifact": "build/libs/*.jar",
+      "artifact": "{java.artifact|build/libs/*.jar}",
       "artifactExclude": [
         "*-plain.jar"
       ],
@@ -214,21 +260,23 @@
       "command": [
         "sh",
         "-c",
-        "exec ./gradlew bootRun --no-daemon -x test"
+        "if [ -f pom.xml ]; then exec ./mvnw -q spring-boot:run; else exec ./gradlew bootRun --no-daemon -x test; fi"
       ],
       "build": [
         "sh",
         "-c",
-        "./gradlew classes --no-daemon -x test"
+        "if [ -f pom.xml ]; then ./mvnw -q compile; else ./gradlew classes --no-daemon -x test; fi"
       ],
       "port": 8080,
       "caches": {
-        "gradle": "/root/.gradle"
+        "gradle": "/root/.gradle",
+        "maven": "/root/.m2"
       },
       "excludes": [
         "build/",
         ".gradle/",
-        "out/"
+        "out/",
+        "target/"
       ],
       "reactions": [
         {
@@ -236,7 +284,9 @@
             "*.gradle",
             "*.gradle.kts",
             "gradle/**",
-            "gradle.properties"
+            "gradle.properties",
+            "pom.xml",
+            ".mvn/**"
           ],
           "do": "restart"
         },
@@ -251,7 +301,35 @@
     },
     "outputs": [
       "build/",
-      ".gradle/"
+      ".gradle/",
+      "target/"
+    ],
+    "buildTools": [
+      {
+        "id": "maven",
+        "when": [
+          "pom.xml"
+        ],
+        "wrapper": [
+          "mvnw",
+          "mvnw.cmd"
+        ],
+        "fallback": "mvn",
+        "how": "commit the Maven wrapper (`mvn wrapper:wrapper`) so every machine and CI builds with one version"
+      },
+      {
+        "id": "gradle",
+        "when": [
+          "build.gradle",
+          "build.gradle.kts"
+        ],
+        "wrapper": [
+          "gradlew",
+          "gradlew.bat"
+        ],
+        "fallback": "gradle",
+        "how": "commit the Gradle wrapper (`gradle wrapper`) so every machine and CI builds with one version"
+      }
     ]
   },
   "node-vite": {

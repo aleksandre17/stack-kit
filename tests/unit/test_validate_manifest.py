@@ -119,3 +119,13 @@ def test_the_scaffold_declares_the_commands_through_the_host_launcher() -> None:
     assert scaffold["commands"]["test"].endswith("ops/cli/stack-kit.ps1 test")
     assert scaffold["commands"]["build"].endswith("ops/cli/stack-kit.ps1 build")
     assert (PKG / "scaffold" / "ops" / "cli" / "stack-kit.ps1").is_file()
+
+
+def test_a_modules_own_test_command_is_a_declared_key_and_a_stray_one_is_not():
+    # init declares `test-<module>` for each module (its own proof); any other undeclared key is still refused.
+    from lib.schema_check import validate
+
+    schema = json.loads((Path(__file__).resolve().parents[2] / "manifest.schema.json").read_text(encoding="utf-8"))
+    commands = schema["properties"]["commands"]
+    assert validate({"test": "t", "test-api": "pwsh ops/cli/stack-kit.ps1 mod api test"}, commands) == []
+    assert validate({"test": "t", "deploy-all": "x"}, commands) == ["deploy-all: not declared by the schema"]

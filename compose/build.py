@@ -138,6 +138,15 @@ def main() -> int:
 
     features = effective_compose_features(manifest, catalog_features)
     for path, spec in targets.items():
+        if spec.get("manifestModule"):
+            from manifest_compose import missing_recipe
+            from lib.project_context import ProjectContext
+
+            why = missing_recipe(ProjectContext(root=root, manifest=manifest), str(spec["manifestModule"]),
+                                 str(spec.get("manifestProfile") or "dev"))
+            if why:
+                print(f"  skip {path.relative_to(root)}: {why}")
+                continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             build_target(

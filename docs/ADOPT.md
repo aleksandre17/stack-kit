@@ -8,7 +8,7 @@ owns: adoption
 
 Taking a host onto the kit, once it is vendored ([INSTALL.md](INSTALL.md)). Field-by-field
 manifest and command detail is [REFERENCE.md](REFERENCE.md); the day-to-day paths are
-[GOLDEN-PATHS.md](GOLDEN-PATHS.md). Reference host: `tests/fixtures/golden-consumer/`.
+[GOLDEN-PATHS.md](GOLDEN-PATHS.md). Reference host: `tests/fixtures/gc/`.
 
 ## Package vs project
 
@@ -214,7 +214,7 @@ ready for multi-module hosts with optional multi-credential profiles.
 | Real stack | `validate.stages` ends on a value anchor | `stack-kit validate --stages` |
 | Manifest | legacy trees migrated | `stack-kit migrate --apply` (one time) |
 | Credentials | per-module `modules.<id>.credentials[]`; global `features.gcpCredentials` + `adapters.gcp` | `pytest tests/unit/test_credentials.py` |
-| CI | host script manifest-driven; kit helpers `ci/*`; golden fixture | `ops/ci/integration-stack.sh`, `tests/fixtures/golden-consumer/` |
+| CI | host script manifest-driven; kit helpers `ci/*`; golden fixture | `ops/ci/integration-stack.sh`, `tests/fixtures/gc/` |
 | Release | `VERSION` (semver), `CHANGELOG.md`, tag `v$(cat VERSION)` | `pytest tests/unit/test_release.py` |
 | Delivery | release, rollback, prune, health, remote dev, migrate-layout, verify against a recorded server | [GOLDEN-PATHS.md#smoke](GOLDEN-PATHS.md#smoke) |
 | Local debug | `launch.json` + `tasks.json` from `modules.*.path`; Java Extension Pack for Spring breakpoints | `stack-kit vscode-gen` |

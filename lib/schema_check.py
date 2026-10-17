@@ -7,7 +7,7 @@ A contract that holds only on some machines is not a contract.
 
 So the schema is interpreted here, for exactly the keywords it uses -- the agent kit's validator
 (`kit/interpreters/validation.py`) in the same handwriting, with the three this schema also needs:
-`oneOf`, `additionalProperties` as a schema, and the `default` annotation. A keyword outside that
+`oneOf`, `additionalProperties` as a schema, `patternProperties`, and the `default` annotation. A keyword outside that
 set is refused loudly: a validator that silently ignores half its schema is a surface that lies.
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from typing import Any
 
 SUPPORTED = {
     "$id", "$schema", "title", "description", "default",
-    "type", "enum", "const", "required", "properties", "additionalProperties",
+    "type", "enum", "const", "required", "properties", "additionalProperties", "patternProperties",
     "items", "minItems", "minLength", "pattern", "minimum", "maximum", "oneOf",
 }
 
@@ -95,10 +95,16 @@ def validate(instance: Any, schema: dict[str, Any], path: str = "(root)") -> lis
             if key in instance:
                 errors += validate(instance[key], sub, key if path == "(root)" else f"{path}.{key}")
         extra = schema.get("additionalProperties", True)
+        patterned = schema.get("patternProperties", {})
         for key in instance:
             if key in properties:
                 continue
             where = key if path == "(root)" else f"{path}.{key}"
+            matched = [sub for pattern, sub in patterned.items() if re.search(pattern, key)]
+            if matched:
+                for sub in matched:
+                    errors += validate(instance[key], sub, where)
+                continue
             if extra is False:
                 errors.append(f"{where}: not declared by the schema")
             elif isinstance(extra, dict):

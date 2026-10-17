@@ -39,7 +39,7 @@ CI job: `ops-package-tests` in `.github/workflows/ci.yml`.
 ## Reference consumer fixture
 
 The suite runs against a **synthetic, self-contained reference consumer** under
-`tests/fixtures/golden-consumer/` — not the live project manifest. This keeps the
+`tests/fixtures/gc/` — not the live project manifest. This keeps the
 kit's tests validating the kit's *machinery* independent of any consumer's module
 set. `conftest.py` self-provisions the one gitignored bit at session
 start (the `kits/stack-kit` junction), so a fresh

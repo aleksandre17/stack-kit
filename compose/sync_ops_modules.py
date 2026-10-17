@@ -41,7 +41,16 @@ def main() -> int:
     from lib.project_context import load_manifest
 
     manifest = load_manifest(root)
-    out_rel = manifest.get("compose", {}).get("syncModules", "apps/backend/ops.modules")
+    from lib.compose_identity import primary_api_module_id
+
+    out_rel = manifest.get("compose", {}).get("syncModules")
+    if not out_rel:
+        primary = primary_api_module_id(manifest)
+        path = str(((manifest.get("modules") or {}).get(primary) or {}).get("path") or "") if primary else ""
+        if not path:
+            print("  no ops.modules: no api module to list beside")
+            return 0
+        out_rel = f"{path.strip('/')}/ops.modules" if path.strip("/") not in ("", ".") else "ops.modules"
     out = root / out_rel
 
     from lib.project_context import ProjectContext
@@ -53,7 +62,11 @@ def main() -> int:
 
     features = effective_compose_features(manifest, catalog_features)
     lines = [HEADER.rstrip(), "# Format: " + str(_owner(manifest)[1].get("columns") or COLUMNS)]
-    lines.extend(ops_modules_lines(ctx, fmt, features))
+    rows = ops_modules_lines(ctx, fmt, features)
+    if not rows and not manifest.get("compose", {}).get("syncModules"):
+        print("  no ops.modules: no module builds an artifact it lists")
+        return 0
+    lines.extend(rows)
     shared_line = _shared_module_line(root, manifest)
     if shared_line:
         lines.append(shared_line)

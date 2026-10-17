@@ -2,7 +2,7 @@
 
 The suite validates the kit's *machinery* (manifest resolution, driver
 registry, compose/config generation, deploy-path logic) against a **synthetic,
-self-contained reference consumer** under ``tests/fixtures/golden-consumer``.
+self-contained reference consumer** under ``tests/fixtures/gc`` (short: a Windows checkout under a deep folder must stay inside MAX_PATH).
 
 Why a synthetic fixture and not the live consumer manifest:
   * The kit is a reusable package. Coupling its tests to whatever
@@ -38,7 +38,7 @@ from pathlib import Path
 import pytest
 
 PKG = Path(__file__).resolve().parents[1]
-FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "golden-consumer"
+FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "gc"
 
 # Make the kit root importable for *in-process* tests regardless of the cwd
 # pytest was launched from. `lib` is a namespace package (no __init__.py); it is

@@ -108,45 +108,22 @@ function Show-Checklist {
     Write-Host "  Fill in (search for YOUR_ / example.com / empty values)" -ForegroundColor Yellow
     Write-Host "  ═══════════════════════════════════════════════════════" -ForegroundColor DarkCyan
 
-    # Where deploys go is declared in the targets file (`deploy.targets`), never an env file.
-    $checks = @()
-    foreach ($mid in Get-ProjectModules) {
-        $role = Get-ModuleRole $mid
-        $sm = Get-ModuleSecretsFolder $mid
-        $hints = switch ($role) {
-            "ui" { @("VITE_API_URL") }
-            "api" { @("GEMINI", "GCP", "API_KEY") }
-            "worker" { @("API_INTERNAL_URL") }
-            default { @() }
+    # The host's own modules name what is left to fill in, and the CI it already had is named beside
+    # the one ci-gen wrote (lib/init_checklist.py: one reading, tested).
+    $py = Get-StackKitPythonArgs
+    if ($py) {
+        $env:PYTHONPATH = $PackageRoot
+        Invoke-StackKitPythonExe $py "-B" (Join-Path $PackageRoot "lib\init_checklist.py") | ForEach-Object {
+            $color = if ($_ -match '^\s*\[x\]') { "Green" } elseif ($_ -match '^\s*\[!\]') { "Magenta" } elseif ($_ -match 'create / seed') { "Red" } else { "Yellow" }
+            Write-Host $_ -ForegroundColor $color
         }
-        $checks += @{ File = "$(Get-SecretsConfigRel)/$sm/.env.dev" -replace '/', '\'; Hints = $hints }
-        $checks += @{ File = "$(Get-SecretsConfigRel)/$sm/.env.prod" -replace '/', '\'; Hints = $hints }
-    }
-    $uiMod = Get-ModuleIdByRole "ui"
-    if ($uiMod) {
-        $nginxTg = (Get-ManifestField "adapters.nginx.env") -replace '/', '\'
-        if ($nginxTg) { $checks += @{ File = $nginxTg; Hints = @("NGINX_FRAME_ANCESTORS") } }
-    }
-
-    foreach ($c in $checks) {
-        $path = Join-Path $Root ($c.File -replace '/', '\')
-        if (-not (Test-Path $path)) {
-            Write-Host "  [ ] $($c.File) — create / seed" -ForegroundColor Red
-            continue
-        }
-        $raw = Get-Content $path -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
-        $todo = $false
-        if ($raw -match 'YOUR_|example\.com|CHANGEME|user@YOUR') { $todo = $true }
-        $color = if ($todo) { "Yellow" } else { "Green" }
-        $mark = if ($todo) { "[ ]" } else { "[✓]" }
-        Write-Host "  $mark $($c.File)" -ForegroundColor $color
     }
 
     Write-Host ""
     Write-Host "  Commands:" -ForegroundColor Cyan
     Write-Host "    .\tools\stack-kit.ps1 compose-gen    # after catalog edits"
     Write-Host "    .\tools\stack-kit.ps1 stack up -d --build"
-    Write-Host "    .\tools\stack-kit.ps1 mod <moduleId> check   # or cli aliases (fe, be, ui, api)"
+    Write-Host "    .\tools\stack-kit.ps1 mod <moduleId> check   # or a module's cli alias"
     Write-Host "  Docs: kits\stack-kit\docs\ADOPT.md"
     Write-Host ""
 }

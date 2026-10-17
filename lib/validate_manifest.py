@@ -294,6 +294,16 @@ def validate_manifest(
     errs.extend(f"config: {p}" for p in reach_errors)
     warnings.extend(f"config: {p}" for p in reach_warnings)
     warnings.extend(f"config: {s}" for s in _shared_data_sources(ctx))
+    # A generated compose file never builds from a recipe that is not there.
+    from lib import compose_refs
+
+    errs.extend(f"compose: {p}" for p in compose_refs.problems(ctx.root, ctx.manifest))
+    # A module's build tool is its driver's, read from its files; a missing wrapper is named before a build fails.
+    from lib import build_tools
+
+    tool_errors, tool_warnings = build_tools.problems(ctx.root, ctx.manifest, registry)
+    errs.extend(tool_errors)
+    warnings.extend(tool_warnings)
     # Build output is never tracked: each driver declares what its toolchain writes (amendment 16.12).
     from lib import tracked_outputs
 

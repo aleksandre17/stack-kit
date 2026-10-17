@@ -109,7 +109,7 @@ Every verb, its options and exit codes: [OPERATIONS.md](OPERATIONS.md).
 
 ## Verify the kit
 
-Package tests need no SSH, rsync or Docker; they run against `tests/fixtures/golden-consumer/`
+Package tests need no SSH, rsync or Docker; they run against `tests/fixtures/gc/`
 ([tests/README.md](../tests/README.md)).
 
 ```powershell

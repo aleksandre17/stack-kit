@@ -168,3 +168,35 @@ def test_the_ops_modules_rows_are_the_drivers_declaration(tmp_path: Path) -> Non
     marker.parent.mkdir(parents=True)
     marker.write_text("", encoding="utf-8")
     assert _shared_module_line(tmp_path, manifest) == decl["shared"]["row"]
+
+
+def test_a_module_without_its_local_recipe_is_not_composed_and_says_why(tmp_path):
+    # Found adopting a foreign project: a root Spring module's compose built from `src/Dockerfile.dev`,
+    # which the project never had.
+    from manifest_compose import missing_recipe
+    from lib.project_context import ProjectContext
+
+    manifest = {"version": 2, "modules": {"app": {"type": "java-boot", "role": "api", "path": "."},
+                                          "web": {"type": "node-vite", "role": "ui", "path": "web"}}}
+    ctx = ProjectContext(root=tmp_path, manifest=manifest)
+    why = missing_recipe(ctx, "app", "dev")
+    assert "has no Dockerfile.dev" in why and "compose.fromRelease" in why
+    assert missing_recipe(ctx, "web", "dev") == "", "a module run from its release image builds from the staged tree"
+    (tmp_path / "Dockerfile.dev").write_text("FROM x", encoding="utf-8")
+    assert missing_recipe(ctx, "app", "dev") == ""
+
+
+def test_a_modules_own_port_and_health_path_win_over_the_roles(mini_project: ProjectContext) -> None:
+    # Read from the app by the draft (Spring's server.port, actuator): the compose asks what the app serves.
+    manifest = _fixture_manifest()
+    manifest["modules"]["retrieval"]["container"] = {"port": 8181, "healthPath": "/actuator/health"}
+    ctx = ProjectContext(root=mini_project.root, manifest=manifest)
+    fmt = {"compose_slug": "demo", "api_service": "demo-api", "app_service": "demo-app", "worker_service": "demo-worker",
+           "worker_image": "demo-worker", "network_key": "demo-net", "network_name": "demo-net",
+           "health_interval": "15s", "health_retries": "5", "health_start": "60s"}
+    from compose.manifest_compose import build_single_module_compose
+
+    body = build_single_module_compose(ctx=ctx, module_id="retrieval", profile="dev",
+                                       compose_dir=mini_project.root / "apps" / "retrieval-service",
+                                       fmt_global=fmt, fmt_extra={})
+    assert "/actuator/health" in body and ":-8181}" in body, body

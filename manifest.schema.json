@@ -763,6 +763,9 @@
         "validate": { "type": "string", "minLength": 1, "description": "The line that validates the host against its declarations (`<launcher> validate`): what a host law's enforcer `stack-kit:validate` runs" },
         "run": { "type": "string", "minLength": 1 }
       },
+      "patternProperties": {
+        "^test-[A-Za-z0-9][A-Za-z0-9_-]*$": { "type": "string", "minLength": 1, "description": "One module's tests (`<launcher> mod <module> test`): the proof of that module alone, beside `test`, which runs every module's. `init` declares one per module." }
+      },
       "additionalProperties": false
     },
     "ci": {

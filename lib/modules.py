@@ -59,10 +59,19 @@ def _read_registry(path: Path) -> dict[str, Any]:
     return {k: v for k, v in data.items() if isinstance(v, dict)}
 
 
+#: Where a project's own drivers are declared when its manifest names no other place -- the place
+#: `extend driver` writes them (the extension point's default, held equal to this by a test).
+DEFAULT_PROJECT_REGISTRY = "ops/drivers/registry.json"
+
+
 def project_registry_path(root: Path, manifest: dict[str, Any]) -> Path | None:
-    """The project's own driver registry, when its manifest declares one (`drivers.registry`)."""
+    """The project's own driver registry: the one its manifest declares (`drivers.registry`), else the
+    default place, when a registry is there -- a driver `extend driver` made is read where it was made."""
     rel = (manifest.get("drivers") or {}).get("registry") if isinstance(manifest.get("drivers"), dict) else None
-    return root / str(rel) if rel else None
+    if rel:
+        return root / str(rel)
+    default = root / DEFAULT_PROJECT_REGISTRY
+    return default if default.is_file() else None
 
 
 def compose_registry(root: Path | None, manifest: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Path]]:

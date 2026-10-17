@@ -61,6 +61,22 @@ def _resolve_dockerfiles(module_path: Path, module_id: str, role: str, driver_ty
     return str(declared.get("dev") or "Dockerfile.dev"), str(declared.get("prod") or "Dockerfile"), "."
 
 
+def missing_recipe(ctx: ProjectContext, module_id: str, profile: str) -> str:
+    """Why a module's local service cannot be built here ("" when it can): it builds from a Dockerfile in
+    the module that is not there. A module that runs its release image (`compose.fromRelease`) builds from
+    the release tree `stage` writes, and is never missing one here."""
+    cfg = (ctx.manifest.get("modules") or {}).get(module_id) or {}
+    driver_type = str(cfg.get("type") or "")
+    if from_release(driver_type):
+        return ""
+    df_dev, df_prod, _suffix = _resolve_dockerfiles(ctx.module_path(module_id), module_id, str(cfg.get("role") or ""), driver_type)
+    wanted = df_dev if profile == "dev" else df_prod
+    if (ctx.module_path(module_id) / wanted).is_file():
+        return ""
+    return (f"modules.{module_id} has no {wanted} in {cfg.get('path') or '.'} -- its local {profile} service is not "
+            f"written; add the recipe, or run its release image (`compose.fromRelease` on its driver)")
+
+
 def _role_catalog_entry(stack_cat: dict[str, Any], role: str) -> dict[str, Any]:
     return (stack_cat.get("roles") or {}).get(role) or {}
 
@@ -198,6 +214,11 @@ def render_module_service(
     port_env, port_default = _module_port(ctx, module_id, role, stack_cat)
     role_cfg = _role_catalog_entry(stack_cat, role)
     health_path = str(role_cfg.get("urlPath") or "/health")
+    own = cfg.get("container") if isinstance(cfg.get("container"), dict) else {}
+    if own.get("port"):  # the module's own (read from the app, e.g. Spring's server.port), over the role's default
+        port_default = str(own["port"])
+    if own.get("healthPath"):
+        health_path = str(own["healthPath"])
     primary = primary_api_module_id(manifest)
     cred_vols, cred_env = _credential_blocks(manifest, module_id, secrets_rel, primary)
     df_dev, df_prod, prod_ctx_suffix = _resolve_dockerfiles(module_path, module_id, role, driver_type)
@@ -287,6 +308,11 @@ def build_manifest_stack_services(
             continue
         role = str(cfg.get("role") or "")
         if role not in ("api", "worker", "ui"):
+            continue
+        why = missing_recipe(ctx, mid, profile)
+        if why:
+            import sys
+            print(f"  skip {why}", file=sys.stderr)
             continue
         chunks.append(
             render_module_service(

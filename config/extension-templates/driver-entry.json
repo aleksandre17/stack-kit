@@ -3,7 +3,10 @@
   "roles": [
     "<<pending: the role it serves>>"
   ],
-  "commands": {},
+  "commands": {
+    "build": "ps1/build.ps1",
+    "test": "ps1/test.ps1"
+  },
   "package": {
     "command": "<<pending: the command that builds it>>",
     "artifacts": [

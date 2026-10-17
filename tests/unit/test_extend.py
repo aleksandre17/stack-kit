@@ -119,3 +119,69 @@ def test_an_ignored_file_is_machine_state_not_an_undeclared_extension(root):
     (root / "ops/compose/infra/services/more.local.txt").write_text("x", encoding="utf-8")
     found = extend.undeclared(root, manifest(root))
     assert not [u for u in found if u.endswith(".local.txt")], found  # every ignored file, not only the last
+
+
+def test_a_driver_made_by_the_door_is_known_and_its_scripts_are_declared(root):
+    # Found adopting a foreign project: `extend driver` wrote a registry the kit did not read
+    # ("unknown driver" until `drivers.registry` was found in the reference), and the scripts every
+    # driver needs were "in a place an extension point owns, but no point declares it".
+    from lib.modules import compose_registry
+
+    said = extend.make(root, manifest(root), "driver", "java-maven")
+    assert (root / "ops/drivers/java-maven/container/Dockerfile").is_file()
+    for step in ("build", "test"):
+        script = root / f"ops/drivers/java-maven/ps1/{step}.ps1"
+        assert script.is_file() and "<<pending:" in script.read_text(encoding="utf-8"), step
+    from lib.modules import DEFAULT_PROJECT_REGISTRY
+
+    assert "drivers" not in manifest(root), "nothing to declare: the reader's default is the writer's"
+    assert extend.points()["driver-entry"]["host_path"].startswith("{drivers.registry|" + DEFAULT_PROJECT_REGISTRY + "}")
+    entry = json.loads((root / "ops/drivers/registry.json").read_text(encoding="utf-8"))["java-maven"]
+    assert entry["commands"] == {"build": "ps1/build.ps1", "test": "ps1/test.ps1"}
+    registry, _ = compose_registry(root, manifest(root))
+    assert "java-maven" in registry, "the door's driver is known the moment it exists"
+    assert extend.undeclared(root, manifest(root)) == [], "its scripts are declared places"
+
+
+def _modules_host(tmp_path, modules):
+    r = tmp_path / "mod-host"
+    r.mkdir()
+    (r / "stack-kit.json").write_text(json.dumps({"version": 2, "modules": modules}), encoding="utf-8")
+    return r
+
+
+def test_init_lays_files_only_for_the_modules_the_host_has(tmp_path):
+    # Found adopting a foreign project: `apps/backend/` and its env example were scaffolded for a
+    # project with no backend, and the embedded worker row for a worker nobody declared.
+    r = _modules_host(tmp_path, {"web": {"type": "node-vite", "role": "ui", "path": "web"}})
+    said = extend.init(r)
+    assert not (r / "apps").exists(), "no folder for a tier no module lives in"
+    assert any("skipped -- no module lives in tier backend" in line for line in said)
+    catalog = json.loads((r / "ops/compose/catalog.json").read_text(encoding="utf-8"))
+    assert not any("backend" in k for k in catalog["targets"]) and catalog["features"]["worker"] is False
+    assert any(k.startswith("web/") for k in catalog["targets"]), "the module it has is served"
+
+
+def test_a_root_module_is_composed_from_its_own_declaration_and_stays_inside_the_repo(tmp_path):
+    r = _modules_host(tmp_path, {"app": {"type": "java-boot", "role": "api", "path": "."}})
+    extend.init(r)
+    catalog = json.loads((r / "ops/compose/catalog.json").read_text(encoding="utf-8"))
+    dev = catalog["targets"]["./docker-compose.dev.yml"] if "./docker-compose.dev.yml" in catalog["targets"] \
+        else catalog["targets"]["docker-compose.dev.yml"]
+    assert dev["manifestModule"] == "app" and "services" not in dev, "the module's own service, not a template's"
+    assert extend.placed("<up:backend>/ops", {"modules": {"app": {"role": "api", "path": "."}}}) == "./ops"
+
+
+def test_validate_refuses_a_compose_that_builds_from_a_recipe_that_is_not_there(tmp_path):
+    from lib import compose_refs
+
+    r = tmp_path / "refs"
+    (r / "ops/compose").mkdir(parents=True)
+    (r / "ops/compose/catalog.json").write_text(json.dumps({"targets": {"docker-compose.dev.yml": {}}}), encoding="utf-8")
+    (r / "docker-compose.dev.yml").write_text(
+        "services:\n  app:\n    build:\n      context: .\n      dockerfile: src/Dockerfile.dev\n", encoding="utf-8")
+    found = compose_refs.problems(r, {})
+    assert len(found) == 1 and "src/Dockerfile.dev, which is not there" in found[0]
+    (r / "src").mkdir()
+    (r / "src/Dockerfile.dev").write_text("FROM x", encoding="utf-8")
+    assert compose_refs.problems(r, {}) == []

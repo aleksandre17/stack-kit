@@ -39,8 +39,10 @@ _FIELD = re.compile(r"\{([A-Za-z0-9_.]+)\|([^}]*)\}")
 _TIER = re.compile(r"<(tier|secrets|up):([a-z0-9][a-z0-9-]*)>")
 #: The base profile: what init lays down, required by every profile.
 INIT = "init"
-#: A point `<id>` + this suffix is made with `<id>`, under the same name.
-COMPANION = "-entry"
+#: A point `<id>` + one of these suffixes is made with `<id>`, under the same name (a driver brings its
+#: registry entry and the lifecycle scripts the entry's `commands` name).
+COMPANIONS = ("-entry", "-build", "-test")
+COMPANION = COMPANIONS[0]
 
 
 class ExtendError(ValueError):
@@ -95,7 +97,7 @@ def placed(text: str, manifest: dict[str, Any]) -> str:
             return path
         if kind == "secrets":
             return mod[1] if mod else tier
-        return "/".join([".."] * len([p for p in path.split("/") if p])) or "."
+        return "/".join([".."] * len([p for p in path.split("/") if p and p != "."])) or "."
     return _TIER.sub(one, text)
 
 
@@ -119,6 +121,39 @@ def place(point: dict[str, Any], manifest: dict[str, Any], name: str = "") -> Pl
     return Place(point, name, Path(f), ptr)
 
 
+def unoccupied(text: str, manifest: dict[str, Any]) -> list[str]:
+    """The tiers a text places files in (`<tier:T>`, `<secrets:T>`, `<up:T>`) that no module lives in --
+    where a file would be laid for a module the host does not have (found adopting a foreign project:
+    `apps/backend/` was scaffolded for a project with no backend)."""
+    return sorted({m.group(2) for m in _TIER.finditer(text) if _tier_module(manifest, m.group(2)) is None})
+
+
+def catalog_for_host(raw: str, manifest: dict[str, Any]) -> str:
+    """The local stack's catalog, made for THIS host's modules: a target for a tier no module lives in is
+    left out; a tier's hand-written service templates give way to the module's own, rendered from its
+    manifest and its driver (`manifestModule`: its path, its secrets, its port, its recipe); the embedded
+    worker is off unless the host declares one (`modules.<api>.compose.embeddedWorker`)."""
+    doc = json.loads(raw)
+    targets = {}
+    for key, spec in (doc.get("targets") or {}).items():
+        if unoccupied(key, manifest):
+            continue
+        tiers = [m.group(2) for m in _TIER.finditer(key) if m.group(1) == "tier"]
+        services = spec.get("services") or []
+        if tiers and services and not spec.get("manifestModule"):
+            mod = _tier_module(manifest, tiers[0])
+            mid = next((m for m, c in (manifest.get("modules") or {}).items() if isinstance(c, dict)
+                        and str(c.get("path") or "").replace("\\", "/").strip("/") == (mod[0] if mod else None)), None)
+            profile = "prod" if any(str(s).endswith("_prod") or str(s).endswith("_prod_overlay") for s in services) else "dev"
+            if mid and any(str(s).startswith("api_") for s in services):
+                spec = {k: v for k, v in {"comment": spec.get("comment"), "manifestModule": mid, "manifestProfile": profile,
+                                         "networks": spec.get("networks")}.items() if v}
+        targets[key] = spec
+    doc["targets"] = targets
+    doc["features"] = {**(doc.get("features") or {}), "worker": False}
+    return json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
+
+
 def template_text(point: dict[str, Any], name: str, manifest: dict[str, Any] | None = None) -> str:
     rel = point["template"].replace("<name>", name)
     path = KIT / rel
@@ -127,6 +162,8 @@ def template_text(point: dict[str, Any], name: str, manifest: dict[str, Any] | N
                           + ", ".join(sorted(p.stem for p in path.parent.glob("*" + path.suffix))) if path.parent.is_dir()
                           else f"{point['id']}: no template {rel}")
     text = path.read_text(encoding="utf-8").replace("<name>", name)
+    if manifest is not None and point["id"] == "compose-catalog":
+        text = catalog_for_host(text, manifest)
     return text if manifest is None else rendered_for(text, manifest)
 
 
@@ -227,8 +264,9 @@ def make(root: Path, manifest: dict[str, Any], point_id: str, name: str = "", *,
                 _set(doc, p.pointer, value)
                 (root / p.file).parent.mkdir(parents=True, exist_ok=True)
                 (root / p.file).write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
-    if point_id + COMPANION in points():
-        said += make(root, manifest, point_id + COMPANION, name, plan=plan)
+    for suffix in COMPANIONS:
+        if point_id + suffix in points():
+            said += make(root, manifest, point_id + suffix, name, plan=plan)
     return said
 
 
@@ -395,7 +433,12 @@ def init(root: Path, *, plan: bool = False) -> list[str]:
     said = []
     for point in points().values():
         if point.get("required_by") == INIT:
-            said += make(root, _load(root, Path(MANIFEST_FILENAME)), point["id"], plan=plan)
+            manifest = _load(root, Path(MANIFEST_FILENAME))
+            empty = unoccupied(point["host_path"], manifest)
+            if empty:
+                said.append(f"{point['id']}: skipped -- no module lives in tier {', '.join(empty)}")
+                continue
+            said += make(root, manifest, point["id"], plan=plan)
     manifest = _load(root, Path(MANIFEST_FILENAME))
     for svc in ((manifest.get("stack") or {}).get("infra") or {}).get("services") or []:
         p = place(points()["infra-service"], manifest, svc)

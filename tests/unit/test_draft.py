@@ -96,7 +96,9 @@ def test_merged_over_the_hosts_manifest_the_draft_changes_nothing_declared(tmp_p
                 "vscode": {"folder": ".vscode", "cliScript": "ops/cli/stack-kit.ps1"}}
     merged, added = drafter.merge(existing, drafter.draft(root, existing))
     assert _leaves(existing).items() <= _leaves(merged).items(), "a declared field changed"
-    assert added == ['+ commands.lint: "pwsh ops/cli/stack-kit.ps1 lint"', '+ layout: {"profile": "monorepo"}'], added
+    assert added == ['+ commands.test-api: "pwsh ops/cli/stack-kit.ps1 mod api test"',
+                     '+ commands.test-web: "pwsh ops/cli/stack-kit.ps1 mod web test"',
+                     '+ commands.lint: "pwsh ops/cli/stack-kit.ps1 lint"', '+ layout: {"profile": "monorepo"}'], added
 
 
 def test_a_multi_service_gradle_build_is_one_java_boot_module(tmp_path):
@@ -154,3 +156,27 @@ def test_plan_writes_nothing_and_approve_records_who(tmp_path, monkeypatch, caps
     assert drafter.main(["--approve", "owner"]) == 0
     written = json.loads((root / identity.MANIFEST_FILENAME).read_text(encoding="utf-8"))
     assert written["modules"]["backend"]["type"] == "java-boot" and written["draft"]["approvedBy"] == "owner"
+
+
+def test_each_module_is_given_its_own_test_command_beside_every_modules(tmp_path):
+    # So a change to one module is proved by that module's tests alone (agent-kit's areas name them).
+    root = dotnet_angular_shaped(tmp_path)
+    existing = {"version": 2, "modules": SHOP_MODULES,
+                "commands": {"test": "pwsh ops/cli/stack-kit.ps1 test", "test-api": "a host's own line"}}
+    merged, _ = drafter.merge(existing, drafter.draft(root, existing))
+    assert merged["commands"]["test"] == "pwsh ops/cli/stack-kit.ps1 test", "every module's, kept"
+    assert merged["commands"]["test-web"] == "pwsh ops/cli/stack-kit.ps1 mod web test"
+    assert merged["commands"]["test-api"] == "a host's own line", "a declared command is never replaced"
+
+
+def test_a_maven_spring_boot_api_is_a_java_boot_module_that_says_it_is_maven(tmp_path):
+    # Found adopting a foreign project: a Maven API was invisible -- java-boot read Gradle only.
+    root = _tree(tmp_path / "mvn", {
+        "pom.xml": "<project><parent><artifactId>spring-boot-starter-parent</artifactId></parent>"
+                   "<artifactId>orders</artifactId></project>",
+        "src/main/java/a/App.java": "class App {}",
+        "web/package.json": "{}", "web/vite.config.ts": "export default {}"})
+    modules = _draft(root)["modules"]
+    api = next(m for m in modules.values() if m["type"] == "java-boot")
+    assert api["path"] == "." and api["java"] == {"build": "maven", "artifact": "target/*.jar"}, api
+    assert any(m["type"] == "node-vite" for m in modules.values())

@@ -112,11 +112,19 @@ def _reads(root: Path, files: list[str], directory: str, reads: dict[str, Any]) 
     out: dict[str, str] = {}
     for field, how in reads.items():
         if "name" in how:
-            hits = _in_dir(files, directory, how["name"])
+            names = how["name"] if isinstance(how["name"], list) else [how["name"]]
+            hits = [h for name in names for h in _in_dir(files, directory, name)]
             if "matches" in how:
                 hits = [h for h in hits if re.search(how["matches"], _text(root, h))]
-            if hits:
-                out[field] = posixpath.basename(hits[0])
+            if "capture" in how:
+                for h in hits:
+                    m = re.search(how["capture"], _text(root, h))
+                    said = next((g for g in (m.groups() if m else ()) if g), None)
+                    if said:
+                        out[field] = int(said) if said.isdigit() else said
+                        break
+            elif hits:
+                out[field] = str(how["value"]) if "value" in how else posixpath.basename(hits[0])
         elif "find" in how:
             mention = out.get(how.get("mentions", ""), "")
             hits = [f for f in files if fnmatch.fnmatch(f, how["find"]) or fnmatch.fnmatch("/" + f, "/" + how["find"])]
@@ -225,6 +233,16 @@ def merge(existing: dict[str, Any], drafted: dict[str, Any]) -> tuple[dict[str, 
             renamed[mid] = new_id
             modules[new_id] = {**mod, "secretsModule": mod["secretsModule"] if mid == new_id else new_id}
             added.append(f"+ modules.{new_id}: {json.dumps(modules[new_id], ensure_ascii=False)}")
+    # Every module's own test command, beside `test` (all of them), through the launcher `test` uses: what
+    # proves one module alone -- so a change to one is proved by its own tests. Declared ones are kept.
+    whole = str((merged.get("commands") or {}).get("test") or (drafted.get("commands") or {}).get("test") or "")
+    if whole.endswith(" test"):
+        commands = merged.setdefault("commands", {})
+        for mid in modules:
+            key = f"test-{mid}"
+            if key not in commands:
+                commands[key] = f"{whole[:-len(' test')]} mod {mid} test"
+                added.append(f"+ commands.{key}: {json.dumps(commands[key])}")
     rest = {k: v for k, v in drafted.items() if k != "modules"}
     taken_targets = set(((merged.get("cli") or {}).get("aliases") or {}).values())
     rest["cli"] = {"aliases": {renamed.get(a, a): renamed.get(t, t) for a, t in ((rest.get("cli") or {}).get("aliases") or {}).items()

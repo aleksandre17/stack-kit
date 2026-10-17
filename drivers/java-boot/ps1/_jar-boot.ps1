@@ -9,6 +9,7 @@ function Get-StackKitHybridBootJar {
         return Join-Path $Root ($explicit -replace '/', '\')
     }
     $libsDir = Join-Path $ModPath "build\libs"
+    if (-not (Test-Path $libsDir)) { $libsDir = Join-Path $ModPath "target" }  # a Maven build
     if (-not (Test-Path $libsDir)) { return $null }
     $candidates = Get-ChildItem $libsDir -Filter "*.jar" |
         Where-Object { $_.Name -notmatch 'plain' -and $_.Name -match 'SNAPSHOT' } |

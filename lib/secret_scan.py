@@ -149,6 +149,21 @@ class Finding:
         return f"{at}: {self.rule}" + (f" (in {self.where})" if self.where != "tree" else "")
 
 
+def calibration_document(text: str) -> bool:
+    """Whether a text is a document of the edit-gate contract -- `gates[]`, each carrying the specimen it
+    must refuse (`proves`) and the one it must admit (`admits`). Its specimens are credential-SHAPED on
+    purpose, so they are its calibration, never a leak: recognised by this shape wherever the document
+    is (a taken copy, a vendored kit), never by its path."""
+    try:
+        doc = json.loads(text.lstrip("\ufeff"))
+    except ValueError:
+        return False
+    gates = doc.get("gates") if isinstance(doc, dict) else None
+    return isinstance(gates, list) and bool(gates) and all(
+        isinstance(g, dict) and isinstance(g.get("proves"), dict) and isinstance(g.get("admits"), dict)
+        and "forbids" in g for g in gates)
+
+
 def _value_of(rule: str, m: re.Match[str]) -> str:
     return m.group(1) if m.groups() else m.group(0)
 
@@ -284,7 +299,15 @@ def tree(root: Path, manifest: dict[str, Any]) -> list[Finding]:
             held[f.path] = values_at((root / f.path).read_text(encoding="utf-8", errors="replace"), exposures[f.path])
         return held[f.path]
 
-    left = [f for f in found if not _allowed(f, allow) and f.path not in documents]
+    calibrations: dict[str, bool] = {}
+
+    def calibration(rel: str) -> bool:
+        if rel not in calibrations:
+            calibrations[rel] = rel.endswith(".json") and calibration_document(
+                (root / rel).read_text(encoding="utf-8", errors="replace"))
+        return calibrations[rel]
+
+    left = [f for f in found if not _allowed(f, allow) and f.path not in documents and not calibration(f.path)]
     failing, known = tracked_split(left, text_of, exposures, values_of)
     KNOWN.clear()
     KNOWN.extend(known)
@@ -333,7 +356,18 @@ def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
             held[key] = values_at(shown.stdout.decode("utf-8", "replace"), exposures[f.path]) if shown.returncode == 0 else None
         return held[key]
 
-    left = [f for f in added if not _allowed(f, allow) and f.path not in documents]
+    calibrations: dict[tuple[str, str], bool] = {}
+
+    def calibration(f: Finding) -> bool:
+        key = (f.where, f.path)
+        if key not in calibrations:
+            shown = subprocess.run(["git", "-C", str(root), "show", f"{f.where.split()[-1]}:{f.path}"],
+                                   capture_output=True) if f.path.endswith(".json") else None
+            calibrations[key] = bool(shown and shown.returncode == 0
+                                     and calibration_document(shown.stdout.decode("utf-8", "replace")))
+        return calibrations[key]
+
+    left = [f for f in added if not _allowed(f, allow) and f.path not in documents and not calibration(f)]
     failing, known_found = tracked_split(left, added.get, exposures, values_of)
     KNOWN.clear()
     KNOWN.extend(known_found)
