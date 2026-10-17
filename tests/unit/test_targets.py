@@ -299,3 +299,19 @@ def test_an_env_file_is_injected_from_outside_the_repository(tmp_path, monkeypat
     monkeypatch.setenv(envfile.injected_name("api", "prod"), str(tmp_path / "missing"))
     with pytest.raises(FileNotFoundError, match="STACK_KIT_ENV_FILE_API_PROD"):
         envfile.run_files(secrets, "api", "prod")
+
+
+def test_the_targets_file_init_lays_is_read_where_it_was_written(tmp_path):
+    # Found adopting a foreign project: `targets` said "none declared" over the file init had just laid.
+    import json as _json
+
+    from lib import extend
+    from lib.targets import declaration
+
+    (tmp_path / "ops" / "deploy").mkdir(parents=True)
+    (tmp_path / "ops" / "deploy" / "targets.json").write_text(_json.dumps({"targets": {}}), encoding="utf-8")
+    assert declaration.declared_file({}, tmp_path) == declaration.DEFAULT_FILE
+    assert declaration.load(tmp_path, {}) == {"targets": {}}
+    assert declaration.declared_file({}) is None, "without a root, only what the manifest declares"
+    point = next(p for p in extend.points().values() if p["template"] == "scaffold/ops/deploy/targets.json")
+    assert point["host_path"] == "{deploy.targets|" + declaration.DEFAULT_FILE + "}", "one default, written and read"

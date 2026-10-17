@@ -558,3 +558,80 @@ stack-kit vscode-gen [--force]
 ```
 
 Exit codes: 0, 1, 2.
+
+## Drivers
+
+From `drivers/registry.json`. `init --plan` drafts a module for each directory whose files a
+driver's detection holds for; a host adds its own with `extend driver <name>`.
+
+| driver | for | roles | recognised by | built by | writes |
+|---|---|---|---|---|---|
+| `dotnet-aspnet` | ASP.NET Core - dotnet run / dotnet publish artifact (Windows or cross-platform host) | api | `*.csproj` | - | `bin/`, `obj/` |
+| `java-boot` | JVM — Spring Boot, built by Gradle or Maven (JAR deploy) | api, worker | `build.gradle`, `build.gradle.kts`, `settings.gradle`, `settings.gradle.kts`, `pom.xml`, `*/build.gradle`, `*/build.gradle.kts`, `*/pom.xml` | maven, gradle | `build/`, `.gradle/`, `target/` |
+| `node-api` | Node — HTTP service (pnpm build + dockerized deploy, Fastify/Express/Nest) | api | `package.json` | - | `node_modules/`, `dist/` |
+| `node-spa` | Node - single-page app run by its own package.json scripts (Angular CLI, Vite, React, Vue, Svelte) | ui | `package.json`, `angular.json` | - | `node_modules/`, `dist/`, `.angular/` |
+| `node-vite` | Node — SPA dev remote + nginx release image (Vite, Angular, Nx) | ui | `package.json`, `vite.config.ts`, `vite.config.js`, `vite.config.mjs` | - | `node_modules/`, `dist/` |
+
+## Extension points
+
+From `config/extension-points.json`: `extend <point> [<name>]` makes one from its template,
+never overwriting; `extend --list` shows each with its state on this host. `init` lays down the
+points it requires.
+
+| point | what | host path | one or many | laid by init |
+|---|---|---|---|---|
+| `manifest` | the project's manifest | `stack-kit.json` | one | yes |
+| `module` | a module of the project (no name: drafted from the tree by the drivers' evidence) | `stack-kit.json#/modules/<name>` | many | - |
+| `catalog-roles` | a role over the kit's (config/catalogs/roles.json) | `stack-kit.json#/catalogs/roles/-` | many | - |
+| `catalog-tiers` | a tier over the kit's | `stack-kit.json#/catalogs/tiers/-` | many | - |
+| `catalog-environments` | an environment over the kit's (e.g. staging) | `stack-kit.json#/catalogs/environments/-` | many | - |
+| `catalog-lifecycle` | a lifecycle step over the kit's (e.g. typecheck) | `stack-kit.json#/catalogs/lifecycle/-` | many | - |
+| `catalog-target-runtimes` | a target runtime over the kit's | `stack-kit.json#/catalogs/targetRuntimes/-` | many | - |
+| `runtime` | a script runtime over the kit's (config/runtimes.json) | `stack-kit.json#/runtimes/<name>` | many | - |
+| `targets` | the deploy targets file | `{deploy.targets|ops/deploy/targets.json}` | one | yes |
+| `target` | a deploy target | `{deploy.targets|ops/deploy/targets.json}#/targets/<name>` | many | - |
+| `targets-local` | this machine's override of the targets (gitignored) | `ops/deploy/targets.local.json` | one | - |
+| `known-hosts` | the targets' pinned host keys | `ops/deploy/known_hosts` | one | yes |
+| `runtime-config` | a file a module's application reads at run time (named by its module) | `stack-kit.json#/modules/<name>/runtimeConfig/-` | many | - |
+| `config-keys` | the configuration catalogue | `{config.keys|ops/config/schema/config-keys.json}` | one | - |
+| `config-key` | a catalogued key, with its env-value policy | `{config.keys|ops/config/schema/config-keys.json}#/keys/-` | many | - |
+| `infra-service` | an infra service of the stack (a named template: postgres, sqlserver, minio, redis, keycloak, ...) | `{stack.infraComposeDir|ops/compose/infra}/services/<name>.yml` | many | - |
+| `infra-service-entry` | the infra service's selection in the manifest | `stack-kit.json#/stack/infra/services/-` | many | - |
+| `backup-anchors` | what a restore of an infra store must still hold | `stack-kit.json#/stack/infra/backup/<name>` | many | - |
+| `env-example` | a module's env file example (the real values stay ignored) | `{secrets|ops/config}/<name>/.env.example` | many | - |
+| `driver` | a project driver's release recipe (with its registry entry) | `ops/drivers/<name>/container/Dockerfile` | many | - |
+| `driver-entry` | a project driver's declaration | `{drivers.registry|ops/drivers/registry.json}#/<name>` | many | - |
+| `driver-build` | a project driver's `build` step (its entry's commands.build) | `ops/drivers/<name>/ps1/build.ps1` | many | - |
+| `driver-test` | a project driver's `test` step (its entry's commands.test) | `ops/drivers/<name>/ps1/test.ps1` | many | - |
+| `ci-actions` | the project's own CI action pins (full SHAs) | `{ci.actions|ops/ci/actions.json}` | one | - |
+| `compose-catalog` | the local stack's catalog | `{compose.catalog|ops/compose/catalog.json}` | one | yes |
+| `init-gitignore` | laid down by init: .gitignore | `.gitignore` | one | yes |
+| `init-apps-backend-logs-gitignore` | laid down by init: apps/backend/logs/.gitignore | `<tier:backend>/logs/.gitignore` | one | yes |
+| `init-apps-frontend-logs-gitignore` | laid down by init: apps/frontend/logs/.gitignore | `<tier:frontend>/logs/.gitignore` | one | yes |
+| `init-apps-frontend-nginxconftemplate` | laid down by init: apps/frontend/nginx.conf.template | `<tier:frontend>/nginx.conf.template` | one | yes |
+| `init-ops-ci-integration-stacksh` | laid down by init: ops/ci/integration-stack.sh | `ops/ci/integration-stack.sh` | one | yes |
+| `init-ops-cli-stack-kitps1` | laid down by init: ops/cli/stack-kit.ps1 | `ops/cli/stack-kit.ps1` | one | yes |
+| `init-ops-cli-stack-kitsh` | laid down by init: ops/cli/stack-kit.sh | `ops/cli/stack-kit.sh` | one | yes |
+| `init-ops-compose-readmemd` | laid down by init: ops/compose/README.md | `ops/compose/README.md` | one | yes |
+| `init-ops-compose-infra-readmemd` | laid down by init: ops/compose/infra/README.md | `ops/compose/infra/README.md` | one | yes |
+| `init-ops-compose-infra-docker-composebaseyml` | laid down by init: ops/compose/infra/docker-compose.base.yml | `ops/compose/infra/docker-compose.base.yml` | one | yes |
+| `init-ops-compose-infra-docker-composeprodyml` | laid down by init: ops/compose/infra/docker-compose.prod.yml | `ops/compose/infra/docker-compose.prod.yml` | one | yes |
+| `init-ops-compose-stack-readmemd` | laid down by init: ops/compose/stack/README.md | `ops/compose/stack/README.md` | one | yes |
+| `init-ops-config-envexample` | laid down by init: ops/config/.env.example | `ops/config/.env.example` | one | yes |
+| `init-ops-config-gitignore` | laid down by init: ops/config/.gitignore | `ops/config/.gitignore` | one | yes |
+| `init-ops-config-readmemd` | laid down by init: ops/config/README.md | `ops/config/README.md` | one | yes |
+| `init-ops-config-backend-envexample` | laid down by init: ops/config/backend/.env.example | `{secrets|ops/config}/<secrets:backend>/.env.example` | one | yes |
+| `init-ops-config-frontend-envexample` | laid down by init: ops/config/frontend/.env.example | `{secrets|ops/config}/<secrets:frontend>/.env.example` | one | yes |
+| `init-ops-config-frontend-embedenvexample` | laid down by init: ops/config/frontend/embed.env.example | `{secrets|ops/config}/<secrets:frontend>/embed.env.example` | one | yes |
+| `init-ops-config-frontend-nginxenvexample` | laid down by init: ops/config/frontend/nginx.env.example | `{secrets|ops/config}/<secrets:frontend>/nginx.env.example` | one | yes |
+| `init-ops-config-profiles-readmemd` | laid down by init: ops/config/profiles/README.md | `ops/config/profiles/README.md` | one | yes |
+| `init-ops-config-profiles-gcp-credentialsmd` | laid down by init: ops/config/profiles/gcp-credentials.md | `ops/config/profiles/gcp-credentials.md` | one | yes |
+| `init-ops-config-profiles-worker-disabledmd` | laid down by init: ops/config/profiles/worker-disabled.md | `ops/config/profiles/worker-disabled.md` | one | yes |
+| `init-ops-config-ssh-gitignore` | laid down by init: ops/config/ssh/.gitignore | `ops/config/ssh/.gitignore` | one | yes |
+| `init-ops-config-ssh-readmemd` | laid down by init: ops/config/ssh/README.md | `ops/config/ssh/README.md` | one | yes |
+| `init-ops-config-ssh-configexample` | laid down by init: ops/config/ssh/config.example | `ops/config/ssh/config.example` | one | yes |
+| `init-ops-config-ssh-id-ed25519example` | laid down by init: ops/config/ssh/id_ed25519.example | `ops/config/ssh/id_ed25519.example` | one | yes |
+| `init-ops-deploy-readmemd` | laid down by init: ops/deploy/README.md | `ops/deploy/README.md` | one | yes |
+| `init-tools-readmemd` | laid down by init: tools/README.md | `tools/README.md` | one | yes |
+| `init-tools-stack-kitcmd` | laid down by init: tools/stack-kit.cmd | `tools/stack-kit.cmd` | one | yes |
+| `init-tools-stack-kitps1` | laid down by init: tools/stack-kit.ps1 | `tools/stack-kit.ps1` | one | yes |

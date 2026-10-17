@@ -156,4 +156,58 @@ def markdown(verbs: dict[str, Verb], kit: str) -> str:
             out += ["", "Exit codes: " + ", ".join(str(c) for c in v.exits) + "."]
             if v.examples:
                 out += ["", "```"] + [f"{kit} {e}" for e in v.examples] + ["```"]
+    out += _drivers_table() + _points_table()
     return "\n".join(out) + "\n"
+
+
+def _evidence(detect: dict) -> list[str]:
+    """The file names a driver's detection reads, in the order it declares them."""
+    found: list[str] = []
+
+    def walk(item) -> None:
+        if isinstance(item, dict):
+            if isinstance(item.get("file"), str) and item["file"] not in found:
+                found.append(item["file"])
+            for value in item.values():
+                walk(value)
+        elif isinstance(item, list):
+            for value in item:
+                walk(value)
+
+    walk(detect.get("all") or [])
+    return found
+
+
+def _drivers_table() -> list[str]:
+    """The kit's drivers, from drivers/registry.json -- what each recognises a module by, the build tools it
+    knows, and what its toolchain writes (never tracked)."""
+    import json
+    from pathlib import Path
+
+    registry = json.loads((Path(__file__).resolve().parents[2] / "drivers" / "registry.json").read_text(encoding="utf-8"))
+    rows = ["", "## Drivers", "", "From `drivers/registry.json`. `init --plan` drafts a module for each directory whose files a",
+            "driver's detection holds for; a host adds its own with `extend driver <name>`.", "",
+            "| driver | for | roles | recognised by | built by | writes |", "|---|---|---|---|---|---|"]
+    for typ, entry in sorted(registry.items()):
+        if not isinstance(entry, dict):
+            continue
+        tools = ", ".join(t["id"] for t in entry.get("buildTools") or []) or "-"
+        rows.append(f"| `{typ}` | {entry.get('label', '')} | {', '.join(entry.get('roles') or [])} | "
+                    f"{', '.join(f'`{f}`' for f in _evidence(entry.get('detect') or {})) or '-'} | {tools} | "
+                    f"{', '.join(f'`{o}`' for o in entry.get('outputs') or []) or '-'} |")
+    return rows
+
+
+def _points_table() -> list[str]:
+    """The extension points, from config/extension-points.json -- every place a host extends the kit."""
+    import json
+    from pathlib import Path
+
+    points = json.loads((Path(__file__).resolve().parents[2] / "config" / "extension-points.json").read_text(encoding="utf-8"))["points"]
+    rows = ["", "## Extension points", "", "From `config/extension-points.json`: `extend <point> [<name>]` makes one from its template,",
+            "never overwriting; `extend --list` shows each with its state on this host. `init` lays down the",
+            "points it requires.", "", "| point | what | host path | one or many | laid by init |", "|---|---|---|---|---|"]
+    for p in points:
+        rows.append(f"| `{p['id']}` | {p['purpose']} | `{p['host_path']}` | {p['cardinality']} | "
+                    f"{'yes' if p.get('required_by') == 'init' else '-'} |")
+    return rows

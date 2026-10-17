@@ -61,7 +61,8 @@ function Invoke-JvmStep {
     param([string]$ModuleId, [string]$Step, [string[]]$Rest = @())
     $root = Get-ProjectRootFromManifest
     $modPath = Get-ModuleProjectPath $ModuleId
-    $tool = Resolve-JvmBuildTool -ModuleId $ModuleId -ModPath $modPath -Root $root
+    try { $tool = Resolve-JvmBuildTool -ModuleId $ModuleId -ModPath $modPath -Root $root }
+    catch { Write-Host "  [$ModuleId $Step] $($_.Exception.Message)" -ForegroundColor Red; return 1 }
     $argv = @(Get-JvmStepArgs -ModuleId $ModuleId -Kind $tool.Kind -Step $Step) + $Rest
     Write-Host "  [$ModuleId $Step] $($tool.Exe) $($argv -join ' ')" -ForegroundColor Cyan
     Push-Location $modPath

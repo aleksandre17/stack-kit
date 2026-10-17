@@ -36,9 +36,20 @@ def environments(manifest: dict[str, Any] | None = None) -> list[str]:
     return catalogs.ids("environments", manifest)
 
 
-def declared_file(manifest: dict[str, Any]) -> str | None:
+#: Where a host's targets are declared when its manifest names no other file -- where `init` lays the
+#: file (the extension point's default, held equal to this by a test).
+DEFAULT_FILE = "ops/deploy/targets.json"
+
+
+def declared_file(manifest: dict[str, Any], root: Path | None = None) -> str | None:
+    """The host's targets file: the one its manifest declares (`deploy.targets`), else the default place
+    when a file is there -- the file `init` wrote is read where it was written (found adopting a foreign
+    project: `targets` said "none declared" over the file init had just laid down)."""
     deploy = manifest.get("deploy")
-    return (deploy.get("targets") or None) if isinstance(deploy, dict) else None
+    declared = (deploy.get("targets") or None) if isinstance(deploy, dict) else None
+    if declared or root is None:
+        return declared
+    return DEFAULT_FILE if (root / DEFAULT_FILE).is_file() else None
 
 
 def local_file(path: Path) -> Path:
@@ -64,7 +75,7 @@ def _read(path: Path) -> dict[str, Any]:
 
 def load(root: Path, manifest: dict[str, Any]) -> dict[str, Any] | None:
     """The declared targets merged with this machine's override, or None when none is declared."""
-    rel = declared_file(manifest)
+    rel = declared_file(manifest, root)
     if not rel:
         return None
     path = root / rel
@@ -155,7 +166,7 @@ def problems(root: Path, manifest: dict[str, Any]) -> list[str]:
     from lib import catalogs
     from lib.schema_check import validate as schema_validate
 
-    rel = declared_file(manifest)
+    rel = declared_file(manifest, root)
     if not rel:
         return []
     out: list[str] = []
