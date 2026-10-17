@@ -7,6 +7,7 @@ Compose generation, SSH deploy, env contract, multi-module CLI — **no** applic
 | | |
 |---|---|
 | **Set up** | [docs/guide/setup.md](docs/guide/setup.md) -- the pipeline step by step, the blueprint of a host, alone or with agent-kit |
+| **Delivery paths** | [docs/guide/delivery-paths.md](docs/guide/delivery-paths.md) -- every way a module goes from code to running: local build, local stack, release, CI's archive, remote dev, CI |
 | **Guide** | [docs/guide/](docs/guide/README.md) -- what the kit does, how, what it generates, how a host extends it |
 | **Install** | [docs/INSTALL.md](docs/INSTALL.md) |
 | **Adopt** | [docs/ADOPT.md](docs/ADOPT.md) |

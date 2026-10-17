@@ -48,6 +48,9 @@ flowchart TD
 Remote development (`dev up <module> --plan`, `dev sync`, `dev watch`) runs a module's workspace on a
 target's workspace environment; it needs a declared target, as a deploy does.
 
+What each of these paths runs, on which machine, and where its files land -- per driver, from the local
+build to a release, CI's archive and remote dev -- is drawn in [delivery-paths.md](delivery-paths.md).
+
 ### An existing project
 
 A host already on the kit, or a module added later, takes the same doors:
