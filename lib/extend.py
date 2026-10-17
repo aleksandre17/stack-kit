@@ -130,24 +130,27 @@ def unoccupied(text: str, manifest: dict[str, Any]) -> list[str]:
 
 def catalog_for_host(raw: str, manifest: dict[str, Any]) -> str:
     """The local stack's catalog, made for THIS host's modules: a target for a tier no module lives in is
-    left out; a tier's hand-written service templates give way to the module's own, rendered from its
-    manifest and its driver (`manifestModule`: its path, its secrets, its port, its recipe); the embedded
-    worker is off unless the host declares one (`modules.<api>.compose.embeddedWorker`)."""
+    left out; a tier's hand-written service templates give way to the module's own service, rendered from
+    its manifest and its driver (`manifestModule`: its path, its secrets, its port, its recipe) -- one
+    file per profile, no overlays a template needed; the embedded worker is off unless the host declares
+    one (`modules.<api>.compose.embeddedWorker`)."""
     doc = json.loads(raw)
     targets = {}
     for key, spec in (doc.get("targets") or {}).items():
         if unoccupied(key, manifest):
             continue
         tiers = [m.group(2) for m in _TIER.finditer(key) if m.group(1) == "tier"]
-        services = spec.get("services") or []
-        if tiers and services and not spec.get("manifestModule"):
+        if tiers and (spec.get("services") or spec.get("extraServices")) and not spec.get("manifestModule"):
+            if "override" in key:
+                continue  # an overlay of a hand-written template: the module's own service needs none
             mod = _tier_module(manifest, tiers[0])
             mid = next((m for m, c in (manifest.get("modules") or {}).items() if isinstance(c, dict)
                         and str(c.get("path") or "").replace("\\", "/").strip("/") == (mod[0] if mod else None)), None)
-            profile = "prod" if any(str(s).endswith("_prod") or str(s).endswith("_prod_overlay") for s in services) else "dev"
-            if mid and any(str(s).startswith("api_") for s in services):
-                spec = {k: v for k, v in {"comment": spec.get("comment"), "manifestModule": mid, "manifestProfile": profile,
-                                         "networks": spec.get("networks")}.items() if v}
+            if not mid:
+                continue
+            spec = {k: v for k, v in {"comment": spec.get("comment"), "manifestModule": mid,
+                                      "manifestProfile": "prod" if key.endswith(".prod.yml") else "dev",
+                                      "networks": spec.get("networks") or "net_bridge"}.items() if v}
         targets[key] = spec
     doc["targets"] = targets
     doc["features"] = {**(doc.get("features") or {}), "worker": False}

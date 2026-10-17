@@ -306,6 +306,15 @@
             },
             "additionalProperties": true
           },
+          "java": {
+            "type": "object",
+            "description": "java-boot driver options (all optional; the draft fills them from the build file it finds)",
+            "additionalProperties": false,
+            "properties": {
+              "build": { "type": "string", "enum": ["maven", "gradle"], "description": "The module's build tool (default: pom.xml -> maven, build.gradle -> gradle)" },
+              "artifact": { "type": "string", "minLength": 1, "description": "The boot jar a release carries, as a glob relative to the module (default build/libs/*.jar; Maven: target/*.jar)" }
+            }
+          },
           "dotnet": {
             "type": "object",
             "description": "dotnet-aspnet driver options (all optional)",
