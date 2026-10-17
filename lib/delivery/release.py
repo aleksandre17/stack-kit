@@ -360,9 +360,9 @@ def rollback(ctx: Delivery, wanted: list[str], to: str = "") -> int:
         again = _restore(ctx, moving, before)
         after = f"the previous release is not healthy either ({'; '.join(again)})" if again \
             else "the previous release is back up"
+        stays = ", ".join(f"{k}={v or 'none'}" for k, v in before.items())  # one quote kind per level: Python 3.10
         raise DeliveryError(f"rollback to {', '.join(f'{k}={v}' for k, v in choice.items())} failed: "
-                            f"{'; '.join(failed)}; current stays "
-                            f"{', '.join(f'{k}={v or 'none'}' for k, v in before.items())} and {after}; "
+                            f"{'; '.join(failed)}; current stays {stays} and {after}; "
                             f"build log: {logs}", code)
     for s in moving:
         point(ctx, s, choice[s.id])
