@@ -154,3 +154,17 @@ def test_a_node_spa_dev_server_runs_the_script_its_module_names():
 
     assert "npm run start -- --host" in command(None)
     assert "npm run start:container -- --host" in command({"scripts": {"dev": "start:container"}})
+
+
+def test_dev_down_hands_a_releases_secrets_to_its_runtime_before_it_comes_back_up(project, tmp_path, monkeypatch):
+    # Found by a re-audit: a secret made while the workspace ran was the deploy user's, and the release
+    # it returned to ran as another uid and could not read it.
+    t = server(tmp_path)
+    ctx = ctx_for(project, t, "dev")
+    assert dev.up(ctx, ["edge"]) == 0
+    order = []
+    monkeypatch.setattr(running, "current_release", lambda c, s: "r1")
+    monkeypatch.setattr(running, "hand_over_secrets", lambda c, svc, rid: order.append(("hand", [s.id for s in svc], rid)))
+    monkeypatch.setattr(running, "up", lambda c, ids: order.append(("up", ids)))
+    assert dev.down(ctx, ["edge"]) == 0
+    assert order == [("hand", ["edge"], "r1"), ("up", ["edge"])]

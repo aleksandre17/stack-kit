@@ -94,3 +94,40 @@ def test_a_known_exposure_is_a_key_in_a_file_never_the_whole_file(tmp_path):
     found = s.tree(root, manifest)
     assert [(f.path, f.line) for f in found] == [("settings.json", 4)], "the new secret beside a known one is a finding"
     assert [(f.path, f.line) for f in s.KNOWN] == [("settings.json", 3)], "the known one is counted as known, not clean"
+
+
+def _known_fixture(tmp_path, settings: str) -> tuple[Path, dict]:
+    gate = {"id": "no-config-secret", "paths": r"\.json$",
+            "forbids": r"\"\w*Key\"\s*:\s*\"(?!__[A-Z0-9_]+__\")[^\"]{8,}\"",
+            "because": "a fixture", "instead": "a placeholder",
+            "proves": {"path": "a.json", "text": "\"Key\": \"0123456789abcdef\""},
+            "admits": {"path": "a.json", "text": "\"Key\": \"__JWT_KEY__\""}}
+    root, manifest = _repo(tmp_path, {"settings.json": settings}, {"schema_version": 1, "gates": [gate]})
+    (root / "keys.json").write_text(json.dumps({"version": 1, "keys": [], "knownExposures": [
+        {"key": "Jwt:Key", "file": "settings.json"}]}), encoding="utf-8")
+    manifest["config"] = {"keys": "keys.json"}
+    return root, manifest
+
+
+def test_a_known_leaf_is_a_whole_name_never_the_end_of_another(tmp_path):
+    # Found by a re-audit: the known `Key` also matched `"ApiKey": ...`, so a new secret was read as known.
+    root, manifest = _known_fixture(tmp_path, '{\n  "Jwt": { "Key": "0123456789abcdef" },\n  "ApiKey": "fedcba9876543210"\n}\n')
+    assert [(f.path, f.line) for f in s.tree(root, manifest)] == [("settings.json", 3)]
+    assert [(f.path, f.line) for f in s.KNOWN] == [("settings.json", 2)]
+
+
+def test_history_keeps_two_findings_of_one_commit_apart_and_counts_both_scans_known(tmp_path):
+    # Found by a re-audit: every history finding was line 0, so a known one and a new one in the same
+    # commit and file collapsed into one -- and the new secret was read as known.
+    root, manifest = _known_fixture(tmp_path, '{\n  "Jwt": { "Key": "0123456789abcdef" },\n  "ApiKey": "fedcba9876543210"\n}\n')
+    found = s.history(root, manifest)
+    assert [(f.path, f.line, f.rule) for f in found] == [("settings.json", 3, "no-config-secret")]
+    assert [(f.path, f.line) for f in s.KNOWN] == [("settings.json", 2)]
+    lines = s.main_lines(root, manifest, True)
+    assert len(lines) == 2 and len(s.KNOWN) == 2, "the tree's known and the history's known are both counted"
+
+
+def test_history_reads_a_committed_env_file_without_failing(tmp_path):
+    # Found by a re-audit: `scan --history` raised on the first committed env file it met.
+    root, manifest = _repo(tmp_path, {".env": "A=b\n"}, None)
+    assert [(f.path, f.rule) for f in s.history(root, manifest)] == [(".env", "env-file")]

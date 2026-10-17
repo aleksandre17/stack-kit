@@ -87,6 +87,18 @@ def _deploy(a: Args) -> int:
         print("  [deploy] nothing deployable in this project", file=sys.stderr)
         return 2
     env = a.value("--env") or identity.env("ENVIRONMENT") or catalogs.default_environment("deploy", manifest)
+    # The checkout it packages carries no credential-shaped value -- known before any target is opened.
+    from lib import secret_scan
+
+    try:
+        leaks = [] if a.value("--artifact") else secret_scan.tree(root, manifest)
+    except secret_scan.ScanError as e:
+        print(f"  [deploy] NOT RUN: {e}", file=sys.stderr)
+        return 2
+    if leaks:
+        print(f"  [deploy] refused: the checkout carries {len(leaks)} credential-shaped value(s) -- "
+              f"`scan secrets` names them (values are never printed)", file=sys.stderr)
+        return 5
     # The target first: a pending or unselectable one refuses before anything is built.
     from lib.delivery.context import DeliveryError
 

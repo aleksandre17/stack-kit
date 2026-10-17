@@ -163,6 +163,12 @@ def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
     shared = shared_data_sources(ctx)
     if shared:
         raise DeliveryError("refused: environments share a data source:\n  " + "\n  ".join(shared), 4)
+    from lib import secret_reach
+
+    unread = secret_reach.release_problems(ctx.root, ctx.manifest, svc, trees) if archive is not None else []
+    if unread:
+        raise DeliveryError("refused: a generated secret would be made and ignored (ADR-001 amendment 20):\n  "
+                            + "\n  ".join(unread), 5)
     for line in preflight.all_checks(ctx, [s.id for s in svc]):
         ctx.out(f"[preflight] {line}")
     for kind in ("stack", "infra", "backups"):
@@ -255,13 +261,16 @@ REMEDY = "check out commit {rid} and run `{kit} deploy {module} --env {env}` (it
 def unrunnable(ctx: Delivery, service: Service, rid: str) -> str:
     """Why release `rid` cannot run as `service` is declared now ("" when it can): a `build` service
     runs an image built from its release's own recipe, so a release without one -- made before the
-    service was built from a recipe (a UI release before 2.4.0) -- has nothing to build from."""
+    service was built from a recipe (a UI release before 2.4.0) -- has nothing to build from; and a
+    release whose code does not read the generated secret its service is given would run without it."""
     if service.kind == "build":
         recipe = posixpath.join(ctx.places.of("releases", service), rid, "Dockerfile")
         if not ctx.transport.exists(recipe):
             return (f"it carries no Dockerfile, and {service.id} is now built from its release's recipe "
                     f"(the release was made before that)")
-    return ""
+    from lib import secret_reach
+
+    return secret_reach.server_problem(ctx, service, rid)
 
 
 def _off_image(ctx: Delivery, svc: list[Service], choice: dict[str, str]) -> list[str]:
@@ -290,6 +299,8 @@ def _restore(ctx: Delivery, svc: list[Service], before: dict[str, str | None]) -
     back = [s for s in svc if before[s.id]]
     if not back or not ctx.commands["compose"]:
         return []
+    for s in back:
+        running.hand_over_secrets(ctx, [s], str(before[s.id]))  # a secret made by the attempt is the runtime's too
     r = ctx.run(ctx.compose("up", "-d", *(s.id for s in back)), check=False)
     if r.code != 0:
         return [f"up of {', '.join(s.id for s in back)}: exit {r.code}"]

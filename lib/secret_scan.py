@@ -41,6 +41,7 @@ RULES = {
 }
 PLACEHOLDER = re.compile(r"^(?:__[A-Z0-9_]+__|\$\{[^}]*\}|\$[A-Z_][A-Z0-9_]*|<[^>]*>|\{[^}]*\}|change_?me|example|xxx+|\*+|"
                          r"password|secret|pass|placeholder|redacted|dummy|test|ci|none|null)$", re.I)
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)")
 ENV_FILE = re.compile(r"(^|/)(\.env(\.[^/]+)?|[^/]+\.env)$")
 TOOLING = ("ops/", "tools/", "scripts/", "ci/")
 #: What an executable or an archive of them starts with (PE, ELF, Mach-O, zip, class files).
@@ -201,7 +202,8 @@ def _known(f: Finding, text_of, exposures: dict[str, set[str]]) -> bool:
     if not leaves:
         return False
     line = text_of(f)
-    return bool(line) and any(re.search(rf'["\']?{re.escape(leaf)}["\']?\s*[:=]', line) for leaf in leaves)
+    # the leaf as a whole name: `Key` is not `ApiKey`, so a new `"ApiKey": ...` beside a known `Key` is a finding
+    return bool(line) and any(re.search(rf'(?<![A-Za-z0-9_])["\']?{re.escape(leaf)}["\']?\s*[:=]', line) for leaf in leaves)
 
 
 def tracked_split(findings: list[Finding], text_of, exposures: dict[str, set[str]]) -> tuple[list[Finding], list[Finding]]:
@@ -247,29 +249,35 @@ def tree(root: Path, manifest: dict[str, Any]) -> list[Finding]:
 
 
 def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
-    """Every line any commit added: a secret removed from the tree is still in history."""
+    """Every line any commit added: a secret removed from the tree is still in history. Each finding
+    carries the line it was added at (the hunk's new-side start), so two in one commit and file are two --
+    a known exposure never hides a new secret added beside it (ADR-001 amendment 20)."""
     allow, known = policy(manifest)
     active = rules(root, manifest)
     ran = subprocess.run(["git", "-C", str(root), "log", "--all", "-p", "--no-color", "--unified=0", "--format=commit %H"],
                          capture_output=True)
-    found: list[Finding] = []
-    commit, path = "", ""
+    found: list[tuple[Finding, str]] = []
+    commit, path, at = "", "", 0
     for raw in ran.stdout.decode("utf-8", "replace").splitlines():
         if raw.startswith("commit "):
             commit = raw[7:19]
-        elif raw.startswith("+++ b/"):
-            path = raw[6:]
-            if ENV_FILE.search(path) and not path.endswith((".example", ".template", ".sample")):
-                found.append(Finding(path, 0, "env-file", f"commit {commit}"))
-        elif raw.startswith("+") and not raw.startswith("+++"):
-            found += [(Finding(f.path, 0, f.rule, f"commit {commit}"), raw[1:]) for f in scan_text(path, raw[1:], known, active)]
+        elif raw.startswith("+++ "):
+            path = raw[6:] if raw.startswith("+++ b/") else ""
+            if path and ENV_FILE.search(path) and not path.endswith((".example", ".template", ".sample")):
+                found.append((Finding(path, 0, "env-file", f"commit {commit}"), ""))
+        elif raw.startswith("@@"):
+            hunk = HUNK.match(raw)
+            at = int(hunk.group(1)) if hunk else 0
+        elif raw.startswith("+") and path:
+            found += [(Finding(f.path, at, f.rule, f"commit {commit}"), raw[1:]) for f in scan_text(path, raw[1:], known, active)]
+            at += 1
     documents = set(declared_documents(manifest))
     added = {f: text for f, text in found}
     left = [f for f in added if not _allowed(f, allow) and f.path not in documents]
     failing, known_found = tracked_split(left, added.get, known_exposures(root, manifest))
     KNOWN.clear()
     KNOWN.extend(known_found)
-    return sorted(set(failing), key=lambda f: (f.path, f.where, f.rule))
+    return sorted(set(failing), key=lambda f: (f.path, f.where, f.line, f.rule))
 
 
 #: The findings the last scan read as KNOWN exposures -- tracked by the catalogue to their removal.
@@ -286,7 +294,13 @@ def fingerprint(value: str) -> str:
 
 
 def main_lines(root: Path, manifest: dict[str, Any], with_history: bool) -> list[str]:
-    return report(tree(root, manifest)) + (report(history(root, manifest)) if with_history else [])
+    """The findings of the tree and, on request, its history; KNOWN then holds both scans' known ones."""
+    lines = report(tree(root, manifest))
+    if with_history:
+        in_tree = list(KNOWN)
+        lines += report(history(root, manifest))
+        KNOWN[:0] = in_tree
+    return lines
 
 
 def as_json(findings: Iterable[Finding]) -> str:

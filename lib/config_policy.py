@@ -33,6 +33,24 @@ def generate_bytes(row: dict[str, Any]) -> int:
     return int(m.group(1)) if m else 0
 
 
+def generated_rows(catalogue: dict[str, Any], folder: str, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """The catalogue keys generated for one secrets folder: each that names it (`policy.modules`), and an
+    unscoped one only in a project with one secrets folder (the catalogue check refuses it otherwise) --
+    never every module. The one reader: what is made, handed over and checked for reach is the same set."""
+    from lib.config_keys import secrets_folders
+
+    single = len(secrets_folders(manifest)) <= 1
+    out = []
+    for row in catalogue.get("keys") or []:
+        if not isinstance(row, dict) or not generate_bytes(row):
+            continue
+        policy = row.get("policy") if isinstance(row.get("policy"), dict) else {}
+        named = policy.get("modules") or []
+        if folder in named or (not named and single):
+            out.append(row)
+    return out
+
+
 def env_name(row: dict[str, Any]) -> str:
     """The one environment spelling a key is given by: its first declared `env`, else `A__B` of `A:B`."""
     import re as _re

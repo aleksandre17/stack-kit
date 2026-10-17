@@ -11,7 +11,18 @@ Both found by an independent audit of the first adopting host.
   directory of key-per-file values, else `<NAME>_FILE` -- and `reads` {glob, pattern, how}, what
   reading it looks like in code. dotnet-aspnet declares `KeyPerFile__Directory` and `AddKeyPerFile(`.
 - `validate` refuses a module given a generated secret its code never reads (`config: modules.<id>:
-  ... the secret would be made and ignored`), and warns where a driver declares no `reads`.
+  ... the secret would be made and ignored`), and one whose driver declares no `reads`.
+- `generatedSecrets.reads.built`: what reading looks like in what a release carries. Every release is
+  refused when its own built output does not read a generated secret its service is given, and
+  `rollback` refuses a release on the server that does not (one made before, which ran on a committed
+  key). dotnet-aspnet names its own assembly and `AddKeyPerFile`; java-boot and node-api now declare
+  their `<NAME>_FILE` reading (node-api also built). `reads.glob` may be a list.
+- `validate` refuses a credential-shaped value tracked in the tree, and `deploy` refuses to package a
+  checkout that carries one -- the scan blocks, not only `scan secrets`. Known exposures are a warning,
+  counted.
+- Build output tracked in a project outside every module (a test project beside the app) is refused,
+  beside that toolchain's project file; an editor's per-user state is refused
+  (`config/editor-state.json`, from github/gitignore's JetBrains and Visual Studio templates).
 - `generatedSecrets.uid`: the user a runtime's image runs as. Before the service starts, the release
   hands each generated file to that uid (0400) with the service's own image, run once as root with
   only `chown`/`chmod` and no network; the directory stays the deploy user's at 0755 (a runtime that
@@ -28,6 +39,18 @@ Both found by an independent audit of the first adopting host.
   counted ("known is not clean").
 - Docs: the dotnet-aspnet `run` reads `.env.dev` only (amendment 8); `REFERENCE.md` no longer lists the
   retired `static` field.
+- Found by a re-audit: `scan secrets --history` failed on the first committed env file; every history
+  finding was line 0, so a known one hid a new one in the same commit and file; a known leaf (`Key`)
+  matched the end of another (`ApiKey`); the KNOWN count was printed only when nothing else was found.
+- A generated value longer than 48 bytes was two lines (`openssl rand -base64` wraps; a Windows build
+  writes CRLF), and an empty one could be moved into place.
+- `dev down` and a failed rollback's restore bring a release back up only after its generated secrets
+  are handed to its runtime's uid.
+- A module can no longer override its driver's `generatedSecrets` (it could make the reach check pass
+  with a pattern anything matches), except for a service built from its own `dockerfile`.
+- The reach check skipped a host checked out under a directory named `bin`, `obj`, `dist` or
+  `node_modules` (it read the absolute path); the secrets folders and the keys a folder is given have
+  one definition each.
 
 ## 2.4.1 — 2026-10-16
 

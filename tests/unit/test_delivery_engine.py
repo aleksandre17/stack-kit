@@ -16,7 +16,8 @@ from lib.delivery import fake_server, legacy_layout, manage, preflight, release,
 from lib.delivery.context import DeliveryError, open_delivery
 from lib.delivery.transport import RecordingTransport, Result
 
-from delivery_host import FOREIGN, ROOT, commit, ctx_for, host, manifest_of, packaged, server  # noqa: E402,F401
+from delivery_host import (FOREIGN, READS_FILE, ROOT, commit, ctx_for, host, manifest_of, packaged,  # noqa: E402,F401
+                           server, with_driver)
 
 
 @pytest.fixture
@@ -332,7 +333,8 @@ def test_a_generated_secret_is_made_on_the_server_once_and_never_read_back(proje
     m = manifest_of(project)
     m["config"] = {"keys": "ops/config/keys.json"}
     (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
-    commit(project, "with a generated secret\n")
+    with_driver(project, generatedSecrets=READS_FILE)
+    commit(project, "key = read(env('DB_PASSWORD_FILE'))\n")  # the fixture's code: it reads <NAME>_FILE
     t = server(tmp_path)
     assert release.release(ctx_for(project, t), "edge", packaged(project)) == 0
     made = [e[1] for e in t.log if e[0] == "exec" and e[1][:2] == ("sh", "-c")]
@@ -354,9 +356,9 @@ def test_a_runtime_that_reads_a_directory_of_secrets_is_given_the_directory(proj
         encoding="utf-8")
     m = manifest_of(project)
     m["config"] = {"keys": "ops/config/keys.json"}
-    m["modules"]["edge"].setdefault("container", {})["generatedSecrets"] = {"directoryEnv": "KeyPerFile__Directory", "uid": 1654}
     (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
-    commit(project, "a runtime that reads a directory\n")
+    with_driver(project, generatedSecrets={"directoryEnv": "KeyPerFile__Directory", "uid": 1654, **DIRECTORY_READS})
+    commit(project, "load_secrets(env('KeyPerFile__Directory'))\n")  # the fixture's code: it loads the directory
     t = server(tmp_path)
     assert release.release(ctx_for(project, t), "edge", packaged(project)) == 0
     svc = json.loads(t.read(f"{ROOT}/shop/staging/stack/compose.yml"))["services"]["edge"]
@@ -373,11 +375,97 @@ def test_a_runtime_that_reads_a_directory_of_secrets_is_given_the_directory(proj
     assert execs.index(handed[0]) < up, "the secret is handed over before the service starts"
 
 
+def _generated_key(project, **policy) -> None:
+    (project / "ops" / "config" / "keys.json").write_text(json.dumps({"version": 1, "keys": [
+        {"key": "Jwt:Key", "env": ["Jwt__Key"], "sensitivity": "SECRET", "owner": "ops", "allowedSource": "server",
+         "rotation": "on restore", "policy": {"required": True, "generate": {"bytes": 48}, "modules": ["edge"], **policy}}]}),
+        encoding="utf-8")
+    m = manifest_of(project)
+    m["config"] = {"keys": "ops/config/keys.json"}
+    (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
+
+
+def test_a_release_whose_built_output_never_reads_its_generated_secret_is_refused(project, tmp_path):
+    # Found by a re-audit: only validate looked, at the source -- a package of another commit, or one
+    # built from code that no longer read the key, shipped and ran on whatever value it found.
+    _generated_key(project)
+    with_driver(project, generatedSecrets={"directoryEnv": "KeyPerFile__Directory", "uid": 1654, **DIRECTORY_READS})
+    commit(project, "code that never reads its key\n")
+    t = server(tmp_path)
+    with pytest.raises(DeliveryError, match="nothing this release built") as e:
+        release.release(ctx_for(project, t), "edge", packaged(project))
+    assert e.value.code == 5 and t.changes() == [], "nothing is written before its code reads the key"
+
+
+def test_a_module_cannot_declare_how_its_drivers_runtime_reads_a_secret(project):
+    # Found by a re-audit: a module could replace the driver's `reads` with a pattern anything matches.
+    from lib.delivery.model import ModelError, module_services
+
+    m = manifest_of(project)
+    m["modules"]["edge"].setdefault("container", {})["generatedSecrets"] = {"reads": {"glob": "**/*", "pattern": "."}}
+    with pytest.raises(ModelError, match="its driver's declaration"):
+        module_services(m, "edge")
+
+
+def test_a_rollback_to_a_release_that_never_read_its_generated_secret_is_judged_on_the_server(project, tmp_path):
+    # Found by a re-audit: a release made before its code read the key (one with the key committed in
+    # its settings) could be rolled back to, and would run on the committed value.
+    from types import SimpleNamespace
+
+    from lib import secret_reach
+    from lib.delivery.model import module_services
+
+    _generated_key(project)
+    with_driver(project, generatedSecrets={"directoryEnv": "KeyPerFile__Directory", **DIRECTORY_READS})
+    ctx = ctx_for(project, server(tmp_path))
+    edge = module_services(ctx.manifest, "edge")[0]
+    asked = []
+
+    def exec_(argv, **kw):
+        asked.append(argv)
+        return Result(1 if "old" in argv[-1] else 0)
+
+    probe = SimpleNamespace(root=ctx.root, manifest=ctx.manifest, places=ctx.places, transport=SimpleNamespace(exec=exec_))
+    assert secret_reach.server_problem(probe, edge, "new") == ""
+    why = secret_reach.server_problem(probe, edge, "old")
+    assert "made before its code read the generated secret" in why
+    assert asked[-1][:2] == ["grep", "-rqaE"] and "load_secrets" in asked[-1][2] and asked[-1][3] == "--include=*.bin"
+
+
+def test_a_generated_value_is_one_line_however_many_bytes(project, tmp_path):
+    # Found by a re-audit: `openssl rand -base64` wraps at 64 columns, so a 96-byte key was two lines.
+    import shutil
+
+    sh = shutil.which("sh")
+    if not sh:
+        pytest.skip("no sh on this machine")
+    _generated_key(project, generate={"bytes": 96})
+    with_driver(project, generatedSecrets={"directoryEnv": "KeyPerFile__Directory", **DIRECTORY_READS})
+    commit(project, "load_secrets(dir)\n")
+    t = server(tmp_path)
+    assert release.release(ctx_for(project, t), "edge", packaged(project)) == 0
+    made = next(e[1][2] for e in t.log if e[0] == "exec" and e[1][:2] == ("sh", "-c"))
+    out = tmp_path / "made"
+    out.mkdir()
+    script = made.replace(f"{ROOT}/shop/staging/edge/edge/runtime/generated", out.as_posix())
+    subprocess.run([sh, "-c", script], check=True)
+    value = (out / "Jwt__Key").read_bytes()
+    one_line, size = not any(c in value for c in b"\r\n"), len(value)
+    assert one_line and size == 128, "a value is never printed: only whether it is one line, and its length"
+
+
+DIRECTORY_READS = {"reads": {"glob": "**/*.code", "pattern": r"load_secrets\(", "how": "call load_secrets(dir)",
+                             "built": {"glob": "*.bin", "pattern": r"load_secrets\("}}}
+
+
 def test_a_dotnet_driver_declares_that_it_reads_a_directory_of_secrets():
     registry = json.loads((Path(__file__).resolve().parents[2] / "drivers" / "registry.json").read_text(encoding="utf-8"))
     declared = registry["dotnet-aspnet"]["container"]["generatedSecrets"]
     assert declared["directoryEnv"] == "KeyPerFile__Directory"
     assert "AddKeyPerFile" in declared["reads"]["pattern"], "what reading it looks like is declared beside it"
+    assert declared["reads"]["built"]["glob"].endswith(".dll"), "and in the assembly a release carries"
+    for driver in ("java-boot", "node-api"):
+        assert registry[driver]["container"]["generatedSecrets"]["reads"]["pattern"], driver
 
 
 def test_a_secret_reaches_only_the_modules_that_name_it(project, tmp_path):

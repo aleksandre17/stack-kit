@@ -196,6 +196,16 @@
       "probe": {
         "tcp": "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{port}' || exit 1",
         "http": "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{port} && printf \"GET {path} HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && head -n1 <&3 | grep -q \" [23][0-9][0-9] \"' || exit 1"
+      },
+      "generatedSecrets": {
+        "reads": {
+          "glob": [
+            "**/*.java",
+            "**/*.kt"
+          ],
+          "pattern": "_FILE\\b",
+          "how": "Spring Boot reads no <NAME>_FILE on its own: read the file the env var names at startup (e.g. an EnvironmentPostProcessor that, for each <NAME>_FILE, adds <NAME> with the file's content)."
+        }
       }
     },
     "dev": {
@@ -494,6 +504,26 @@
       "probe": {
         "tcp": "nc -z 127.0.0.1 {port} || exit 1",
         "http": "wget -q -O /dev/null http://127.0.0.1:{port}{path} || exit 1"
+      },
+      "generatedSecrets": {
+        "reads": {
+          "glob": [
+            "**/*.js",
+            "**/*.ts",
+            "**/*.mjs",
+            "**/*.cjs"
+          ],
+          "pattern": "_FILE\\b",
+          "how": "Node reads no <NAME>_FILE on its own: at startup, for each <NAME>_FILE, set process.env.<NAME> from fs.readFileSync(process.env.<NAME>_FILE, 'utf8').trim().",
+          "built": {
+            "glob": [
+              "**/*.js",
+              "**/*.mjs",
+              "**/*.cjs"
+            ],
+            "pattern": "_FILE\\b"
+          }
+        }
       }
     },
     "dev": {
@@ -646,7 +676,11 @@
         "reads": {
           "glob": "**/*.cs",
           "pattern": "AddKeyPerFile\\(",
-          "how": "Load it at startup: var dir = builder.Configuration[\"KeyPerFile:Directory\"]; if (!string.IsNullOrEmpty(dir)) builder.Configuration.AddKeyPerFile(dir, optional: false); -- a file named Jwt__Key becomes Jwt:Key."
+          "how": "Load it at startup: var dir = builder.Configuration[\"KeyPerFile:Directory\"]; if (!string.IsNullOrEmpty(dir)) builder.Configuration.AddKeyPerFile(dir, optional: false); -- a file named Jwt__Key becomes Jwt:Key.",
+          "built": {
+            "glob": "{dotnet.project|app.csproj|:stem}.dll",
+            "pattern": "AddKeyPerFile"
+          }
         }
       },
       "probe": {

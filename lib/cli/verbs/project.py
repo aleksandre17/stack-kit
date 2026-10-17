@@ -170,11 +170,12 @@ def _scan(a: Args) -> int:
         return 2
     for line in lines:
         print(f"  {line}")
+    known = (f"; {len(secret_scan.KNOWN)} KNOWN exposure(s) the configuration catalogue tracks to their removal "
+             f"(knownExposures) -- known is not clean" if secret_scan.KNOWN else "")
     print("  [scan] " + (f"{len(lines)} finding(s) -- values are never printed; allow one by path and rule with its reason "
                          f"(security.allow), or rotate it and list its fingerprint (security.knownLeaks)" if lines
-                         else "no credential-shaped value" + (" in the tree or its history" if a.has("--history") else " in the tree")
-                         + (f" beyond {len(secret_scan.KNOWN)} KNOWN exposure(s) the configuration catalogue tracks to "
-                            f"their removal (knownExposures) -- known is not clean" if secret_scan.KNOWN else "")))
+                         else "no credential-shaped value" + (" in the tree or its history" if a.has("--history") else " in the tree"))
+          + known)
     return 1 if lines else 0
 
 

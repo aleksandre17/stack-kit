@@ -88,6 +88,9 @@ def down(ctx: Delivery, wanted: list[str]) -> int:
     back = [s.id for s in svc if running.current_release(ctx, s)]
     gone = [s.id for s in svc if s.id not in back]
     if back:
+        for s in svc:
+            if s.id in back:
+                running.hand_over_secrets(ctx, [s], str(running.current_release(ctx, s)))
         running.up(ctx, back)
         ctx.out(f"[dev] {', '.join(back)}: back to their release")
     if gone:

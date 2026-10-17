@@ -14,7 +14,8 @@ from lib import tracked_outputs
 from lib.modules import driver_registry
 
 #: A driver no kit ships: what its toolchain writes is all the check knows of it.
-REGISTRY = {"fx-build": {"label": "a fixture toolchain", "roles": ["api"], "commands": {}, "outputs": ["bin/", "obj/"]},
+REGISTRY = {"fx-build": {"label": "a fixture toolchain", "roles": ["api"], "commands": {}, "outputs": ["bin/", "obj/"],
+                         "detect": {"all": [{"file": "*.fxproj"}]}},
             "fx-plain": {"label": "declares no outputs", "roles": ["api"], "commands": {}}}
 
 
@@ -117,3 +118,25 @@ def test_validate_refuses_a_tracked_output(tmp_path, monkeypatch):
     assert [e for e in errs if e.startswith("outputs:")] == [
         "outputs: modules.api: 1 tracked file in build output apps/api/build/ ('build/', driver java-boot) -- "
         "untrack: git rm -r --cached apps/api/build; ignore: add 'apps/api/**/build/' to .gitignore"]
+
+
+def test_a_project_outside_every_module_tracks_no_output_beside_its_project_file(tmp_path):
+    # Found by a re-audit: a test project beside the app lies outside every module, so its bin/ and
+    # obj/ were never looked at. There an output is the toolchain's only beside its project file.
+    root = _repo(tmp_path, {"apps/svc/Program.src": "x", "tests/svc/Tests.fxproj": "p", "tests/svc/bin/t.dll": "b",
+                            "tests/svc/obj/a.json": "o", "tools/bin/run.sh": "s"},
+                 track=["apps/svc/Program.src", "tests/svc", "tools/bin/run.sh"])
+    found = tracked_outputs.problems(root, _manifest(svc={}), REGISTRY)
+    assert [f.split(":")[0] for f in found] == ["tests/svc/bin/", "tests/svc/obj/"], found
+    assert "a fx-build project outside every module" in found[0]
+
+
+def test_an_editors_per_user_state_is_never_tracked_and_its_shared_settings_are(tmp_path):
+    ide = ".idea/.idea.app/.idea"
+    root = _repo(tmp_path, {f"{ide}/workspace.xml": "w", f"{ide}/dictionaries/me.xml": "d", f"{ide}/vcs.xml": "v", f"{ide}/dictionaries/project.xml": "p",
+                            f"{ide}/codeStyles/codeStyleConfig.xml": "c", "App.csproj.user": "u", "workspace.xml": "x"},
+                 track=["."])
+    found = tracked_outputs.problems(root, {}, REGISTRY)
+    assert len(found) == 2 and found[0].startswith(f"{ide}: 2 tracked editor-state files") and "App.csproj.user" in found[1]
+    assert "vcs.xml" not in found[0] and "codeStyle" not in found[0] and "project.xml" not in found[0], \
+        "what an editor shares is the team's"

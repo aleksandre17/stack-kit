@@ -303,6 +303,12 @@ def validate_manifest(
     pattern_errors, pattern_warnings = secret_scan.pattern_problems(ctx.root, ctx.manifest)
     errs.extend(f"security: {s}" for s in pattern_errors)
     warnings.extend(f"security: {s}" for s in pattern_warnings)
+    if not pattern_errors:
+        errs.extend(f"security: {f} -- a credential-shaped value is tracked (`scan secrets`; values are never printed)"
+                    for f in secret_scan.tree(ctx.root, ctx.manifest))
+        if secret_scan.KNOWN:
+            warnings.append(f"security: {len(secret_scan.KNOWN)} KNOWN exposure(s) the configuration catalogue tracks "
+                            f"to their removal (knownExposures) -- known is not clean: rotate, then remove")
     from lib import projections
 
     stale, unrendered = projections.drift(ctx.root, ctx.manifest)

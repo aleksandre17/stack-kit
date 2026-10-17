@@ -72,6 +72,20 @@ def host(tmp_path: Path, *, target_extra: dict | None = None, manifest_extra: di
     return root
 
 
+def with_driver(root: Path, **container) -> None:
+    """The fixture driver's container declaration, extended -- how its runtime reads a generated secret is
+    the driver's to declare, never a module's."""
+    p = root / "drivers" / "registry.json"
+    registry = json.loads(p.read_text(encoding="utf-8"))
+    registry["fixture-svc"]["container"].update(container)
+    p.write_text(json.dumps(registry), encoding="utf-8")
+
+
+#: How the fixture runtime reads a generated secret: its code names `<NAME>_FILE`, in source and built.
+READS_FILE = {"reads": {"glob": "**/*.code", "pattern": "_FILE", "how": "read <NAME>_FILE at startup",
+                        "built": {"glob": "*.bin", "pattern": "_FILE"}}}
+
+
 def manifest_of(root: Path) -> dict:
     return json.loads((root / identity.MANIFEST_FILENAME).read_text(encoding="utf-8"))
 

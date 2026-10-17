@@ -1126,22 +1126,52 @@ reported the tree clean over seven committed secrets and would have hidden a new
    (dotnet-aspnet: `KeyPerFile__Directory`, read with ASP.NET Core's `AddKeyPerFile`); without it, the
    `<NAME>_FILE` convention stands.
 2. *Reading it is checked, not assumed.* A driver declares what reading looks like in code
-   (`generatedSecrets.reads`: glob, pattern, how); `validate` refuses a module given a generated
-   secret when nothing in its sources matches, naming the line that would read it. A driver that
-   declares no `reads` is warned about, never passed silently.
+   (`generatedSecrets.reads`: a glob or several, a pattern, how) and in the built output a release
+   carries (`reads.built`: dotnet-aspnet's own assembly names `AddKeyPerFile`; node-api's sources are
+   its build). It is checked where that code is: `validate` on the module's source; every release on
+   its own built output -- so a package of another commit (`--artifact`) is held too; `rollback` on
+   the release on the server -- a release made before its code read the secret (one that ran on a
+   committed key) is refused, nothing changed. A driver that declares no `reads` cannot be given a
+   generated secret. A module does not override the declaration -- the checks are only as true as it
+   -- except for a service it builds from its own `dockerfile`. The check is static: it proves the code
+   names the reader, not that the reader is called; that the app starts on the generated value is the
+   host's test and the release's health. Which keys a service is given is one function
+   (`config_policy.generated_rows`) -- what is made, handed over and checked is the same set.
 2b. *The file is the runtime's.* A driver declares the uid its image runs as (`generatedSecrets.uid`);
    before `up`, the release hands each generated file to it (0400) with the service's own image, run
    as root with only `chown`/`chmod` and no network. The deploy user keeps the directory (0755 -- measured: ASP.NET's
    key-per-file LISTS it, and 0711 left the app unable to start): it sees which files exist and reads none. *Rejected:* world-readable files (any host user reads the key);
    running the service as the deploy user (the image's own unprivileged user is the one it was built
    and tested as).
-3. *A known exposure is a key in a file.* A finding is known only on the line carrying a tracked key;
-   a new secret in the same file is a finding. Known findings are counted and named -- `scan` says
-   "known is not clean" instead of "no credential-shaped value".
+3. *A known exposure is a key in a file.* A finding is known only on the line carrying a tracked key
+   -- its leaf as a whole name (`Key` is not `ApiKey`); a new secret in the same file is a finding.
+   In history, each finding carries the line it was added at, so two in one commit and file stay two.
+   Known findings are counted and named, beside findings or without them -- "known is not clean".
+4. *The scan blocks.* `validate` refuses a credential-shaped value tracked in the tree, and `deploy`
+   refuses to package a checkout that carries one, before any target is opened -- not only `scan
+   secrets`, which reports to whoever asks.
+5. *A generated value is one line.* `openssl rand -base64` wraps at 64 columns (and a Windows build
+   ends lines with CRLF): the value is joined, and an empty one is never moved into place.
+6. *What a toolchain or an editor writes is never tracked, in or out of a module* (amendment 16.12,
+   extended). A project of a used toolchain outside every module -- a test project beside the app --
+   is judged by that toolchain's outputs beside one of its project files (the files its driver's
+   `detect` names, so a `bin/` of scripts is never one); an editor's per-user state is named by
+   `config/editor-state.json`, from github/gitignore's JetBrains and Visual Studio templates (a
+   JetBrains project dictionary, `dictionaries/project.xml`, is the team's).
+
+*Found by a re-audit* (decisions 2-6 as now written): `scan --history` failed on the first committed
+env file; history findings were all line 0, so a known one hid a new one in the same commit; the leaf
+`Key` matched `ApiKey`; the scan and the reach check blocked nothing a deploy ran; a rollback could
+return to a release that ran on a committed key; a module could replace its driver's `reads` with a
+pattern anything matches; a test project's `bin/` was never looked at.
 
 **Rejected.** *Rewrite `<NAME>_FILE` into values inside the container* (an entrypoint shim): a
 second process owns the app's configuration, and the value enters the environment the convention
 exists to keep it out of. *Hard-code the kit's mount path in the app*: couples the app to the kit's
 layout; the env name is the contract. *Keep the file-wide exemption and warn*: a warning over a
-known file is the silence that hid the first one.
+known file is the silence that hid the first one. *Prove the reader is called by analysing the
+code* (a call graph per runtime): a compiler's work redone per language, and still not proof the app
+runs on the value -- the host's test and health say that. *Search the whole release for the reader*:
+a runtime's own library names it (ASP.NET's key-per-file assembly does), so the app's own built file
+is named.
 

@@ -1,0 +1,38 @@
+{
+  "$comment": "What an editor writes for one machine or one user -- never tracked (ADR-001 amendment 16.12). Taken from github/gitignore (Global/JetBrains.gitignore, VisualStudio.gitignore), the shared reference for both: `under` names a directory an editor keeps its state in and the paths inside it that are per-user or generated (what it shares -- code styles, inspection profiles, run configurations -- is not listed); `names` are per-user files wherever they are. `shared` are paths inside one that the editor itself keeps for the team -- a JetBrains project dictionary is dictionaries/project.xml; a user's is named after the user.",
+  "under": {
+    ".idea": [
+      "workspace.xml",
+      "tasks.xml",
+      "usage.statistics.xml",
+      "dictionaries/*",
+      "shelf/*",
+      "contentModel.xml",
+      "dataSources/*",
+      "dataSources.ids",
+      "dataSources.local.xml",
+      "sqlDataSources.xml",
+      "dynamic.xml",
+      "uiDesigner.xml",
+      "dbnavigator.xml",
+      "httpRequests/*",
+      "caches/*",
+      "aws.xml"
+    ],
+    ".vs": [
+      "*"
+    ]
+  },
+  "shared": {
+    ".idea": [
+      "dictionaries/project.xml"
+    ]
+  },
+  "names": [
+    "*.suo",
+    "*.user",
+    "*.userosscache",
+    "*.sln.docstates",
+    "*.userprefs"
+  ]
+}

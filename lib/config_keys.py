@@ -154,6 +154,12 @@ def file_exposures(root: Path, rel: str, secrets: list[dict[str, Any]]) -> list[
     return found
 
 
+def secrets_folders(manifest: dict[str, Any]) -> set[str]:
+    """The project's secrets folders -- each module's `secretsModule`, else its id: the one definition."""
+    return {str(m.get("secretsModule") or name) for name, m in (manifest.get("modules") or {}).items()
+            if isinstance(m, dict)}
+
+
 def check(root: Path, manifest: dict[str, Any]) -> Verdict:
     """The catalogue's shape, rotation for every secret, and no committed secret value."""
     verdict = Verdict()
@@ -173,8 +179,7 @@ def check(root: Path, manifest: dict[str, Any]) -> Verdict:
 
     verdict.failures += [f"{rel}: {e}" for e in validate(catalogue, json.loads(_SCHEMA.read_text(encoding="utf-8")))]
     rows = [r for r in catalogue.get("keys") or [] if isinstance(r, dict) and r.get("key")]
-    folders = {str(m.get("secretsModule") or name) for name, m in (manifest.get("modules") or {}).items()
-               if isinstance(m, dict)}
+    folders = secrets_folders(manifest)
     for r in rows:
         if r.get("sensitivity") == "SECRET" and not r.get("rotation"):
             verdict.failures.append(f"{rel}: {r['key']} is SECRET and declares no rotation")

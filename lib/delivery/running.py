@@ -96,28 +96,14 @@ def credential_files(ctx: Delivery, service: Service) -> dict[str, Path]:
         if folder.is_dir() else {}
 
 
-def _secrets_folders(ctx: Delivery) -> set[str]:
-    return {str(m.get("secretsModule") or name) for name, m in (ctx.manifest.get("modules") or {}).items()
-            if isinstance(m, dict)}
-
-
 def generated(ctx: Delivery, service: Service) -> dict[str, int]:
     """{env name: bytes} of the catalogue keys generated on the server for this service's folder
     (`policy.generate`): the value is made there, once, and never leaves it."""
     from lib import config_policy
-    from lib.envgen import generate_bytes
 
-    out: dict[str, int] = {}
-    for row in (config_policy.catalogue_of(ctx.root, ctx.manifest).get("keys") or []):
-        if not isinstance(row, dict) or not generate_bytes(row):
-            continue
-        policy = row.get("policy") if isinstance(row.get("policy"), dict) else {}
-        # Only the modules that name a generated secret are given it; an unscoped one only in a project
-        # with one secrets folder (the catalogue check refuses it otherwise) -- never every module.
-        named = policy.get("modules") or []
-        if service.secrets_folder in named or (not named and len(_secrets_folders(ctx)) <= 1):
-            out[config_policy.env_name(row)] = generate_bytes(row)
-    return out
+    rows = config_policy.generated_rows(config_policy.catalogue_of(ctx.root, ctx.manifest), service.secrets_folder,
+                                        ctx.manifest)
+    return {config_policy.env_name(row): config_policy.generate_bytes(row) for row in rows}
 
 
 def generate_secrets(ctx: Delivery, service: Service) -> list[str]:
@@ -130,8 +116,8 @@ def generate_secrets(ctx: Delivery, service: Service) -> list[str]:
     for name, size in sorted(generated(ctx, service).items()):
         f = shlex.quote(posixpath.join(base, name))
         ctx.run(["sh", "-c", f"umask 077; mkdir -p {shlex.quote(base)}; [ -s {f} ] || "
-                             f"{{ (openssl rand -base64 {size} 2>/dev/null || head -c {size} /dev/urandom | base64 | tr -d '\\n')"
-                             f" > {f}.tmp && mv {f}.tmp {f}; }}"])
+                             f"{{ (openssl rand -base64 {size} 2>/dev/null || head -c {size} /dev/urandom | base64)"
+                             f" | tr -d '\\r\\n' > {f}.tmp && [ -s {f}.tmp ] && mv {f}.tmp {f}; }}"])
         made.append(name)
     return made
 

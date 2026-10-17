@@ -28,7 +28,11 @@ if (!string.IsNullOrEmpty(keyPerFile))
     builder.Configuration.AddKeyPerFile(keyPerFile, optional: false);  // Jwt__Key -> Jwt:Key
 ```
 
-`validate` refuses a module given a generated secret when no `AddKeyPerFile(` appears in its sources.
+`validate` refuses a module given a generated secret when no `AddKeyPerFile(` appears in its sources;
+a release is refused when its own assembly (`<project>.dll`) does not name `AddKeyPerFile`, and a
+rollback to a release on the server that does not (one made before it read the key) is refused. The
+check proves the code names the reader; a test of the host proves it is called (a host built with
+`WebApplicationFactory`, `KeyPerFile__Directory` set and no other key, starts).
 The image runs as `app` (uid 1654), so before the service starts each generated file is handed to
 that uid (mode 0400) by the service's own image -- the deploy user keeps the directory (0755: key-per-file
 lists it) and never reads a value back.
