@@ -620,7 +620,7 @@ points it requires.
 | `init-ops-compose-infra-docker-composeprodyml` | laid down by init: ops/compose/infra/docker-compose.prod.yml | `ops/compose/infra/docker-compose.prod.yml` | one | yes |
 | `init-ops-compose-stack-readmemd` | laid down by init: ops/compose/stack/README.md | `ops/compose/stack/README.md` | one | yes |
 | `init-ops-config-envexample` | laid down by init: ops/config/.env.example | `ops/config/.env.example` | one | yes |
-| `init-ops-config-gitignore` | laid down by init: ops/config/.gitignore | `ops/config/.gitignore` | one | yes |
+| `init-ops-config-gitignore` | laid down by init: the secrets root's .gitignore (real values ignored, every *.example kept) | `{secrets|ops/config}/.gitignore` | one | yes |
 | `init-ops-config-readmemd` | laid down by init: ops/config/README.md | `ops/config/README.md` | one | yes |
 | `init-ops-config-backend-envexample` | laid down by init: ops/config/backend/.env.example | `{secrets|ops/config}/<secrets:backend>/.env.example` | one | yes |
 | `init-ops-config-frontend-envexample` | laid down by init: ops/config/frontend/.env.example | `{secrets|ops/config}/<secrets:frontend>/.env.example` | one | yes |
