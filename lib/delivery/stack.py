@@ -106,8 +106,16 @@ def service_document(service: Service, *, project: str, environment: str, target
                 environment_vars[cred["envVar"]] = cred["mount"]
     if generated:
         volumes.append(f"{posixpath.join(unit['runtime'], 'generated')}:{d['generatedMount']}:ro")
-        for name in generated:  # the *_FILE convention: the app reads the file, the value never enters an env file
-            environment_vars[f"{name}_FILE"] = posixpath.join(d["generatedMount"], name)
+        # How the app reads a generated secret is its driver's declaration, never this module's: a runtime
+        # that loads a directory of key-per-file values (ASP.NET Core) is handed the directory under the
+        # env name it declares; every other one gets the <NAME>_FILE convention. Either way the value
+        # never enters an env file.
+        directory_env = (spec.get("generatedSecrets") or {}).get("directoryEnv")
+        if directory_env:
+            environment_vars[directory_env] = d["generatedMount"]
+        else:
+            for name in generated:
+                environment_vars[f"{name}_FILE"] = posixpath.join(d["generatedMount"], name)
     if spec.get("logs") and unit:
         volumes.append(f"{unit['logs']}:{spec['logs']}")
     for name, mount in sorted((spec.get("volumes") or {}).items()):

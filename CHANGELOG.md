@@ -1,5 +1,28 @@
 # Changelog — stack-kit
 
+## 2.5.0 — 2026-10-17
+
+A generated secret reaches the app, and a known exposure is a key, not a file (ADR-001 amendment 20).
+Both found by an independent audit of the first adopting host.
+
+### Added
+
+- `generatedSecrets` (a service field): how a runtime reads a generated secret -- `directoryEnv` for a
+  directory of key-per-file values, else `<NAME>_FILE` -- and `reads` {glob, pattern, how}, what
+  reading it looks like in code. dotnet-aspnet declares `KeyPerFile__Directory` and `AddKeyPerFile(`.
+- `validate` refuses a module given a generated secret its code never reads (`config: modules.<id>:
+  ... the secret would be made and ignored`), and warns where a driver declares no `reads`.
+
+### Fixed
+
+- The dotnet-aspnet driver handed a generated secret as `<NAME>_FILE`, which ASP.NET Core does not
+  read: the app kept whatever value it found elsewhere.
+- `scan secrets` no longer drops every finding in a file listed in `knownExposures`: a finding is known
+  only on the line of a tracked key, a new secret beside it is a finding, and known findings are
+  counted ("known is not clean").
+- Docs: the dotnet-aspnet `run` reads `.env.dev` only (amendment 8); `REFERENCE.md` no longer lists the
+  retired `static` field.
+
 ## 2.4.1 — 2026-10-16
 
 `release rollback` is a transaction, and never reports a success it is not (ADR-001 amendment 19).

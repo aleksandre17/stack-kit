@@ -1110,3 +1110,32 @@ run that commit again it deploys it.
 proves: an incompatible release refused with no change; a failed build, an unhealthy release and a
 container left on the new image each restore the previous `current` and its container and exit
 non-zero naming the build log; a good rollback links `current` only after the last `up`.
+
+## Amendment 20 — a generated secret reaches the app, and a known exposure is a key, not a file (2026-10-17, owner-delegated)
+
+**Context.** An independent audit of the first adopting host found two failures every check had
+passed over. (a) The kit generated a JWT key on the server and handed it as `Jwt__Key_FILE`; ASP.NET
+Core reads no `<NAME>_FILE`, so the app took the key it found in a committed `appsettings.json` and
+signed its tokens with it -- a forgeable identity on a live environment, green everywhere. (b) `scan
+secrets` dropped every finding in a file the configuration catalogue tracks (`knownExposures`), so it
+reported the tree clean over seven committed secrets and would have hidden a new one beside them.
+
+**Decision.**
+1. *How a runtime reads a generated secret is its driver's declaration* (`generatedSecrets`, a service
+   field at every level): `directoryEnv` names one env var given the directory of key-per-file values
+   (dotnet-aspnet: `KeyPerFile__Directory`, read with ASP.NET Core's `AddKeyPerFile`); without it, the
+   `<NAME>_FILE` convention stands.
+2. *Reading it is checked, not assumed.* A driver declares what reading looks like in code
+   (`generatedSecrets.reads`: glob, pattern, how); `validate` refuses a module given a generated
+   secret when nothing in its sources matches, naming the line that would read it. A driver that
+   declares no `reads` is warned about, never passed silently.
+3. *A known exposure is a key in a file.* A finding is known only on the line carrying a tracked key;
+   a new secret in the same file is a finding. Known findings are counted and named -- `scan` says
+   "known is not clean" instead of "no credential-shaped value".
+
+**Rejected.** *Rewrite `<NAME>_FILE` into values inside the container* (an entrypoint shim): a
+second process owns the app's configuration, and the value enters the environment the convention
+exists to keep it out of. *Hard-code the kit's mount path in the app*: couples the app to the kit's
+layout; the env name is the contract. *Keep the file-wide exemption and warn*: a warning over a
+known file is the silence that hid the first one.
+

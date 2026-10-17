@@ -287,6 +287,12 @@ def validate_manifest(
 
     errs.extend(f"config: {f}" for f in runtime_config_problems(ctx.root, ctx.manifest))
     warnings.extend(f"config: {k}" for k in keys.known)
+    # A generated secret reaches the app only if its code reads it (amendment 20): checked, not assumed.
+    from lib import secret_reach
+
+    reach_errors, reach_warnings = secret_reach.problems(ctx.root, ctx.manifest)
+    errs.extend(f"config: {p}" for p in reach_errors)
+    warnings.extend(f"config: {p}" for p in reach_warnings)
     warnings.extend(f"config: {s}" for s in _shared_data_sources(ctx))
     # Build output is never tracked: each driver declares what its toolchain writes (amendment 16.12).
     from lib import tracked_outputs

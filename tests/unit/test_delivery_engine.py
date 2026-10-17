@@ -345,6 +345,33 @@ def test_a_generated_secret_is_made_on_the_server_once_and_never_read_back(proje
 
 
 
+def test_a_runtime_that_reads_a_directory_of_secrets_is_given_the_directory(project, tmp_path):
+    # Found by an audit: ASP.NET Core reads no <NAME>_FILE, so a generated key handed that way never reached
+    # the app and a committed one signed its tokens. The driver now declares how its runtime reads them.
+    (project / "ops" / "config" / "keys.json").write_text(json.dumps({"version": 1, "keys": [
+        {"key": "Jwt:Key", "env": ["Jwt__Key"], "sensitivity": "SECRET", "owner": "ops", "allowedSource": "server",
+         "rotation": "on restore", "policy": {"required": True, "generate": {"bytes": 48}, "modules": ["edge"]}}]}),
+        encoding="utf-8")
+    m = manifest_of(project)
+    m["config"] = {"keys": "ops/config/keys.json"}
+    m["modules"]["edge"].setdefault("container", {})["generatedSecrets"] = {"directoryEnv": "KeyPerFile__Directory"}
+    (project / identity.MANIFEST_FILENAME).write_text(json.dumps(m), encoding="utf-8")
+    commit(project, "a runtime that reads a directory\n")
+    t = server(tmp_path)
+    assert release.release(ctx_for(project, t), "edge", packaged(project)) == 0
+    svc = json.loads(t.read(f"{ROOT}/shop/staging/stack/compose.yml"))["services"]["edge"]
+    assert svc["environment"]["KeyPerFile__Directory"] == "/run/stack-kit/generated"
+    assert "Jwt__Key_FILE" not in svc["environment"]
+    assert f"{ROOT}/shop/staging/edge/edge/runtime/generated:/run/stack-kit/generated:ro" in svc["volumes"]
+
+
+def test_a_dotnet_driver_declares_that_it_reads_a_directory_of_secrets():
+    registry = json.loads((Path(__file__).resolve().parents[2] / "drivers" / "registry.json").read_text(encoding="utf-8"))
+    declared = registry["dotnet-aspnet"]["container"]["generatedSecrets"]
+    assert declared["directoryEnv"] == "KeyPerFile__Directory"
+    assert "AddKeyPerFile" in declared["reads"]["pattern"], "what reading it looks like is declared beside it"
+
+
 def test_a_secret_reaches_only_the_modules_that_name_it(project, tmp_path):
     # Least privilege: in a project with more than one secrets folder, an unscoped generated secret
     # is given to no service, and the catalogue check refuses an unscoped SECRET outright.

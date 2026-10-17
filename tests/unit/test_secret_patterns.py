@@ -75,3 +75,22 @@ def test_a_declared_gate_that_groups_the_key_name_still_finds_the_value(tmp_path
                                       "b.json": "\"d\": \"Server=x;Password=__DB_PASSWORD__;\""},
                            {"schema_version": 1, "gates": [gate]})
     assert [(f.path, f.rule) for f in s.tree(root, manifest)] == [("a.json", "no-connection-string-password")]
+
+
+def test_a_known_exposure_is_a_key_in_a_file_never_the_whole_file(tmp_path):
+    # Found by an audit: the scan dropped every finding in a file the catalogue tracked, so it reported
+    # the tree clean over seven committed secrets -- and would have hidden a new one beside them.
+    gate = {"id": "no-connection-string-password", "paths": ".*",
+            "forbids": r"(?i)[;\"'>]\s*(password|pwd)\s*=\s*(?!__[A-Z0-9_]+__)[^;\"'\s]+",
+            "because": "a fixture", "instead": "a placeholder",
+            "proves": {"path": "a.json", "text": "\"d\": \"Server=x;Password=hunter2;\""},
+            "admits": {"path": "a.json", "text": "\"d\": \"Server=x;Password=__DB_PASSWORD__;\""}}
+    settings = ('{\n  "ConnectionStrings": {\n    "Known": "Server=x;Password=hunter2;",\n'
+                '    "Added": "Server=y;Password=tiger3;"\n  }\n}\n')
+    root, manifest = _repo(tmp_path, {"settings.json": settings}, {"schema_version": 1, "gates": [gate]})
+    (root / "keys.json").write_text(json.dumps({"version": 1, "keys": [], "knownExposures": [
+        {"key": "ConnectionStrings:Known", "file": "settings.json"}]}), encoding="utf-8")
+    manifest["config"] = {"keys": "keys.json"}
+    found = s.tree(root, manifest)
+    assert [(f.path, f.line) for f in found] == [("settings.json", 4)], "the new secret beside a known one is a finding"
+    assert [(f.path, f.line) for f in s.KNOWN] == [("settings.json", 3)], "the known one is counted as known, not clean"

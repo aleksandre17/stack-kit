@@ -29,7 +29,7 @@ DEFAULTS = KIT / "config" / "delivery.json"
 SERVICE_FIELDS = ("template", "dockerfile", "serverConfig", "webRoot", "image", "port", "command", "entry", "healthcheck",
                   "environment", "volumes", "logs", "serve", "dependsOn", "healthWait", "keep", "context",
                   "artifact", "artifactExclude", "networks", "tier", "healthPath", "probe", "proxy", "builtChecks",
-                  "allowBaked")
+                  "allowBaked", "generatedSecrets")
 #: The fields a remote-dev declaration may carry -- driver `dev`, module `dev` -- a later level winning.
 DEV_FIELDS = ("image", "command", "build", "port", "debugPort", "caches", "excludes", "reactions", "watch",
               "environment", "debounceMs")

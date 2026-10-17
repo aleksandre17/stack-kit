@@ -174,17 +174,41 @@ def scan_path(path: str, data: bytes, known: set[str] | None = None, active: lis
     return found + scan_text(path, data.decode("utf-8", "replace"), known, active)
 
 
-def known_exposures(root: Path, manifest: dict[str, Any]) -> set[str]:
-    """Files the configuration catalogue already tracks to their removal (`knownExposures`): reported
-    there, with their work, and not failed twice."""
+def known_exposures(root: Path, manifest: dict[str, Any]) -> dict[str, set[str]]:
+    """file -> the KEYS the configuration catalogue tracks to their removal there (`knownExposures`).
+
+    A known exposure is a key in a file, never the file: a finding is known only on the line that
+    carries that key (its leaf name, quoted, followed by a colon), so a NEW secret added to the same
+    file is still a finding (ADR-001 amendment 20 -- the scan once dropped every finding in such a file
+    and reported the tree clean over seven committed secrets)."""
     rel = (manifest.get("config") or {}).get("keys")
     p = root / str(rel) if rel else None
     if not p or not p.is_file():
-        return set()
+        return {}
     try:
-        return {str(e.get("file")) for e in json.loads(p.read_text(encoding="utf-8-sig")).get("knownExposures") or []}
+        rows = json.loads(p.read_text(encoding="utf-8-sig")).get("knownExposures") or []
     except ValueError:
-        return set()
+        return {}
+    out: dict[str, set[str]] = {}
+    for row in rows:
+        if isinstance(row, dict) and row.get("file") and row.get("key"):
+            out.setdefault(str(row["file"]), set()).add(str(row["key"]).replace("__", ":").split(":")[-1])
+    return out
+
+
+def _known(f: Finding, text_of, exposures: dict[str, set[str]]) -> bool:
+    leaves = exposures.get(f.path)
+    if not leaves:
+        return False
+    line = text_of(f)
+    return bool(line) and any(re.search(rf'["\']?{re.escape(leaf)}["\']?\s*[:=]', line) for leaf in leaves)
+
+
+def tracked_split(findings: list[Finding], text_of, exposures: dict[str, set[str]]) -> tuple[list[Finding], list[Finding]]:
+    """(findings, known): a finding on a line the catalogue tracks is KNOWN -- counted and named as such,
+    never reported clean and never failed twice."""
+    known = [f for f in findings if _known(f, text_of, exposures)]
+    return [f for f in findings if f not in known], known
 
 
 def _allowed(f: Finding, allow: list[dict[str, Any]]) -> bool:
@@ -207,8 +231,19 @@ def tree(root: Path, manifest: dict[str, Any]) -> list[Finding]:
         p = root / rel
         if p.is_file() and p.stat().st_size < 2_000_000:
             found += scan_path(rel, p.read_bytes(), known, active)
-    tracked = known_exposures(root, manifest) | set(declared_documents(manifest))  # a gate document carries its calibration
-    return [f for f in found if not _allowed(f, allow) and f.path not in tracked]
+    documents = set(declared_documents(manifest))  # a gate document carries its calibration
+    lines: dict[str, list[str]] = {}
+
+    def text_of(f: Finding) -> str:
+        if f.path not in lines:
+            lines[f.path] = (root / f.path).read_text(encoding="utf-8", errors="replace").splitlines()
+        return lines[f.path][f.line - 1] if 0 < f.line <= len(lines[f.path]) else ""
+
+    left = [f for f in found if not _allowed(f, allow) and f.path not in documents]
+    failing, known = tracked_split(left, text_of, known_exposures(root, manifest))
+    KNOWN.clear()
+    KNOWN.extend(known)
+    return failing
 
 
 def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
@@ -227,9 +262,18 @@ def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
             if ENV_FILE.search(path) and not path.endswith((".example", ".template", ".sample")):
                 found.append(Finding(path, 0, "env-file", f"commit {commit}"))
         elif raw.startswith("+") and not raw.startswith("+++"):
-            found += [Finding(f.path, 0, f.rule, f"commit {commit}") for f in scan_text(path, raw[1:], known, active)]
-    tracked = known_exposures(root, manifest) | set(declared_documents(manifest))
-    return sorted({f for f in found if not _allowed(f, allow) and f.path not in tracked}, key=lambda f: (f.path, f.where, f.rule))
+            found += [(Finding(f.path, 0, f.rule, f"commit {commit}"), raw[1:]) for f in scan_text(path, raw[1:], known, active)]
+    documents = set(declared_documents(manifest))
+    added = {f: text for f, text in found}
+    left = [f for f in added if not _allowed(f, allow) and f.path not in documents]
+    failing, known_found = tracked_split(left, added.get, known_exposures(root, manifest))
+    KNOWN.clear()
+    KNOWN.extend(known_found)
+    return sorted(set(failing), key=lambda f: (f.path, f.where, f.rule))
+
+
+#: The findings the last scan read as KNOWN exposures -- tracked by the catalogue to their removal.
+KNOWN: list[Finding] = []
 
 
 def report(findings: Iterable[Finding]) -> list[str]:

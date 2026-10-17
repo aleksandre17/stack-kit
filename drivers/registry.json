@@ -640,6 +640,14 @@
       "template": "container/Dockerfile",
       "port": 8080,
       "entry": "{dotnet.project|app.csproj|:stem}.dll",
+      "generatedSecrets": {
+        "directoryEnv": "KeyPerFile__Directory",
+        "reads": {
+          "glob": "**/*.cs",
+          "pattern": "AddKeyPerFile\\(",
+          "how": "Load it at startup: var dir = builder.Configuration[\"KeyPerFile:Directory\"]; if (!string.IsNullOrEmpty(dir)) builder.Configuration.AddKeyPerFile(dir, optional: false); -- a file named Jwt__Key becomes Jwt:Key."
+        }
+      },
       "probe": {
         "tcp": "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{port}' || exit 1",
         "http": "bash -c 'exec 3<>/dev/tcp/127.0.0.1/{port} && printf \"GET {path} HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && head -n1 <&3 | grep -q \" [23][0-9][0-9] \"' || exit 1"

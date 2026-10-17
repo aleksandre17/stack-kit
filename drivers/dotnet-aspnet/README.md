@@ -7,7 +7,7 @@ Runtime: PowerShell (Windows PowerShell 5.1+ or pwsh).
 
 | Command | What it does |
 |---|---|
-| `run` | Shared hybrid runner: imports `<secrets>/<secretsModule>/.env.prod` then `.env.dev` into the process, then `dotnet run --project <project> [--launch-profile <p>]` (declared as `hybrid.script` in `drivers/registry.json`) |
+| `run` | Shared hybrid runner: imports `<secrets>/<secretsModule>/.env.dev` into the process -- a development run never reads production configuration (ADR-001 amendment 8) -- then `dotnet run --project <project> [--launch-profile <p>]` (declared as `hybrid.script` in `drivers/registry.json`) |
 | `check` | Pre-flight: dotnet SDK, module path, resolvable project file, secrets dir / `.env.dev` (warnings) |
 | `package` | `dotnet publish` into the kit's staging directory (`-Output {out}`), verifies the declared `publishExpect` paths, writes `release.json`; `stack-kit package <module>` then archives it with its provenance |
 | `deploy` (`deliver release`) | the kit's release: `container/Dockerfile` runs the published assembly (`{dotnet.project}` stem) on the ASP.NET runtime of the module's `toolchain.version`, internal port 8080 |
@@ -16,6 +16,19 @@ Runtime: PowerShell (Windows PowerShell 5.1+ or pwsh).
 ASP.NET Core reads configuration from environment variables with `__` as the section separator,
 so `ConnectionStrings__DefaultConnection=...` in `.env.dev` reaches the app without being written
 into a tracked `appsettings.*.json`.
+
+A **generated** secret (a catalogue key with `generate`) never enters an env file. On the server it is
+a file in a read-only directory, and the container is told the directory as `KeyPerFile__Directory`
+(this driver's `generatedSecrets`). ASP.NET Core reads no `<NAME>_FILE`, so the app loads the
+directory itself -- once, at startup:
+
+```csharp
+var keyPerFile = builder.Configuration["KeyPerFile:Directory"];
+if (!string.IsNullOrEmpty(keyPerFile))
+    builder.Configuration.AddKeyPerFile(keyPerFile, optional: false);  // Jwt__Key -> Jwt:Key
+```
+
+`validate` refuses a module given a generated secret when no `AddKeyPerFile(` appears in its sources.
 
 ## Manifest
 

@@ -12,7 +12,7 @@ one home of every runtime key. Each key declares:
 | `policy.required` | where it must be set; a secret not required in an environment is left unset there |
 | `default`, `environments` | non-secret values, one per environment |
 | `dataSource: true` | it names a store; each environment's store is compared, and `none` writes an unroutable sentinel so the app can never reach a real store |
-| `generate: random:<bytes>` | made by the kit: locally into an ignored env file, and on the server once (umask 077, never read back), given to the app as `<NAME>_FILE` |
+| `generate: random:<bytes>` | made by the kit: locally into an ignored env file, and on the server once (umask 077, never read back), handed to the app in the form its driver declares (`generatedSecrets`): a directory of key-per-file values under one env name (ASP.NET Core: `KeyPerFile__Directory`), or `<NAME>_FILE`. `validate` refuses a module given a generated secret its code never reads -- a secret made and ignored leaves the app on whatever value it finds elsewhere |
 
 ## Env files
 
