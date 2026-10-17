@@ -169,10 +169,16 @@ if (-not $SkipSeed) {
             Write-Host "  [warn] ci_prepare seed failed" -ForegroundColor Yellow
         }
     }
-    $nginxEx = (Get-ManifestField "adapters.nginx.envExample") -replace '/', '\'
-    $nginxTg = (Get-ManifestField "adapters.nginx.env") -replace '/', '\'
-    if ($nginxEx -and $nginxTg) {
-        Copy-IfMissing -ExampleRel $nginxEx -TargetRel $nginxTg -Optional:$true -Force:$ForceExamples
+    # The ui module's nginx env, where init laid its example -- the same reading the checklist names
+    # (lib/init_checklist.py), never the scaffold's folder names.
+    $py = Get-StackKitPythonArgs
+    if ($py) {
+        $env:PYTHONPATH = $PackageRoot
+        $pair = Invoke-StackKitPythonExe $py "-B" (Join-Path $PackageRoot "lib\init_checklist.py") "--nginx"
+        if ($pair) {
+            $nginxEx, $nginxTg = ($pair | Select-Object -First 1) -split '\|'
+            Copy-IfMissing -ExampleRel ($nginxEx -replace '/', '\') -TargetRel ($nginxTg -replace '/', '\') -Optional:$true -Force:$ForceExamples
+        }
     }
 }
 

@@ -30,9 +30,21 @@ def items(root: Path, manifest: dict[str, Any]) -> list[tuple[str, list[str]]]:
         for env in ("dev", "prod"):
             out.append((f"{secrets}/{folder}/.env.{env}", HINTS.get(role, [])))
     if ui:
-        declared = ((manifest.get("adapters") or {}).get("nginx") or {}).get("env")
-        out.append((str(declared or f"{secrets}/{ui}/nginx.env"), ["NGINX_FRAME_ANCESTORS"]))
+        out.append((nginx_env(manifest)[1], ["NGINX_FRAME_ANCESTORS"]))
     return out
+
+
+def nginx_env(manifest: dict[str, Any]) -> "tuple[str, str] | None":
+    """(example, env file) of the ui module's nginx env: the manifest's own, else in the ui module's
+    secrets folder -- where init lays the example."""
+    secrets = str(manifest.get("secrets") or "ops/config").strip("/")
+    ui = next((str(c.get("secretsModule") or m) for m, c in (manifest.get("modules") or {}).items()
+               if isinstance(c, dict) and c.get("role") == "ui"), None)
+    if not ui:
+        return None
+    declared = (manifest.get("adapters") or {}).get("nginx") or {}
+    env = str(declared.get("env") or f"{secrets}/{ui}/nginx.env")
+    return str(declared.get("envExample") or f"{env}.example"), env
 
 
 def existing_ci(root: Path, manifest: dict[str, Any]) -> list[str]:
@@ -67,6 +79,11 @@ def main() -> int:
     from lib.project_context import ProjectContext
 
     ctx = ProjectContext.discover()
+    if "--nginx" in sys.argv[1:]:
+        pair = nginx_env(ctx.manifest)
+        if pair:
+            print("|".join(pair))
+        return 0
     print("\n".join(lines(ctx.root, ctx.manifest)))
     return 0
 

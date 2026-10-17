@@ -23,3 +23,9 @@ def test_the_checklist_names_the_ci_the_repository_already_had(tmp_path):
     said = init_checklist.lines(tmp_path, {"modules": {}})
     assert any("build.yml -- this repository's own CI, kept beside .github/workflows/ci.yml" in line for line in said)
     assert not any("ci.yml --" in line for line in said), "the generated one is not named against itself"
+
+
+def test_the_ui_nginx_env_is_seeded_from_where_init_laid_its_example():
+    manifest = {"modules": {"web": {"type": "node-vite", "role": "ui", "path": "web"}}}
+    assert init_checklist.nginx_env(manifest) == ("ops/config/web/nginx.env.example", "ops/config/web/nginx.env")
+    assert init_checklist.nginx_env({"modules": {}}) is None
