@@ -92,11 +92,15 @@ def _markers(entry: dict[str, Any]) -> list[str]:
 
 
 def outside_modules(files: list[str], bases: dict[str, str], types: dict[str, str],
-                    registry: dict[str, Any]) -> list[str]:
-    """Every output a project outside every module tracks: a directory a used toolchain writes, beside one
-    of that toolchain's project files."""
+                    registry: dict[str, Any], root: "Path | None" = None) -> list[str]:
+    """Every output a project outside every module tracks: a directory a used toolchain writes, in a
+    directory where that toolchain's whole detection holds (its driver's `detect`) -- a `package.json`
+    alone is not a web app, and a committed `dist/` beside it (a JavaScript action) is not its output."""
+    from lib import draft
+
     toolchains = [(typ, [o for o in (registry.get(typ) or {}).get("outputs") or [] if o.endswith("/")],
                    _markers(registry.get(typ) or {})) for typ in sorted(set(types.values()))]
+    detects = {typ: (registry.get(typ) or {}).get("detect") or {} for typ in types.values()}
     names: dict[str, set[str]] = {}
     for rel in files:
         parent, _, name = rel.rpartition("/")
@@ -109,7 +113,8 @@ def outside_modules(files: list[str], bases: dict[str, str], types: dict[str, st
         for k in range(len(parts) - 1):
             parent = "/".join(parts[:k])
             found = next((typ for typ, outputs, markers in toolchains if parts[k] + "/" in outputs
-                          and any(fnmatch.fnmatch(n, m) for m in markers for n in names.get(parent, ()))), None)
+                          and any(fnmatch.fnmatch(n, m) for m in markers for n in names.get(parent, ()))
+                          and (root is None or draft.detected(root, files, parent, detects[typ]))), None)
             if found:
                 where = "/".join(parts[:k + 1])
                 hits[(where, found)] = hits.get((where, found), 0) + 1
@@ -179,4 +184,4 @@ def problems(root: Path, manifest: dict[str, Any], registry: dict[str, Any],
         out.append(f"modules.{mid}: {count} tracked {noun} in build output {path}{'/' if is_dir else ''} "
                    f"('{pattern}', {owner}) -- untrack: git rm -r --cached {path}; ignore: add '{ignore}' to .gitignore")
     types = {mid: str(cfg.get("type") or "") for mid, cfg in modules.items()}
-    return out + outside_modules(files, bases, types, registry) + editor_state(files)
+    return out + outside_modules(files, bases, types, registry, root) + editor_state(files)

@@ -106,7 +106,7 @@ def module_services(manifest: dict[str, Any], module_id: str) -> list[Service]:
                              f"`template` with its `serverConfig`); remove the field")
         kind = "image" if spec.get("image") and not spec.get("template") and not spec.get("dockerfile") else "build"
         own = {**(cfg.get("container") or {}), **(declared.get(sid) or {})}
-        if "generatedSecrets" in own and kind == "build" and not spec.get("dockerfile"):
+        if "generatedSecrets" in own and not own.get("dockerfile"):
             raise ModelError(f"modules.{module_id} ({typ}): service '{sid}' declares `generatedSecrets` -- how a "
                              f"runtime reads a generated secret is its driver's declaration, and the checks that it "
                              f"is read are only as true as that; declare it with the module's own `dockerfile`, or "

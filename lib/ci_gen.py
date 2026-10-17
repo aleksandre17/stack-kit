@@ -295,7 +295,8 @@ def render(ctx: ProjectContext) -> str:
 
         data = deploy_targets.load(ctx.root, manifest) or {}
         secrets_root = str(manifest.get("secrets") or "ops/config").rstrip("/")
-        previous: list[str] = [re.sub(r"[^A-Za-z0-9_-]", "-", m) for m in promoted]
+        # the first deploy waits for the secret scan too -- the later ones wait for it through it
+        previous: list[str] = ["secrets", *(re.sub(r"[^A-Za-z0-9_-]", "-", m) for m in promoted)]
         for env in catalogs.ids("environments", manifest):
             name = chosen[env]
             target = data["targets"][name]

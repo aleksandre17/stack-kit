@@ -51,6 +51,23 @@ Both found by an independent audit of the first adopting host.
 - The reach check skipped a host checked out under a directory named `bin`, `obj`, `dist` or
   `node_modules` (it read the absolute path); the secrets folders and the keys a folder is given have
   one definition each.
+- Found by a third audit:
+  - A known exposure is the VALUE at a tracked key path (in a JSON document; elsewhere, the key's own
+    line), compared against the value each finding matched. A new secret under another key with the same
+    leaf, or inside another value, is a finding. A line with several secrets yields several findings (it
+    yielded only the first).
+  - `deploy --artifact` -- the path generated CI takes -- scans the checkout too, and the first deploy job
+    waits for the secret scan.
+  - node-api (uid 1000) and java-boot (uid 10001) are handed their generated secrets.
+  - Their `reads` pattern names each key (`@env@_FILE`, or a generic `endsWith("_FILE")` loader), so a
+    `LOG_FILE` is not a reader.
+  - The `generatedSecrets` override guard holds whatever kind the service is.
+  - An automatic rollback never returns to a release that cannot run.
+  - Outside every module a toolchain's project is where its driver's whole `detect` holds (a
+    `package.json` beside a committed JavaScript action is not a web app).
+  - The scan reads UTF-16 files, names git quotes, and files marked `-diff`. The built-in set knows AWS
+    keys, GitHub tokens and a password named first.
+  - `editor-state.json` gains the rest of the JetBrains template.
 
 ## 2.4.1 — 2026-10-16
 

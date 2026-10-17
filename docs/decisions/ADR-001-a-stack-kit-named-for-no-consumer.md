@@ -1159,6 +1159,17 @@ reported the tree clean over seven committed secrets and would have hidden a new
    `config/editor-state.json`, from github/gitignore's JetBrains and Visual Studio templates (a
    JetBrains project dictionary, `dictionaries/project.xml`, is the team's).
 
+7. *A known exposure is a value, not a name* (decision 3, as a third audit found it). In a JSON document
+   a finding is known only when the value it matched is the value at a tracked key path; elsewhere only
+   on that key's own line. Every match on a line is a finding.
+8. *Each key is read by name.* A driver's reading may name the key (`@env@` is each generated key's env
+   name), so a reader of another `X_FILE` reads nothing of this one; a directory loader reads them all.
+
+**Limits, said.** The reach check is static (decision 2). java-boot's release is held by its source alone:
+a jar is compressed, and it declares no `built` reading. A value generated wrapped by an earlier release
+is never re-made (a generated value is never replaced): rotate it. Files of 2 MB or more are not scanned.
+A tracked tree outside a repository is not scanned.
+
 *Found by a re-audit* (decisions 2-6 as now written): `scan --history` failed on the first committed
 env file; history findings were all line 0, so a known one hid a new one in the same commit; the leaf
 `Key` matched `ApiKey`; the scan and the reach check blocked nothing a deploy ran; a rollback could

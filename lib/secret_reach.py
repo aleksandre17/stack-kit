@@ -53,6 +53,16 @@ def keys_of(root: Path, manifest: dict[str, Any], service: model.Service) -> lis
     return [str(r.get("key")) for r in config_policy.generated_rows(catalogue, service.secrets_folder, manifest)]
 
 
+def _patterns(root: Path, manifest: dict[str, Any], service: model.Service, pattern: str) -> list:
+    """The pattern each key must be read by: `@env@` is that key's env name, so a reader of some OTHER
+    `X_FILE` never reads this key; a pattern without it reads every key at once (a directory loader)."""
+    if "@env@" not in pattern:
+        return [re.compile(pattern)]
+    catalogue = config_policy.catalogue_of(root, manifest)
+    rows = config_policy.generated_rows(catalogue, service.secrets_folder, manifest)
+    return [re.compile(pattern.replace("@env@", re.escape(config_policy.env_name(row)))) for row in rows]
+
+
 def _unread(service: model.Service, keys: list[str]) -> str:
     declared = service.spec.get("generatedSecrets") or {}
     return (f"modules.{service.module}: is given {', '.join(keys)} as {_form(declared)}, and its driver "
@@ -77,10 +87,9 @@ def problems(root: Path, manifest: dict[str, Any]) -> tuple[list[str], list[str]
             errors.append(_unread(service, keys))
             continue
         base = root / str((manifest.get("modules") or {}).get(service.module, {}).get("path") or "")
-        pattern = re.compile(str(reads["pattern"]))
-        found = any(pattern.search(path.read_text(encoding="utf-8", errors="replace"))
-                    for glob in _globs(reads) for path in base.glob(glob)
-                    if path.is_file() and not OUTPUTS & set(path.relative_to(base).parts))
+        texts = [path.read_text(encoding="utf-8", errors="replace") for glob in _globs(reads) for path in base.glob(glob)
+                 if path.is_file() and not OUTPUTS & set(path.relative_to(base).parts)]
+        found = all(any(p.search(text) for text in texts) for p in _patterns(root, manifest, service, str(reads["pattern"])))
         if not found:
             errors.append(f"modules.{service.module}: is given {', '.join(keys)} as {_form(declared)}, and nothing in "
                           f"{', '.join(_globs(reads))} under {base.relative_to(root).as_posix()} matches "
@@ -105,9 +114,9 @@ def release_problems(root: Path, manifest: dict[str, Any], services: list[model.
         built = reads.get("built")
         if not built:
             continue
-        pattern = re.compile(str(built["pattern"]).encode("utf-8"))
-        files = trees.get(service.id) or {}
-        if not any(pattern.search(data) for rel, data in files.items() if _matches(rel, _globs(built))):
+        files = [data.decode("utf-8", "replace") for rel, data in (trees.get(service.id) or {}).items()
+                 if _matches(rel, _globs(built))]
+        if not all(any(p.search(text) for text in files) for p in _patterns(root, manifest, service, str(built["pattern"]))):
             out.append(f"{service.id}: is given {', '.join(keys)}, and nothing this release built "
                        f"({', '.join(_globs(built))}) matches {built['pattern']!r} -- it would run without it")
     return out

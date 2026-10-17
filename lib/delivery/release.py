@@ -188,6 +188,10 @@ def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
     if failed:
         ctx.out(f"[release] health FAILED: {'; '.join(failed)}")
         back = {s.id: previous[s.id] for s in svc if previous[s.id] and previous[s.id] != rid}
+        for s in svc:  # the same judgement an explicit rollback meets: never back to a release that cannot run
+            why = unrunnable(ctx, s, str(back[s.id])) if s.id in back else ""
+            if why:
+                ctx.out(f"[release] {s.id}: not rolled back to {back.pop(s.id)} -- {why}")
         if ctx.flag("rollbackOnFailure") and back:
             for s in svc:
                 if s.id in back:

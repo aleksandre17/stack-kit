@@ -91,7 +91,7 @@ def _deploy(a: Args) -> int:
     from lib import secret_scan
 
     try:
-        leaks = [] if a.value("--artifact") else secret_scan.tree(root, manifest)
+        leaks = secret_scan.tree(root, manifest)  # the checkout CI packaged the artifact from, too
     except secret_scan.ScanError as e:
         print(f"  [deploy] NOT RUN: {e}", file=sys.stderr)
         return 2

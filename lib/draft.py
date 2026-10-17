@@ -100,6 +100,12 @@ def _holds(root: Path, files: list[str], directory: str, cond: dict[str, Any]) -
     return bool(hits)
 
 
+def detected(root: Path, files: list[str], directory: str, detect: dict[str, Any]) -> bool:
+    """Whether a driver's whole `detect` holds for `directory` -- the one reading of it, shared."""
+    conditions = detect.get("all") if isinstance(detect, dict) else None
+    return bool(conditions) and all(_holds(root, files, directory, c) for c in conditions)
+
+
 def _reads(root: Path, files: list[str], directory: str, reads: dict[str, Any]) -> dict[str, str]:
     """What a driver reads from its evidence, field by field (in declaration order: a `find` may
     mention an earlier read)."""

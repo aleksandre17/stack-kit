@@ -17,7 +17,12 @@
       "dbnavigator.xml",
       "httpRequests/*",
       "caches/*",
-      "aws.xml"
+      "aws.xml",
+      "gradle.xml",
+      "libraries/*",
+      "mongoSettings.xml",
+      "replstate.xml",
+      "sonarlint/*"
     ],
     ".vs": [
       "*"
@@ -33,6 +38,7 @@
     "*.user",
     "*.userosscache",
     "*.sln.docstates",
-    "*.userprefs"
+    "*.userprefs",
+    "*.iws"
   ]
 }

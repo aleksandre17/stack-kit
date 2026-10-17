@@ -53,7 +53,7 @@ TWO = {"schema": 1, "defaults": {"dev": "stage", "prod": "live"},
 def test_build_once_and_promote_the_same_bytes_dev_then_prod(tmp_path):
     text = _render(_host(tmp_path, TWO))
     dev, prod = _job(text, "deploy-dev"), _job(text, "deploy-prod")
-    assert "needs: [api, search, worker, web, svc]" in dev and "needs: [deploy-dev]" in prod
+    assert "needs: [secrets, api, search, worker, web, svc]" in dev and "needs: [deploy-dev]" in prod
     assert "environment: 'dev'" in dev and "environment: 'prod'" in prod  # GitHub Environments gate them
     assert "group: 'deploy-live-prod'" in prod and "cancel-in-progress: false" in prod
     assert "inputs.environment == 'prod'" in prod and "workflow_dispatch:" in text and "type: choice" in text

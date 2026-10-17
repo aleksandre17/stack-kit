@@ -26,7 +26,7 @@ import hashlib
 import json
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -36,6 +36,11 @@ RULES = {
     # a connection string: a server-like key, then a password-like key, in one `;`-separated value
     "connection-string": re.compile(r"(?i)\b(?:server|host|data source|addr|address|endpoint|accountname)\s*=[^;'\"]*;[^'\"]*?"
                                     r"\b(?:password|pwd|accountkey|sharedaccesskey)\s*=\s*([^;'\"\s]{3,})"),
+    # a connection string that names its password first
+    "connection-string-password-first": re.compile(r"(?i)\b(?:password|pwd)\s*=\s*([^;'\"\s]{3,})\s*;[^'\"]*?"
+                                                   r"\b(?:server|host|data source|addr|address)\s*="),
+    "aws-access-key": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+    "github-token": re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
     # the armour of a real key: alone on its line, or followed by its base64 body (a pattern naming it is not one)
     "private-key": re.compile(r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----(?:\s*$|\\n[A-Za-z0-9+/=]{16})"),
 }
@@ -136,6 +141,8 @@ class Finding:
     line: int
     rule: str
     where: str = "tree"
+    #: What the rule matched -- held only to judge it against a tracked value; never printed, never written.
+    value: str = field(default="", repr=False)
 
     def __str__(self) -> str:
         at = f"{self.path}:{self.line}" if self.line else self.path
@@ -155,8 +162,7 @@ def scan_text(path: str, text: str, known: set[str] | None = None, active: list[
                 value = _value_of(r.id, m).strip("'\"")
                 if not r.declared and r.id != "private-key" and PLACEHOLDER.match(value):
                     continue
-                found.append(Finding(path, n, r.id))
-                break
+                found.append(Finding(path, n, r.id, value=m.group(0)))  # every match: one line may hold several
         if known:
             for token in re.findall(r"[A-Za-z0-9+/=_\-.]{12,}", line):
                 if hashlib.sha256(token.encode("utf-8")).hexdigest() in known:
@@ -170,6 +176,8 @@ def scan_path(path: str, data: bytes, known: set[str] | None = None, active: lis
         found.append(Finding(path, 0, "env-file"))
     if path.startswith(TOOLING) and data.startswith(BINARY_MAGIC):
         found.append(Finding(path, 0, "tooling-binary"))
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):  # UTF-16 with its mark -- what Windows tools often write
+        return found + scan_text(path, data.decode("utf-16", "replace"), known, active)
     if b"\0" in data[:4096]:
         return found
     return found + scan_text(path, data.decode("utf-8", "replace"), known, active)
@@ -193,23 +201,50 @@ def known_exposures(root: Path, manifest: dict[str, Any]) -> dict[str, set[str]]
     out: dict[str, set[str]] = {}
     for row in rows:
         if isinstance(row, dict) and row.get("file") and row.get("key"):
-            out.setdefault(str(row["file"]), set()).add(str(row["key"]).replace("__", ":").split(":")[-1])
+            out.setdefault(str(row["file"]), set()).add(str(row["key"]).replace("__", ":"))
     return out
 
 
-def _known(f: Finding, text_of, exposures: dict[str, set[str]]) -> bool:
-    leaves = exposures.get(f.path)
-    if not leaves:
+def values_at(text: str, keys: set[str]) -> "set[str] | None":
+    """The string values a JSON document holds at these configuration key paths (`A:B:C`, matched as the
+    configuration system matches them, without case), or None when the text is not a JSON document."""
+    try:
+        doc = json.loads(text.lstrip("\ufeff"))
+    except ValueError:
+        return None
+    found: set[str] = set()
+    for key in keys:
+        cur = doc
+        for part in key.split(":"):
+            cur = next((v for k, v in cur.items() if k.lower() == part.lower()), None) if isinstance(cur, dict) else None
+        if isinstance(cur, str) and len(cur) >= 4:
+            found.add(cur)
+    return found
+
+
+def _known(f: Finding, text_of, exposures: dict[str, set[str]], values_of=None) -> bool:
+    """A finding is KNOWN only where it is the very value the catalogue tracks: in a JSON document, the line
+    carries the value that stands at a tracked key path; elsewhere, the line IS that key's own line (its leaf
+    as a whole name, at the start of the line). A new secret under another key, or inside another value,
+    is a finding -- whatever it shares with a tracked one by name."""
+    keys = exposures.get(f.path)
+    if not keys:
         return False
     line = text_of(f)
-    # the leaf as a whole name: `Key` is not `ApiKey`, so a new `"ApiKey": ...` beside a known `Key` is a finding
-    return bool(line) and any(re.search(rf'(?<![A-Za-z0-9_])["\']?{re.escape(leaf)}["\']?\s*[:=]', line) for leaf in leaves)
+    if not line:
+        return False
+    values = values_of(f) if values_of else None
+    if values is not None:
+        seen = f.value or line
+        return any(value in seen or (f.value and f.value in value) for value in values)
+    return any(re.match(rf'^\s*["\']?{re.escape(key.split(":")[-1])}["\']?\s*[:=]', line) for key in keys)
 
 
-def tracked_split(findings: list[Finding], text_of, exposures: dict[str, set[str]]) -> tuple[list[Finding], list[Finding]]:
-    """(findings, known): a finding on a line the catalogue tracks is KNOWN -- counted and named as such,
-    never reported clean and never failed twice."""
-    known = [f for f in findings if _known(f, text_of, exposures)]
+def tracked_split(findings: list[Finding], text_of, exposures: dict[str, set[str]],
+                  values_of=None) -> tuple[list[Finding], list[Finding]]:
+    """(findings, known): a finding that is a value the catalogue tracks is KNOWN -- counted and named as
+    such, never reported clean and never failed twice."""
+    known = [f for f in findings if _known(f, text_of, exposures, values_of)]
     return [f for f in findings if f not in known], known
 
 
@@ -241,8 +276,16 @@ def tree(root: Path, manifest: dict[str, Any]) -> list[Finding]:
             lines[f.path] = (root / f.path).read_text(encoding="utf-8", errors="replace").splitlines()
         return lines[f.path][f.line - 1] if 0 < f.line <= len(lines[f.path]) else ""
 
+    exposures = known_exposures(root, manifest)
+    held: dict[str, "set[str] | None"] = {}
+
+    def values_of(f: Finding):
+        if f.path not in held:
+            held[f.path] = values_at((root / f.path).read_text(encoding="utf-8", errors="replace"), exposures[f.path])
+        return held[f.path]
+
     left = [f for f in found if not _allowed(f, allow) and f.path not in documents]
-    failing, known = tracked_split(left, text_of, known_exposures(root, manifest))
+    failing, known = tracked_split(left, text_of, exposures, values_of)
     KNOWN.clear()
     KNOWN.extend(known)
     return failing
@@ -254,27 +297,44 @@ def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
     a known exposure never hides a new secret added beside it (ADR-001 amendment 20)."""
     allow, known = policy(manifest)
     active = rules(root, manifest)
-    ran = subprocess.run(["git", "-C", str(root), "log", "--all", "-p", "--no-color", "--unified=0", "--format=commit %H"],
+    ran = subprocess.run(["git", "-C", str(root), "-c", "core.quotepath=off", "log", "--all", "-p", "--no-color",
+                          "--unified=0", "--text", "--no-textconv", "--no-ext-diff", "--format=commit %H"],
                          capture_output=True)
     found: list[tuple[Finding, str]] = []
     commit, path, at = "", "", 0
-    for raw in ran.stdout.decode("utf-8", "replace").splitlines():
+    for raw in ran.stdout.decode("utf-8", "replace").split("\n"):
+        raw = raw.rstrip("\r")
         if raw.startswith("commit "):
             commit = raw[7:19]
         elif raw.startswith("+++ "):
-            path = raw[6:] if raw.startswith("+++ b/") else ""
+            named = raw[4:]
+            if named.startswith('"') and named.endswith('"'):  # a name git quotes: unescape it
+                named = named[1:-1].encode("latin-1", "backslashreplace").decode("unicode_escape").encode(
+                    "latin-1", "replace").decode("utf-8", "replace")
+            path = named[2:] if named.startswith("b/") else ""
             if path and ENV_FILE.search(path) and not path.endswith((".example", ".template", ".sample")):
                 found.append((Finding(path, 0, "env-file", f"commit {commit}"), ""))
         elif raw.startswith("@@"):
             hunk = HUNK.match(raw)
             at = int(hunk.group(1)) if hunk else 0
         elif raw.startswith("+") and path:
-            found += [(Finding(f.path, at, f.rule, f"commit {commit}"), raw[1:]) for f in scan_text(path, raw[1:], known, active)]
+            found += [(Finding(f.path, at, f.rule, f"commit {commit}", value=f.value), raw[1:])
+                      for f in scan_text(path, raw[1:], known, active)]
             at += 1
     documents = set(declared_documents(manifest))
     added = {f: text for f, text in found}
+    exposures = known_exposures(root, manifest)
+    held: dict[tuple[str, str], "set[str] | None"] = {}
+
+    def values_of(f: Finding):
+        key = (f.where, f.path)
+        if key not in held:
+            shown = subprocess.run(["git", "-C", str(root), "show", f"{f.where.split()[-1]}:{f.path}"], capture_output=True)
+            held[key] = values_at(shown.stdout.decode("utf-8", "replace"), exposures[f.path]) if shown.returncode == 0 else None
+        return held[key]
+
     left = [f for f in added if not _allowed(f, allow) and f.path not in documents]
-    failing, known_found = tracked_split(left, added.get, known_exposures(root, manifest))
+    failing, known_found = tracked_split(left, added.get, exposures, values_of)
     KNOWN.clear()
     KNOWN.extend(known_found)
     return sorted(set(failing), key=lambda f: (f.path, f.where, f.line, f.rule))
@@ -304,4 +364,4 @@ def main_lines(root: Path, manifest: dict[str, Any], with_history: bool) -> list
 
 
 def as_json(findings: Iterable[Finding]) -> str:
-    return json.dumps([f.__dict__ for f in findings], indent=1)
+    return json.dumps([{k: v for k, v in f.__dict__.items() if k != "value"} for f in findings], indent=1)

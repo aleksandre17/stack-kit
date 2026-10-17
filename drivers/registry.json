@@ -203,9 +203,10 @@
             "**/*.java",
             "**/*.kt"
           ],
-          "pattern": "_FILE\\b",
+          "pattern": "@env@_FILE|endsWith\\(\\s*\\\"_FILE\\\"\\s*\\)",
           "how": "Spring Boot reads no <NAME>_FILE on its own: read the file the env var names at startup (e.g. an EnvironmentPostProcessor that, for each <NAME>_FILE, adds <NAME> with the file's content)."
-        }
+        },
+        "uid": 10001
       }
     },
     "dev": {
@@ -513,7 +514,7 @@
             "**/*.mjs",
             "**/*.cjs"
           ],
-          "pattern": "_FILE\\b",
+          "pattern": "@env@_FILE|endsWith\\(\\s*['\\\"]_FILE['\\\"]\\s*\\)",
           "how": "Node reads no <NAME>_FILE on its own: at startup, for each <NAME>_FILE, set process.env.<NAME> from fs.readFileSync(process.env.<NAME>_FILE, 'utf8').trim().",
           "built": {
             "glob": [
@@ -521,9 +522,10 @@
               "**/*.mjs",
               "**/*.cjs"
             ],
-            "pattern": "_FILE\\b"
+            "pattern": "@env@_FILE|endsWith\\(\\s*['\\\"]_FILE['\\\"]\\s*\\)"
           }
-        }
+        },
+        "uid": 1000
       }
     },
     "dev": {

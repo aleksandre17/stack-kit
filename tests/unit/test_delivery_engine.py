@@ -705,3 +705,25 @@ def test_a_good_rollback_moves_current_only_after_the_stack_runs_it_healthy(proj
     links = [i for i, e in enumerate(t.log) if e[0] == "link"]
     assert ups and links and max(ups) < min(links), t.log
     assert f"  * {old}" in release.listing(ctx, ["edge"]) and f"    {new}" in release.listing(ctx, ["edge"])
+
+
+def test_an_automatic_rollback_never_returns_to_a_release_that_cannot_run(project, tmp_path, monkeypatch):
+    # Found by the third audit: a failed release went back to the previous one with no judgement of it --
+    # the release that ran on a committed key, the first time its fixed successor failed health.
+    t = server(tmp_path)
+    ctx = ctx_for(project, t)
+    first = packaged(project)
+    assert release.release(ctx, "edge", first) == 0
+    commit(project, "v2\n")
+    second = packaged(project)
+    st = fake_server._load(fake_server.state_file(tmp_path / "server.json"))
+    st["health"] = {"edge": "unhealthy"}
+    fake_server.state_file(tmp_path / "server.json").write_text(json.dumps(st), encoding="utf-8")
+    monkeypatch.setattr(release, "unrunnable", lambda c, s, rid: "it ran on a committed key" if rid in first.name else "")
+    said = []
+    ctx.out = said.append
+    with pytest.raises(DeliveryError):
+        release.release(ctx, "edge", second)
+    edge = running.find(ctx, ["edge"])[0]
+    assert running.current_release(ctx, edge) != first.name[len("edge-"):-len(".tgz")]
+    assert any("not rolled back to" in line and "committed key" in line for line in said)
