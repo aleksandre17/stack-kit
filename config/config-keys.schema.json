@@ -170,6 +170,11 @@
           "tracking": {
             "type": "string",
             "minLength": 1
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "The sha256 of the exposed value (`scan secrets --fingerprint <file> <key>`, which never prints the value): the scan reads a finding as this known exposure only when a value it carries hashes to it exactly. Without it, whatever value stands at the key reads as known."
           }
         },
         "additionalProperties": false

@@ -94,18 +94,34 @@ def _markers(entry: dict[str, Any]) -> list[str]:
 def outside_modules(files: list[str], bases: dict[str, str], types: dict[str, str],
                     registry: dict[str, Any], root: "Path | None" = None) -> list[str]:
     """Every output a project outside every module tracks: a directory a used toolchain writes, in a
-    directory where that toolchain's whole detection holds (its driver's `detect`) -- a `package.json`
-    alone is not a web app, and a committed `dist/` beside it (a JavaScript action) is not its output."""
+    directory beside a project file only that toolchain's driver names (a `*.csproj` -- a class library
+    too); where the file is one several drivers name, only where the driver's whole detection holds --
+    a `package.json` alone is not a web app, and a committed `dist/` beside it (a JavaScript action) is
+    not its output."""
     from lib import draft
 
     toolchains = [(typ, [o for o in (registry.get(typ) or {}).get("outputs") or [] if o.endswith("/")],
                    _markers(registry.get(typ) or {})) for typ in sorted(set(types.values()))]
+    # A marker one driver alone names (a *.csproj, a pom.xml) is that toolchain's project whatever it
+    # builds -- a class library writes bin/ too; one several drivers name (package.json) proves nothing
+    # alone, so there the driver's whole detection must hold.
+    named: dict[str, int] = {}
+    for entry in registry.values():
+        for marker in _markers(entry) if isinstance(entry, dict) else []:
+            named[marker] = named.get(marker, 0) + 1
+    shared = {m for m, n in named.items() if n > 1}
     detects = {typ: (registry.get(typ) or {}).get("detect") or {} for typ in types.values()}
     names: dict[str, set[str]] = {}
     for rel in files:
         parent, _, name = rel.rpartition("/")
         names.setdefault(parent, set()).add(name)
     hits: dict[tuple[str, str], int] = {}
+
+    def project(typ: str, markers: list[str], parent: str) -> bool:
+        beside = {m for m in markers for n in names.get(parent, ()) if fnmatch.fnmatch(n, m)}
+        return bool(beside) and (bool(beside - shared) or root is None
+                                 or draft.detected(root, files, parent, detects[typ]))
+
     for rel in files:
         if _owner(rel, bases) is not None:
             continue
@@ -113,8 +129,7 @@ def outside_modules(files: list[str], bases: dict[str, str], types: dict[str, st
         for k in range(len(parts) - 1):
             parent = "/".join(parts[:k])
             found = next((typ for typ, outputs, markers in toolchains if parts[k] + "/" in outputs
-                          and any(fnmatch.fnmatch(n, m) for m in markers for n in names.get(parent, ()))
-                          and (root is None or draft.detected(root, files, parent, detects[typ]))), None)
+                          and project(typ, markers, parent)), None)
             if found:
                 where = "/".join(parts[:k + 1])
                 hits[(where, found)] = hits.get((where, found), 0) + 1

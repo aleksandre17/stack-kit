@@ -25,9 +25,9 @@ def _repo(tmp_path: Path, rel: str) -> Path:
 
 def test_a_taken_edit_gate_document_is_calibration_wherever_it_lies(tmp_path):
     root = _repo(tmp_path, ".agents/taken/secrets/payload/edit-gates.json")
-    assert s.scan_path(".agents/taken/secrets/payload/edit-gates.json", PAYLOAD.read_bytes()), \
+    assert s.scan_text(".agents/taken/secrets/payload/edit-gates.json", PAYLOAD.read_text(encoding="utf-8")), \
         "its specimens are credential-shaped: a scan that saw nothing would prove nothing here"
-    assert s.tree(root, {}) == [], "the tree scan reads it as calibration"
+    assert s.tree(root, {}) == [], "the tree scan reads its specimens as calibration"
     assert s.history(root, {}) == [], "and so does the history scan"
 
 

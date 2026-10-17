@@ -1,5 +1,26 @@
 # Changelog — stack-kit
 
+## Unreleased
+
+Found by the fourth audit: the secret scan could be blinded by a fake `gates` key or by a tracked key
+path, a class library's build output went unflagged, and a compose `build:` was read in one order only.
+
+### Fixed
+
+- `scan secrets` (tree and history) exempts only the specimen strings of an edit-gate document -- what
+  its gates hold in `proves` and `admits` -- and scans the rest of the file. A settings file with a
+  fake top-level `gates` key once hid every secret in it.
+- A known exposure is matched by its value's sha256: a `knownExposures` row takes `fingerprint`, and a
+  finding is known only when a value it carries hashes to it exactly. A new secret written at a tracked
+  key, or one that contains a short tracked value, is a finding. A row without a fingerprint is still
+  matched by the value at its key and is warned about (`scan secrets`, `validate`), with the way to add
+  it: `scan secrets --fingerprint <file> <key>` prints the hash, never the value.
+- Outside every module, a build output beside a project file only one driver names (`*.csproj`,
+  `pom.xml`, `build.gradle*`) is flagged again whatever the project builds (a class library's `bin/` and
+  `obj/`); a file several drivers name (`package.json`) still needs the driver's whole detection.
+- `validate` reads a compose `build:` block in any field order (`args`, `target`, ...), as a flow
+  mapping, and in the short form `build: ./dir`.
+
 ## 2.5.0 — 2026-10-17
 
 A generated secret reaches the app, and a known exposure is a key, not a file (ADR-001 amendment 20).

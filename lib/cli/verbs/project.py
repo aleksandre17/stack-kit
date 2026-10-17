@@ -160,9 +160,18 @@ def _scan(a: Args) -> int:
     from lib.project_context import ProjectContext
 
     if a.positional[:1] != ["secrets"]:
-        print("  Usage: scan secrets [--history]")
+        print("  Usage: scan secrets [--history] | scan secrets --fingerprint <file> <key>")
         return 2
     ctx = ProjectContext.discover()
+    if a.value("--fingerprint"):
+        rel, key = a.value("--fingerprint"), (a.positional[1:2] or [""])[0]
+        sha = secret_scan.fingerprint_at(ctx.root, rel, key) if key else None
+        if not sha:
+            print(f"  [scan] no single value stands at {key or '<key>'} in {rel} -- nothing to fingerprint")
+            return 2
+        print(f"  [scan] {rel} {key}: fingerprint {sha} -- add \"fingerprint\": \"{sha}\" to its knownExposures row "
+              f"(the value is not printed)")
+        return 0
     try:
         lines = secret_scan.main_lines(ctx.root, ctx.manifest, a.has("--history"))
     except secret_scan.ScanError as e:
@@ -170,6 +179,8 @@ def _scan(a: Args) -> int:
         return 2
     for line in lines:
         print(f"  {line}")
+    for warning in secret_scan.unfingerprinted(ctx.root, ctx.manifest):
+        print(f"  [warn] {warning}")
     known = (f"; {len(secret_scan.KNOWN)} KNOWN exposure(s) the configuration catalogue tracks to their removal "
              f"(knownExposures) -- known is not clean" if secret_scan.KNOWN else "")
     print("  [scan] " + (f"{len(lines)} finding(s) -- values are never printed; allow one by path and rule with its reason "
@@ -210,10 +221,14 @@ VERBS = [
                  "projection; a release refuses one (exit 5). Paths: manifest `projections.containers` "
                  "(default ops/containers/{module}/Dockerfile) and `projections.stack` (default ops/compose/stack/{environment}/compose.yml)."),
     Verb("scan", "the secret boundary: credential-shaped values in the tracked tree (and, --history, every commit)",
-         ["scan secrets [--history]"], _scan, options=[Option("--history", "every line any commit added, too")], exits=(0, 1, 2),
+         ["scan secrets [--history]", "scan secrets --fingerprint <file> <key>"], _scan,
+         options=[Option("--history", "every line any commit added, too"),
+                  Option("--fingerprint", "print the sha256 of the value at <key> in this file, for its knownExposures row", "file")],
+         exits=(0, 1, 2),
          details="JWTs, passwords in URLs, connection-string passwords, private keys, committed env files, binaries in the "
                  "tooling directories, and values the operator lists as leaked (security.knownLeaks: sha256 fingerprints). "
-                 "Placeholders are not values; a file the configuration catalogue tracks (knownExposures) is not failed twice."),
+                 "Placeholders are not values; a value the configuration catalogue tracks (knownExposures) is not failed twice -- "
+                 "matched by its row's `fingerprint` (sha256; `--fingerprint <file> <key>` prints it, never the value)."),
     Verb("vscode-gen", "generate .vscode launch and tasks from the manifest", ["vscode-gen [--force]"],
          _py("lib/vscode_gen.py"), passthrough=True, group="generate"),
     Verb("config-gen", "generate module config from the manifest", ["config-gen [--all|--check|--dry-run] [module]"],

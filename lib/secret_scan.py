@@ -9,6 +9,11 @@ tracked file and, on request, in every commit -- a value is never printed, only 
     tooling-binary     an executable binary in the tooling directories (ops/, tools/, scripts/, ci/)
     known-leak         a value whose sha256 the operator lists as leaked (`security.knownLeaks`)
 
+A document of agent-kit's edit-gate contract carries credential-shaped specimens on purpose: only the
+strings its gates hold in `proves` and `admits` are exempt, never the file. A secret the configuration
+catalogue tracks to its removal (`knownExposures`) is KNOWN when a value the finding carries hashes to
+its row's `fingerprint` exactly; a row without one is matched by the value at its key, and warned about.
+
 A placeholder is not a value (`__NAME__`, `${NAME}`, `<...>`, `changeme`, `example`, `***`), and a host
 may allow a finding by path and rule with its reason (`security.allow`).
 
@@ -164,6 +169,39 @@ def calibration_document(text: str) -> bool:
         and "forbids" in g for g in gates)
 
 
+#: A JSON string literal on one line (a JSON string never spans lines).
+LITERAL = re.compile(r'"(?:[^"\\\r\n]|\\.)*"')
+
+
+def specimens(text: str) -> set[str]:
+    """The specimen strings of a document of the edit-gate contract -- every string its gates carry in
+    `proves` and `admits` -- or none when it is not one. Only these are calibration: the rest of the
+    document is scanned like any other file, so a settings file that merely has a `gates` key hides
+    nothing (a whole file read as calibration once hid every secret beside a fake `gates`)."""
+    if not calibration_document(text):
+        return set()
+    doc = json.loads(text.lstrip("\ufeff"))
+    return {v for g in doc["gates"] for side in ("proves", "admits") for v in g[side].values()
+            if isinstance(v, str) and v}
+
+
+def _decoded(literal: str) -> "str | None":
+    try:
+        value = json.loads(literal)
+    except ValueError:
+        return None
+    return value if isinstance(value, str) else None
+
+
+def without_specimens(text: str, held: set[str]) -> str:
+    """The text with every JSON string literal that IS a specimen blanked (its length and lines kept, so
+    every other finding keeps its line)."""
+    if not held:
+        return text
+    return LITERAL.sub(lambda m: '"' + " " * (len(m.group(0)) - 2) + '"' if _decoded(m.group(0)) in held
+                       else m.group(0), text)
+
+
 def _value_of(rule: str, m: re.Match[str]) -> str:
     return m.group(1) if m.groups() else m.group(0)
 
@@ -192,30 +230,73 @@ def scan_path(path: str, data: bytes, known: set[str] | None = None, active: lis
     if path.startswith(TOOLING) and data.startswith(BINARY_MAGIC):
         found.append(Finding(path, 0, "tooling-binary"))
     if data.startswith((b"\xff\xfe", b"\xfe\xff")):  # UTF-16 with its mark -- what Windows tools often write
-        return found + scan_text(path, data.decode("utf-16", "replace"), known, active)
-    if b"\0" in data[:4096]:
+        text = data.decode("utf-16", "replace")
+    elif b"\0" in data[:4096]:
         return found
-    return found + scan_text(path, data.decode("utf-8", "replace"), known, active)
+    else:
+        text = data.decode("utf-8", "replace")
+    if path.endswith(".json"):  # a gate document's specimens are its calibration -- only they
+        text = without_specimens(text, specimens(text))
+    return found + scan_text(path, text, known, active)
+
+
+def _exposure_rows(root: Path, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    rel = (manifest.get("config") or {}).get("keys")
+    p = root / str(rel) if rel else None
+    if not p or not p.is_file():
+        return []
+    try:
+        rows = json.loads(p.read_text(encoding="utf-8-sig")).get("knownExposures") or []
+    except (ValueError, AttributeError):
+        return []
+    return [r for r in rows if isinstance(r, dict) and r.get("file") and r.get("key")]
+
+
+def known_fingerprints(root: Path, manifest: dict[str, Any]) -> dict[str, set[str]]:
+    """file -> the sha256 of each exposed value the catalogue tracks there (`knownExposures[].fingerprint`).
+    A finding is known only when a value it carries hashes to one exactly: a new secret written at a
+    tracked key, or one that merely contains a tracked value, is a finding."""
+    out: dict[str, set[str]] = {}
+    for row in _exposure_rows(root, manifest):
+        if isinstance(row.get("fingerprint"), str) and row["fingerprint"].strip():
+            out.setdefault(str(row["file"]), set()).add(row["fingerprint"].strip().lower())
+    return out
+
+
+def unfingerprinted(root: Path, manifest: dict[str, Any]) -> list[str]:
+    """A warning per knownExposures row without its value's fingerprint, with the way to add it."""
+    return [f"knownExposures: {r['file']} {r['key']} has no fingerprint -- it is matched by whatever value stands at "
+            f"its key, so a new secret written there reads as known; add it (the value is never printed): "
+            f"scan secrets --fingerprint {r['file']} {r['key']}"
+            for r in _exposure_rows(root, manifest) if not (isinstance(r.get("fingerprint"), str) and r["fingerprint"].strip())]
+
+
+def fingerprint_at(root: Path, rel: str, key: str) -> "str | None":
+    """The fingerprint of the value standing at a key (`A:B` or `A__B`) in a file -- None when none stands there."""
+    p = root / rel
+    if not p.is_file():
+        return None
+    text = p.read_text(encoding="utf-8-sig", errors="replace")
+    key = key.replace("__", ":")
+    values = values_at(text, {key})
+    if values is None:  # not JSON: the key's own line, `leaf = value` or `leaf: value`
+        leaf = re.escape(key.split(":")[-1])
+        m = re.search(rf'(?m)^\s*["\']?{leaf}["\']?\s*[:=]\s*(.+?)\s*$', text)
+        values = {m.group(1).strip("'\"")} if m else set()
+    return fingerprint(next(iter(values))) if len(values) == 1 else None
 
 
 def known_exposures(root: Path, manifest: dict[str, Any]) -> dict[str, set[str]]:
-    """file -> the KEYS the configuration catalogue tracks to their removal there (`knownExposures`).
+    """file -> the KEYS the configuration catalogue tracks to their removal there (`knownExposures`) that
+    carry no fingerprint -- matched the older way, by the value at the key, and warned about.
 
     A known exposure is a key in a file, never the file: a finding is known only on the line that
     carries that key (its leaf name, quoted, followed by a colon), so a NEW secret added to the same
     file is still a finding (ADR-001 amendment 20 -- the scan once dropped every finding in such a file
     and reported the tree clean over seven committed secrets)."""
-    rel = (manifest.get("config") or {}).get("keys")
-    p = root / str(rel) if rel else None
-    if not p or not p.is_file():
-        return {}
-    try:
-        rows = json.loads(p.read_text(encoding="utf-8-sig")).get("knownExposures") or []
-    except ValueError:
-        return {}
     out: dict[str, set[str]] = {}
-    for row in rows:
-        if isinstance(row, dict) and row.get("file") and row.get("key"):
+    for row in _exposure_rows(root, manifest):
+        if not (isinstance(row.get("fingerprint"), str) and row["fingerprint"].strip()):
             out.setdefault(str(row["file"]), set()).add(str(row["key"]).replace("__", ":"))
     return out
 
@@ -237,11 +318,30 @@ def values_at(text: str, keys: set[str]) -> "set[str] | None":
     return found
 
 
-def _known(f: Finding, text_of, exposures: dict[str, set[str]], values_of=None) -> bool:
+def _carried(f: Finding, line: str) -> set[str]:
+    """Every value a finding carries: what its rule matched, and each JSON string on its line that holds the
+    match or lies inside it (decoded) -- each hashed whole, never compared as a substring."""
+    out = {f.value} if f.value else set()
+    for m in LITERAL.finditer(line):
+        raw = m.group(0)
+        if f.value and (f.value in raw or raw in f.value):
+            value = _decoded(raw)
+            if value:
+                out.add(value)
+    return out
+
+
+def _known(f: Finding, text_of, exposures: dict[str, set[str]], values_of=None,
+           prints: "dict[str, set[str]] | None" = None) -> bool:
     """A finding is KNOWN only where it is the very value the catalogue tracks: in a JSON document, the line
     carries the value that stands at a tracked key path; elsewhere, the line IS that key's own line (its leaf
     as a whole name, at the start of the line). A new secret under another key, or inside another value,
     is a finding -- whatever it shares with a tracked one by name."""
+    held = (prints or {}).get(f.path)
+    if held:
+        line = text_of(f) or ""
+        if any(fingerprint(v) in held for v in _carried(f, line)):
+            return True
     keys = exposures.get(f.path)
     if not keys:
         return False
@@ -256,10 +356,10 @@ def _known(f: Finding, text_of, exposures: dict[str, set[str]], values_of=None) 
 
 
 def tracked_split(findings: list[Finding], text_of, exposures: dict[str, set[str]],
-                  values_of=None) -> tuple[list[Finding], list[Finding]]:
+                  values_of=None, prints: "dict[str, set[str]] | None" = None) -> tuple[list[Finding], list[Finding]]:
     """(findings, known): a finding that is a value the catalogue tracks is KNOWN -- counted and named as
     such, never reported clean and never failed twice."""
-    known = [f for f in findings if _known(f, text_of, exposures, values_of)]
+    known = [f for f in findings if _known(f, text_of, exposures, values_of, prints)]
     return [f for f in findings if f not in known], known
 
 
@@ -283,7 +383,6 @@ def tree(root: Path, manifest: dict[str, Any]) -> list[Finding]:
         p = root / rel
         if p.is_file() and p.stat().st_size < 2_000_000:
             found += scan_path(rel, p.read_bytes(), known, active)
-    documents = set(declared_documents(manifest))  # a gate document carries its calibration
     lines: dict[str, list[str]] = {}
 
     def text_of(f: Finding) -> str:
@@ -292,6 +391,7 @@ def tree(root: Path, manifest: dict[str, Any]) -> list[Finding]:
         return lines[f.path][f.line - 1] if 0 < f.line <= len(lines[f.path]) else ""
 
     exposures = known_exposures(root, manifest)
+    prints = known_fingerprints(root, manifest)
     held: dict[str, "set[str] | None"] = {}
 
     def values_of(f: Finding):
@@ -299,16 +399,8 @@ def tree(root: Path, manifest: dict[str, Any]) -> list[Finding]:
             held[f.path] = values_at((root / f.path).read_text(encoding="utf-8", errors="replace"), exposures[f.path])
         return held[f.path]
 
-    calibrations: dict[str, bool] = {}
-
-    def calibration(rel: str) -> bool:
-        if rel not in calibrations:
-            calibrations[rel] = rel.endswith(".json") and calibration_document(
-                (root / rel).read_text(encoding="utf-8", errors="replace"))
-        return calibrations[rel]
-
-    left = [f for f in found if not _allowed(f, allow) and f.path not in documents and not calibration(f.path)]
-    failing, known = tracked_split(left, text_of, exposures, values_of)
+    left = [f for f in found if not _allowed(f, allow)]
+    failing, known = tracked_split(left, text_of, exposures, values_of, prints)
     KNOWN.clear()
     KNOWN.extend(known)
     return failing
@@ -325,6 +417,16 @@ def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
                          capture_output=True)
     found: list[tuple[Finding, str]] = []
     commit, path, at = "", "", 0
+    shown: dict[tuple[str, str], str] = {}
+
+    def show(at_commit: str, rel: str) -> str:
+        """A file as one commit holds it ("" when it does not)."""
+        if (at_commit, rel) not in shown:
+            ran_show = subprocess.run(["git", "-C", str(root), "show", f"{at_commit}:{rel}"], capture_output=True)
+            shown[(at_commit, rel)] = ran_show.stdout.decode("utf-8", "replace") if ran_show.returncode == 0 else ""
+        return shown[(at_commit, rel)]
+
+    held_specimens: dict[tuple[str, str], set[str]] = {}
     for raw in ran.stdout.decode("utf-8", "replace").split("\n"):
         raw = raw.rstrip("\r")
         if raw.startswith("commit "):
@@ -341,34 +443,28 @@ def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
             hunk = HUNK.match(raw)
             at = int(hunk.group(1)) if hunk else 0
         elif raw.startswith("+") and path:
-            found += [(Finding(f.path, at, f.rule, f"commit {commit}", value=f.value), raw[1:])
-                      for f in scan_text(path, raw[1:], known, active)]
+            line = raw[1:]
+            hits = scan_text(path, line, known, active)
+            if hits and path.endswith(".json"):  # the specimens of the document as that commit holds it
+                if (commit, path) not in held_specimens:
+                    held_specimens[(commit, path)] = specimens(show(commit, path))
+                hits = scan_text(path, without_specimens(line, held_specimens[(commit, path)]), known, active)
+            found += [(Finding(f.path, at, f.rule, f"commit {commit}", value=f.value), line) for f in hits]
             at += 1
-    documents = set(declared_documents(manifest))
     added = {f: text for f, text in found}
     exposures = known_exposures(root, manifest)
+    prints = known_fingerprints(root, manifest)
     held: dict[tuple[str, str], "set[str] | None"] = {}
 
     def values_of(f: Finding):
         key = (f.where, f.path)
         if key not in held:
-            shown = subprocess.run(["git", "-C", str(root), "show", f"{f.where.split()[-1]}:{f.path}"], capture_output=True)
-            held[key] = values_at(shown.stdout.decode("utf-8", "replace"), exposures[f.path]) if shown.returncode == 0 else None
+            text = show(f.where.split()[-1], f.path)
+            held[key] = values_at(text, exposures[f.path]) if text else None
         return held[key]
 
-    calibrations: dict[tuple[str, str], bool] = {}
-
-    def calibration(f: Finding) -> bool:
-        key = (f.where, f.path)
-        if key not in calibrations:
-            shown = subprocess.run(["git", "-C", str(root), "show", f"{f.where.split()[-1]}:{f.path}"],
-                                   capture_output=True) if f.path.endswith(".json") else None
-            calibrations[key] = bool(shown and shown.returncode == 0
-                                     and calibration_document(shown.stdout.decode("utf-8", "replace")))
-        return calibrations[key]
-
-    left = [f for f in added if not _allowed(f, allow) and f.path not in documents and not calibration(f)]
-    failing, known_found = tracked_split(left, added.get, exposures, values_of)
+    left = [f for f in added if not _allowed(f, allow)]
+    failing, known_found = tracked_split(left, added.get, exposures, values_of, prints)
     KNOWN.clear()
     KNOWN.extend(known_found)
     return sorted(set(failing), key=lambda f: (f.path, f.where, f.line, f.rule))

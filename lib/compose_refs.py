@@ -10,8 +10,14 @@ import re
 from pathlib import Path
 from typing import Any
 
-_BUILD = re.compile(r"^(\s*)build:\s*$")
-_FIELD = re.compile(r"^\s+(context|dockerfile):\s*(\S+)\s*$")
+_BUILD = re.compile(r"^(\s*)build:\s*(.*?)\s*$")
+_FIELD = re.compile(r"^(\s+)([A-Za-z_][\w-]*):\s*(.*?)\s*$")
+_FLOW = re.compile(r"\b(context|dockerfile)\s*:\s*([^,}\s]+)")
+
+
+def _scalar(text: str) -> str:
+    """A YAML scalar's first token, unquoted, without a trailing comment."""
+    return (text.split(" #")[0].strip().split() or [""])[0].strip("'\"")
 
 
 def compose_files(root: Path, manifest: dict[str, Any]) -> list[Path]:
@@ -29,18 +35,33 @@ def compose_files(root: Path, manifest: dict[str, Any]) -> list[Path]:
 
 
 def references(text: str) -> list[tuple[str, str]]:
-    """(context, dockerfile) of each `build:` block."""
+    """(context, dockerfile) of each `build:` -- its block in any field order (args, target, ... beside
+    them), a flow mapping, or the short form `build: ./dir` (the context, with its Dockerfile)."""
     out, lines = [], text.splitlines()
     for i, line in enumerate(lines):
         m = _BUILD.match(line)
         if not m:
             continue
-        found = {}
-        for nxt in lines[i + 1:i + 6]:
-            f = _FIELD.match(nxt)
-            if not f or len(nxt) - len(nxt.lstrip()) <= len(m.group(1)):
+        inline = m.group(2)
+        if inline and not inline.startswith("#"):
+            if inline.startswith("{"):
+                flow = dict((k, v.strip("'\"")) for k, v in _FLOW.findall(inline))
+                out.append((flow.get("context", "."), flow.get("dockerfile", "Dockerfile")))
+            else:
+                out.append((_scalar(inline) or ".", "Dockerfile"))
+            continue
+        found: dict[str, str] = {}
+        child = None
+        for nxt in lines[i + 1:]:
+            if not nxt.strip() or nxt.lstrip().startswith("#"):
+                continue
+            depth = len(nxt) - len(nxt.lstrip())
+            if depth <= len(m.group(1)):
                 break
-            found[f.group(1)] = f.group(2).strip("'\"")
+            child = depth if child is None else child
+            f = _FIELD.match(nxt)
+            if f and depth == child and f.group(2) in ("context", "dockerfile"):
+                found[f.group(2)] = _scalar(f.group(3))
         out.append((found.get("context", "."), found.get("dockerfile", "Dockerfile")))
     return out
 

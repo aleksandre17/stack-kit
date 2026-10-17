@@ -319,6 +319,7 @@ def validate_manifest(
         if secret_scan.KNOWN:
             warnings.append(f"security: {len(secret_scan.KNOWN)} KNOWN exposure(s) the configuration catalogue tracks "
                             f"to their removal (knownExposures) -- known is not clean: rotate, then remove")
+        warnings.extend(f"security: {w}" for w in secret_scan.unfingerprinted(ctx.root, ctx.manifest))
     from lib import projections
 
     stale, unrendered = projections.drift(ctx.root, ctx.manifest)
