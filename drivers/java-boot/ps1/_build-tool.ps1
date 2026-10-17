@@ -1,7 +1,7 @@
 # java-boot - the module's build tool, resolved once for the launch step and every lifecycle step:
 # `modules.<id>.java.build` when declared (maven | gradle), else the build file in the module (pom.xml:
 # Maven; build.gradle(.kts): Gradle). Its wrapper beside the build file is used, else the tool on the
-# PATH; with neither, the step is refused by name. The same order the driver declares (`buildTools`),
+# PATH; with neither, the step is refused by name. No pom.xml: Gradle, as before Maven was known. The same order the driver declares (`buildTools`),
 # which validate reads. Needs lib/project.ps1 and lib/drivers.ps1 in scope.
 
 function Resolve-JvmBuildTool {
@@ -9,9 +9,7 @@ function Resolve-JvmBuildTool {
     $onWindows = [System.Environment]::OSVersion.Platform -eq 'Win32NT'
     $kind = Get-ModuleField $ModuleId 'java.build'
     if (-not $kind) {
-        if (Test-Path (Join-Path $ModPath "pom.xml")) { $kind = "maven" }
-        elseif ((Test-Path (Join-Path $ModPath "build.gradle")) -or (Test-Path (Join-Path $ModPath "build.gradle.kts"))) { $kind = "gradle" }
-        else { throw "modules.${ModuleId}: no pom.xml and no build.gradle in $ModPath -- nothing says how it is built" }
+        $kind = if (Test-Path (Join-Path $ModPath "pom.xml")) { "maven" } else { "gradle" }
     }
     if ($kind -eq "maven") {
         $wrapperName = if ($onWindows) { "mvnw.cmd" } else { "mvnw" }

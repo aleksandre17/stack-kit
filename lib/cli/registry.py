@@ -181,10 +181,9 @@ def _evidence(detect: dict) -> list[str]:
 def _drivers_table() -> list[str]:
     """The kit's drivers, from drivers/registry.json -- what each recognises a module by, the build tools it
     knows, and what its toolchain writes (never tracked)."""
-    import json
-    from pathlib import Path
+    from lib.modules import kit_registry
 
-    registry = json.loads((Path(__file__).resolve().parents[2] / "drivers" / "registry.json").read_text(encoding="utf-8"))
+    registry = kit_registry()
     rows = ["", "## Drivers", "", "From `drivers/registry.json`. `init --plan` drafts a module for each directory whose files a",
             "driver's detection holds for; a host adds its own with `extend driver <name>`.", "",
             "| driver | for | roles | recognised by | built by | writes |", "|---|---|---|---|---|---|"]

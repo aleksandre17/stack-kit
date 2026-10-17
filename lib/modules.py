@@ -64,6 +64,11 @@ def _read_registry(path: Path) -> dict[str, Any]:
 DEFAULT_PROJECT_REGISTRY = "ops/drivers/registry.json"
 
 
+def kit_registry() -> dict[str, Any]:
+    """The kit's own drivers, without a host's -- what the operator documentation tabulates."""
+    return _read_registry(KIT_DRIVERS / "registry.json")
+
+
 def project_registry_path(root: Path, manifest: dict[str, Any]) -> Path | None:
     """The project's own driver registry: the one its manifest declares (`drivers.registry`), else the
     default place, when a registry is there -- a driver `extend driver` made is read where it was made."""

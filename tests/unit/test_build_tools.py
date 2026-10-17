@@ -34,10 +34,16 @@ def test_a_gradle_module_without_its_wrapper_is_named(tmp_path):
     assert errors == [] and "a gradle build with no wrapper" in warnings[0]
 
 
-def test_a_module_with_no_build_file_is_refused(tmp_path):
+def test_a_module_with_no_build_file_yet_is_named(tmp_path):
+    # A freshly scaffolded module may have no build file yet: named, and its build refused by name.
     root = _host(tmp_path, {"README.md": "x"})
-    errors, _ = build_tools.problems(root, _manifest(), driver_registry())
-    assert len(errors) == 1 and "no build file its driver knows" in errors[0]
+    errors, warnings = build_tools.problems(root, _manifest(), driver_registry())
+    assert errors == [] and len(warnings) == 1 and "no build file its driver knows" in warnings[0]
+
+
+def test_a_module_with_only_its_wrapper_is_built_by_that_tool(tmp_path):
+    root = _host(tmp_path, {"gradlew": "#!/bin/sh"})
+    assert build_tools.problems(root, _manifest(), driver_registry()) == ([], [])
 
 
 def test_the_release_artifact_follows_the_build_tool():

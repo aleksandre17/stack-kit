@@ -11,8 +11,11 @@ from typing import Any
 
 
 def tool_of(root: Path, cfg: dict[str, Any], entry: dict[str, Any]) -> "dict[str, Any] | None":
+    """The first tool whose build file is in the module, else the first whose wrapper is there."""
     base = root / str(cfg.get("path") or ".")
-    return next((tool for tool in entry.get("buildTools") or [] if any((base / w).is_file() for w in tool["when"])), None)
+    tools = entry.get("buildTools") or []
+    return (next((t for t in tools if any((base / w).is_file() for w in t["when"])), None)
+            or next((t for t in tools if any((base / w).is_file() for w in t["wrapper"])), None))
 
 
 def problems(root: Path, manifest: dict[str, Any], registry: dict[str, Any]) -> tuple[list[str], list[str]]:
@@ -27,8 +30,8 @@ def problems(root: Path, manifest: dict[str, Any], registry: dict[str, Any]) -> 
         base = root / str(cfg.get("path") or ".")
         if tool is None:
             known = ", ".join(w for t in entry["buildTools"] for w in t["when"])
-            errors.append(f"modules.{mid}: no build file its driver knows ({known}) in {cfg.get('path') or '.'} -- "
-                          f"nothing says how it is built")
+            warnings.append(f"modules.{mid}: no build file its driver knows ({known}) in {cfg.get('path') or '.'} yet -- "
+                            f"its build will be refused until one is there")
             continue
         if not any((base / w).is_file() for w in tool["wrapper"]):
             warnings.append(f"modules.{mid}: a {tool['id']} build with no wrapper ({' / '.join(tool['wrapper'])}) -- it "
