@@ -67,7 +67,7 @@ def test_a_declared_gate_that_groups_the_key_name_still_finds_the_value(tmp_path
     # agent-kit's connection-string gate captures the KEY ("Password") and refuses placeholders by a
     # lookahead; the scan must not read the group as the value and call "Password" a placeholder.
     gate = {"id": "no-connection-string-password", "paths": ".*",
-            "forbids": "(?i)[;\"'>]\s*(password|pwd)\s*=\s*(?!__[A-Z0-9_]+__)[^;\"'\s]+",
+            "forbids": r"(?i)[;\"'>]\s*(password|pwd)\s*=\s*(?!__[A-Z0-9_]+__)[^;\"'\s]+",
             "because": "a fixture", "instead": "a placeholder",
             "proves": {"path": "a.json", "text": "\"d\": \"Server=x;Password=hunter2;\""},
             "admits": {"path": "a.json", "text": "\"d\": \"Server=x;Password=__DB_PASSWORD__;\""}}
