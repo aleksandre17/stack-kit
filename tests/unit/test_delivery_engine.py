@@ -368,7 +368,7 @@ def test_a_runtime_that_reads_a_directory_of_secrets_is_given_the_directory(proj
     execs = [" ".join(e[1]) for e in t.log if e[0] == "exec"]
     handed = [x for x in execs if "chown 1654:1654 /secrets/*" in x]
     assert len(handed) == 1 and "--user 0" in handed[0] and "--network none" in handed[0]
-    assert any(x.startswith("chmod 0711 ") and x.endswith("/runtime/generated") for x in execs)
+    assert any(x.startswith("chmod 0755 ") and x.endswith("/runtime/generated") for x in execs)
     up = next(i for i, x in enumerate(execs) if " up -d" in x)
     assert execs.index(handed[0]) < up, "the secret is handed over before the service starts"
 

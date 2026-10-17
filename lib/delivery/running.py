@@ -142,8 +142,10 @@ def hand_over_secrets(ctx: Delivery, services: list[Service], release: str) -> l
     as another uid -- ASP.NET's `app`, 1654 -- could not read them, so the app would refuse to start.
 
     The service's own image, run once as root with only `chown`/`chmod`, hands each file over (0400, that
-    uid); the directory stays the deploy user's at 0711, so the next release still sees which files exist
-    without being able to read one: never read back, by construction. Idempotent."""
+    uid); the directory stays the deploy user's at 0755 -- a runtime that loads a directory of secrets
+    (ASP.NET's key-per-file) LISTS it, and a key's name is no secret -- while every value is the runtime's
+    alone: the deploy user sees which files exist and reads none. Never read back, by construction.
+    Idempotent. (0711 was measured on a real host: the app could not list the directory and refused to start.)"""
     handed = []
     for service in services:
         uid = (service.spec.get("generatedSecrets") or {}).get("uid")
@@ -151,7 +153,7 @@ def hand_over_secrets(ctx: Delivery, services: list[Service], release: str) -> l
             continue
         base = posixpath.join(ctx.places.of("runtime", service), "generated")
         image = naming.remote_image(ctx.project, ctx.environment, service.id, release)
-        ctx.run(["chmod", "0711", base])
+        ctx.run(["chmod", "0755", base])
         owner = f"{int(uid)}:{int(uid)}"
         ctx.run(ctx.engine("run", "--rm", "--user", "0", "--network", "none", "--entrypoint", "sh",
                            "-v", f"{base}:/secrets", image, "-c",

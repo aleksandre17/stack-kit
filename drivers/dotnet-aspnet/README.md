@@ -30,8 +30,8 @@ if (!string.IsNullOrEmpty(keyPerFile))
 
 `validate` refuses a module given a generated secret when no `AddKeyPerFile(` appears in its sources.
 The image runs as `app` (uid 1654), so before the service starts each generated file is handed to
-that uid (mode 0400) by the service's own image -- the deploy user keeps the directory and never reads
-a value back.
+that uid (mode 0400) by the service's own image -- the deploy user keeps the directory (0755: key-per-file
+lists it) and never reads a value back.
 
 ## Manifest
 
