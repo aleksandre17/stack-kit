@@ -1186,3 +1186,33 @@ runs on the value -- the host's test and health say that. *Search the whole rele
 a runtime's own library names it (ASP.NET's key-per-file assembly does), so the app's own built file
 is named.
 
+## Amendment 21 — a remote-dev workspace carries what its module's build reads from above (2026-10-18, owner-delegated)
+
+**Context.** The first adopting host moved its two .NET projects' versions and shared properties into
+`Directory.Packages.props` and `Directory.Build.props` beside them -- the build tool's own convention,
+found by walking up from the project. Every local path built. Remote dev did not: it syncs the
+module's directory, so the workspace had neither file and the dev container's build found no target
+framework and no package version (`NETSDK1013`). The host had to fold the files back into its
+project files to run remote dev at all -- a host conforming to a kit gap, not to a better form.
+
+**Decision.**
+1. *A driver names the files its build reads from above the module* (`dev.inherited`, a module may add
+   its own): dotnet-aspnet names `Directory.Build.props`, `Directory.Build.targets`,
+   `Directory.Packages.props`, `global.json` and `NuGet.config`.
+2. *Each is found as the build tool finds it*: the nearest directory above the module, up to the
+   project root and never past it, and is sent to the workspace's root -- unless the module has its
+   own, which the tool would read first. A watcher sees it change, and the driver's reactions apply
+   to it by name; the excludes still hold (an inherited name is never a way to ship a secret).
+3. *rsync keeps its mirror*: it still mirrors the module directory with `--delete`; the inherited
+   files are kept out of its reach and sent beside it.
+
+**Rejected.** Syncing from the project root (the workspace would carry every other module and its
+secrets' neighbours, and the dev command's paths would change for every host); a workspace that
+mirrors the repository path up to a declared context root (the general form, but the dev command,
+working directory and every mount would move -- a breaking change for one host's need); copying the
+whole chain above the module (a file that imports a further one names a path the workspace cannot
+mirror; only the nearest of each name is sent, and that limit is written here).
+
+**Owed.** Proven against the recorded and the local transport; a real host's dev container building a
+project whose versions live above it is the adopting host's take of this release.
+

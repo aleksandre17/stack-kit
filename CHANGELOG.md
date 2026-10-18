@@ -1,5 +1,17 @@
 # Changelog — stack-kit
 
+## 2.6.0 — 2026-10-18
+
+### Added
+
+- Remote dev carries what a module's build reads from above its directory (`dev.inherited`, ADR-001
+  amendment 21). dotnet-aspnet names `Directory.Build.props`, `Directory.Build.targets`,
+  `Directory.Packages.props`, `global.json` and `NuGet.config`: each is found the way the build tool
+  finds it -- the nearest directory above the module, up to the project root -- and sent to the
+  workspace's root unless the module has its own. A watcher sees it change and restarts on it. A host
+  may now keep central package management and shared properties above its projects and still run
+  them in remote dev.
+
 ## 2.5.2 — 2026-10-17
 
 ### Fixed

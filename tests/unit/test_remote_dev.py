@@ -168,3 +168,64 @@ def test_dev_down_hands_a_releases_secrets_to_its_runtime_before_it_comes_back_u
     monkeypatch.setattr(running, "up", lambda c, ids: order.append(("up", ids)))
     assert dev.down(ctx, ["edge"]) == 0
     assert order == [("hand", ["edge"], "r1"), ("up", ["edge"])]
+
+
+def _inherits(root: Path, names: list[str]) -> None:
+    """The fixture driver's build reads these from above its module, as MSBuild reads Directory.Build.props."""
+    p = root / "drivers" / "registry.json"
+    registry = json.loads(p.read_text(encoding="utf-8"))
+    registry["fixture-svc"]["dev"]["inherited"] = names
+    p.write_text(json.dumps(registry), encoding="utf-8")
+
+
+def test_a_module_inherits_the_nearest_build_files_above_it(project, tmp_path):
+    _inherits(project, ["Shared.props", "Root.props", "Own.props", "Absent.props", ".env"])
+    _touch(project / "apps" / "Shared.props", "near")
+    _touch(project / "Shared.props", "far")              # the nearer one wins, as the build tool reads it
+    _touch(project / "Root.props", "root")               # the project root is the last place looked
+    _touch(project.parent / "Absent.props", "outside")   # never above the project root
+    _touch(project / "apps" / "edge" / "Own.props", "mine")
+    _touch(project / ".env", "SECRET=1")                 # an inherited name is still under the excludes
+    remote = tmp_path / "remote"
+    t = LocalTransport(remote, confine=f"{ROOT}/shop/dev")
+    ctx = ctx_for(project, server(tmp_path), "dev")
+    edge = _edge(ctx)
+    src = project / "apps" / "edge"
+    above = dev.inherited(ctx, edge)
+    assert {k: v.read_text() for k, v in above.items()} == {"Shared.props": "near", "Root.props": "root", ".env": "SECRET=1"}
+    pats, cache = sync.excludes(edge, src), tmp_path / "cache.json"
+    first = sync.sync(t, src, WS, pats, cache=cache, above=above)
+    ws = remote / WS.lstrip("/")
+    assert {"Shared.props", "Root.props", "Own.props"} <= set(first.sent) and ".env" not in first.sent
+    assert (ws / "Shared.props").read_text() == "near" and (ws / "Own.props").read_text() == "mine"
+    assert not (ws / ".env").exists() and not (ws / "Absent.props").exists()
+    again = sync.sync(t, src, WS, pats, cache=cache, above=above)
+    assert again.sent == [] and again.deleted == []          # inherited files are not deleted as strangers
+    before = sync.snapshot(src, pats, above)
+    _touch(project / "apps" / "Shared.props", "changed", bump=50)
+    assert sync.snapshot(src, pats, above) != before        # a watcher sees an inherited file change
+    assert sync.sync(t, src, WS, pats, cache=cache, above=above).sent == ["Shared.props"]
+
+
+def test_rsync_keeps_inherited_files_out_of_its_delete_and_sends_them_beside(project, tmp_path):
+    from lib.delivery.transport import RecordingTransport, Result
+
+    class Rsyncing(RecordingTransport):
+        has_rsync = True
+        calls: list = []
+
+        def exec(self, argv, cwd="", env=None, stream=False, readonly=False):
+            return Result(0, "rsync 3", "") if argv[:2] == ["rsync", "--version"] else super().exec(argv, cwd, env, stream, readonly)
+
+        def rsync(self, local_dir, path, excludes):
+            self.calls.append(list(excludes))
+
+    _inherits(project, ["Shared.props"])
+    _touch(project / "apps" / "Shared.props", "near")
+    t = Rsyncing()
+    ctx = ctx_for(project, server(tmp_path), "dev")
+    edge, src = _edge(ctx), project / "apps" / "edge"
+    result = sync.sync(t, src, WS, sync.excludes(edge, src), above=dev.inherited(ctx, edge))
+    assert result.way == "rsync" and result.sent == ["Shared.props"]
+    assert "/Shared.props" in t.calls[-1]
+    assert t.read(f"{WS}/Shared.props") == b"near"

@@ -47,10 +47,15 @@ def dev_services(ctx: Delivery, wanted: list[str]) -> list[Service]:
     return svc
 
 
+def inherited(ctx: Delivery, service: Service) -> dict[str, Path]:
+    return sync.inherited(service, module_dir(ctx, service), ctx.root)
+
+
 def sync_one(ctx: Delivery, service: Service, *, full: bool = False) -> sync.SyncResult:
     src = module_dir(ctx, service)
     ws = ctx.places.of("workspace", service)
-    result = sync.sync(ctx.transport, src, ws, sync.excludes(service, src), cache=_cache(ctx, service), full=full)
+    result = sync.sync(ctx.transport, src, ws, sync.excludes(service, src), cache=_cache(ctx, service), full=full,
+                       above=inherited(ctx, service))
     ctx.out(f"[dev] {service.id}: {result.summary()} -> {ws}")
     return result
 
@@ -156,7 +161,8 @@ def watch(ctx: Delivery, wanted: list[str], *, poll: float = 0.5, stop: Callable
     svc = dev_services(ctx, wanted)
     srcs = {s.id: module_dir(ctx, s) for s in svc}
     pats = {s.id: sync.excludes(s, srcs[s.id]) for s in svc}
-    seen = {s.id: sync.snapshot(srcs[s.id], pats[s.id]) for s in svc}
+    above = {s.id: inherited(ctx, s) for s in svc}
+    seen = {s.id: sync.snapshot(srcs[s.id], pats[s.id], above[s.id]) for s in svc}
     for s in svc:
         sync_one(ctx, s)
     ctx.out(f"[dev] watching {', '.join(s.id for s in svc)} (Ctrl-C stops)")
@@ -173,13 +179,13 @@ def watch(ctx: Delivery, wanted: list[str], *, poll: float = 0.5, stop: Callable
                     pending_full, backoff = False, 1.0
                     ctx.out("[dev] reconnected; full sync done")
                 for s in svc:
-                    now = sync.snapshot(srcs[s.id], pats[s.id])
+                    now = sync.snapshot(srcs[s.id], pats[s.id], above[s.id])
                     if now == seen[s.id]:
                         continue
                     debounce = float(s.dev.get("debounceMs") or 800) / 1000.0
                     while True:  # settle: a burst of saves is one change
                         ctx.sleep(debounce)
-                        later = sync.snapshot(srcs[s.id], pats[s.id])
+                        later = sync.snapshot(srcs[s.id], pats[s.id], above[s.id])
                         if later == now:
                             break
                         now = later

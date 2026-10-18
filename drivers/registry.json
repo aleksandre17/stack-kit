@@ -788,12 +788,24 @@
         "bin/",
         "obj/"
       ],
+      "inherited": [
+        "Directory.Build.props",
+        "Directory.Build.targets",
+        "Directory.Packages.props",
+        "global.json",
+        "NuGet.config",
+        "nuget.config"
+      ],
       "reactions": [
         {
           "globs": [
             "*.csproj",
             "*.sln",
-            "Directory.*.props"
+            "Directory.*.props",
+            "Directory.*.targets",
+            "global.json",
+            "NuGet.config",
+            "nuget.config"
           ],
           "do": "restart"
         }

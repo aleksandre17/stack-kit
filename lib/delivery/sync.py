@@ -6,6 +6,13 @@ config/delivery.json `neverShip` and `credentialPatterns`), the driver's `dev.ex
 names is never sent, and never deleted on the server either (a dependency directory the dev
 container fills inside the workspace survives every sync).
 
+What a module's build reads from ABOVE its directory -- a build tool's project-wide properties,
+version pins or SDK pin -- is not in the module, so a workspace holding the module alone could not
+build it. The driver names those files (`dev.inherited`); each is found the way the build tool finds
+it, the nearest directory above the module up to the project root, and is sent to the workspace's
+root -- unless the module has its own, which the tool would read first. Only the nearest of each
+name is sent: a chain that imports a further file above it is not followed.
+
 Two ways, chosen by what both ends have:
     rsync     over the target's ssh, when this machine and the server both have it
     index     a built-in fallback needing only ssh and tar: this machine's index (path -> size,
@@ -78,8 +85,31 @@ def excluded(rel: str, patterns: list[str]) -> bool:
     return False
 
 
-def local_index(module_dir: Path, patterns: list[str]) -> dict[str, tuple[int, int, Path]]:
+def inherited(service: Service, module_dir: Path, root: Path) -> dict[str, Path]:
+    """workspace name -> the file above the module it is (the driver's or module's `dev.inherited`)."""
+    top, here = root.resolve(), module_dir.resolve()
+    out: dict[str, Path] = {}
+    for name in service.dev.get("inherited") or []:
+        if (here / name).is_file():
+            continue
+        d = here.parent
+        while True:
+            if (d / name).is_file():
+                out[name] = d / name
+                break
+            if d == top or d.parent == d or top not in d.parents:
+                break
+            d = d.parent
+    return out
+
+
+def local_index(module_dir: Path, patterns: list[str],
+                above: dict[str, Path] | None = None) -> dict[str, tuple[int, int, Path]]:
     out: dict[str, tuple[int, int, Path]] = {}
+    for rel, p in (above or {}).items():
+        if not excluded(rel, patterns):
+            st = p.stat()
+            out[rel] = (st.st_size, int(st.st_mtime), p)
     for p in sorted(module_dir.rglob("*")):
         if not p.is_file():
             continue
@@ -100,19 +130,26 @@ def remote_has_rsync(transport: Transport) -> bool:
 
 
 def sync(transport: Transport, module_dir: Path, workspace: str, patterns: list[str], *,
-         cache: Path | None = None, full: bool = False, prefer_rsync: bool = True) -> SyncResult:
-    """The workspace made equal to the module's source, minus the excludes."""
+         cache: Path | None = None, full: bool = False, prefer_rsync: bool = True,
+         above: dict[str, Path] | None = None) -> SyncResult:
+    """The workspace made equal to the module's source and what it inherits from above, minus the
+    excludes."""
     transport.mkdir(workspace)
+    above = {rel: p for rel, p in (above or {}).items() if not excluded(rel, patterns)}
     if prefer_rsync and remote_has_rsync(transport):
-        transport.rsync(module_dir, workspace, patterns)
-        return SyncResult("rsync")
+        # rsync mirrors the module directory with --delete: the inherited files are kept out of its
+        # reach, then sent beside it.
+        transport.rsync(module_dir, workspace, [*patterns, *(f"/{rel}" for rel in above)])
+        if above:
+            transport.untar(workspace, tar_of(above))
+        return SyncResult("rsync", sent=sorted(above))
     known: dict[str, str] = {}
     if cache is not None and cache.is_file() and not full:
         try:
             known = json.loads(cache.read_text(encoding="utf-8"))
         except ValueError:
             known = {}
-    mine = local_index(module_dir, patterns)
+    mine = local_index(module_dir, patterns, above)
     theirs = transport.index(workspace)
     result = SyncResult("index")
     send: dict[str, Path] = {}
@@ -140,9 +177,10 @@ def sync(transport: Transport, module_dir: Path, workspace: str, patterns: list[
     return result
 
 
-def snapshot(module_dir: Path, patterns: list[str]) -> dict[str, tuple[int, int]]:
-    """What a watcher compares between polls."""
-    return {rel: (size, mtime) for rel, (size, mtime, _p) in local_index(module_dir, patterns).items()}
+def snapshot(module_dir: Path, patterns: list[str],
+             above: dict[str, Path] | None = None) -> dict[str, tuple[int, int]]:
+    """What a watcher compares between polls: the module's files and the ones it inherits."""
+    return {rel: (size, mtime) for rel, (size, mtime, _p) in local_index(module_dir, patterns, above).items()}
 
 
 SEVERITY = {"hot-reload": 0, "restart": 1, "rebuild": 2}

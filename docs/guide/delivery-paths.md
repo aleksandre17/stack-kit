@@ -232,7 +232,10 @@ sequenceDiagram
 | node-vite | `node:<v>-alpine` | install, then `dev --host 0.0.0.0` | 5173 |
 | node-spa | `node:<v>-alpine` | install, then the `dev` (else `start`) script `--host 0.0.0.0` | 4200 |
 
-The workspace is `{unit}/workspace`, mounted at `/workspace`. Caches (Gradle and Maven, NuGet,
+The workspace is `{unit}/workspace`, mounted at `/workspace`. What the build reads from above the module
+(the driver's `dev.inherited`: dotnet-aspnet's `Directory.Build.props`, `Directory.Packages.props`,
+`global.json`, `NuGet.config`) is found the way the build tool finds it and sent to the workspace root,
+unless the module has its own. Caches (Gradle and Maven, NuGet,
 `node_modules`) are named volumes `{project}-{environment}-{service}-{cache}`. This machine keeps its
 sync state in `.stack-kit/dev/<target>-<env>-<service>.json`.
 
