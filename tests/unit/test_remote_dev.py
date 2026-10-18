@@ -13,7 +13,7 @@ import pytest
 
 from lib import identity
 from lib.delivery import dev, running, sync
-from lib.delivery.transport import LocalTransport, TransportError
+from lib.delivery.transport import LocalTransport, Result, TransportError
 from delivery_host import ROOT, ctx_for, host, server
 
 WS = f"{ROOT}/shop/dev/edge/edge/workspace"
@@ -229,3 +229,54 @@ def test_rsync_keeps_inherited_files_out_of_its_delete_and_sends_them_beside(pro
     assert result.way == "rsync" and result.sent == ["Shared.props"]
     assert "/Shared.props" in t.calls[-1]
     assert t.read(f"{WS}/Shared.props") == b"near"
+
+
+def test_an_rsync_sync_reacts_to_the_paths_the_watcher_saw_change():
+    """rsync names no file it moved: the reaction is judged on what changed between the watcher's two
+    snapshots -- a build file edited is a rebuild, never a hot-reload judged on a placeholder."""
+    before = {"src/main.code": (2, 1), "app.cfg": (5, 1), "gone.txt": (1, 1)}
+    after = {"src/main.code": (3, 2), "app.cfg": (5, 1), "new.txt": (1, 2)}
+    rsync = sync.SyncResult("rsync", sent=["Directory.Build.props"])
+    assert dev.changes(before, after, rsync) == ["gone.txt", "new.txt", "src/main.code"]
+    tar = sync.SyncResult("tar", sent=["src/main.code"], deleted=["gone.txt"])
+    assert dev.changes(before, after, tar) == ["src/main.code", "gone.txt"]
+    assert "names no file" in rsync.summary() and "1 inherited file(s)" in rsync.summary()
+
+
+def test_ports_the_engine_cannot_list_are_not_checked_and_said_so(project, tmp_path):
+    """None of the declared ports is judged when the engine cannot say which it publishes: a port held by
+    our own container would read as a stranger's, and an empty list would read as none taken."""
+    from lib.delivery import preflight
+
+    t = server(tmp_path)
+    ctx = ctx_for(project, t, "dev")
+    ctx.target = {**ctx.target, "ports": {"dev": {"edge": [18081]}}}
+    answers = t.responses
+
+    def engine_down(argv, cwd, env):  # the engine does not answer `ps`; everything else is the fixture server
+        if "ps" in argv and "--format" in argv:
+            return Result(1, "", "Cannot connect to the Docker daemon")
+        return answers(argv, cwd, env)
+
+    t.responses = engine_down
+    notices = preflight.ports(ctx)
+    assert len(notices) == 1 and notices[0].startswith("ports: NOT CHECKED -- the container engine does not list")
+
+
+def test_a_service_the_engine_will_not_remove_is_named_never_reported_stopped(project, tmp_path):
+    """CWE-390: `dev down` reads the engine's answer -- a container it could not remove is not 'stopped'."""
+    t = server(tmp_path)
+    ctx = ctx_for(project, t, "dev")
+    dev.up(ctx, ["edge"])
+    answers = t.responses
+
+    def rm_refused(argv, cwd, env):
+        if "rm" in argv and "-f" in argv and "compose" not in " ".join(argv):
+            return Result(1, "", "Error response from daemon: container is busy")
+        return answers(argv, cwd, env)
+
+    t.responses = rm_refused
+    said = []
+    ctx.out = said.append
+    assert dev.down(ctx, ["edge"]) == 0
+    assert any("edge: NOT removed" in line for line in said) and not any("stopped" in line for line in said), said

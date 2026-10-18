@@ -44,9 +44,9 @@ function Write-InfraLog {
 
 function Resolve-InfraEnvFile {
     if ($Prod) {
-        $f = Join-Path $SecretsInfra ".env.prod"
-        if (-not (Test-Path $f)) { $f = Join-Path $SecretsInfra ".env.dev" }
-        return $f
+        # Production never reads development's values (ADOPT.md): a missing .env.prod is reported missing
+        # (Assert-InfraEnvFile), never replaced by .env.dev.
+        return Join-Path $SecretsInfra ".env.prod"
     }
     return Join-Path $SecretsInfra ".env.dev"
 }
@@ -72,10 +72,12 @@ function Resolve-InfraComposeFileArgs {
     $files = [System.Collections.ArrayList]@()
     Add-InfraComposeFileArgs -Target $files
     if ($IsProd) {
-        $prod = Join-Path $InfraComposeDir "docker-compose.prod.yml"
-        if (Test-Path $prod) { [void]$files.AddRange(@('-f', $prod)) }
-        $coexist = Join-Path $InfraComposeDir "docker-compose.coexist.yml"
-        if (Test-Path $coexist) { [void]$files.AddRange(@('-f', $coexist)) }
+        # Each prod overlay is optional; one that is absent is said, never silently left out.
+        foreach ($name in @("docker-compose.prod.yml", "docker-compose.coexist.yml")) {
+            $overlay = Join-Path $InfraComposeDir $name
+            if (Test-Path $overlay) { [void]$files.AddRange(@('-f', $overlay)) }
+            else { Write-InfraLog "no $name in $InfraComposeDir - production runs without that overlay" "WARN" }
+        }
     }
     return $files.ToArray()
 }
@@ -128,10 +130,6 @@ switch ($Mode.ToLowerInvariant()) {
         Write-InfraLog "infra $Mode runs on the target through the CLI: stack-kit infra remote <action> --target <t> --env <id> (prereqs: stack-kit targets --verify)" "ERROR"
         exit 2
     }
-    default { Write-InfraLog "Usage: stack-kit infra remote up|down|sync|status|purge -Confirm" "ERROR"; exit 1 }
-        }
-    }
-    "tunnel" { Start-InfraTunnel }
     default {
         Write-InfraLog "Unknown mode: $Mode" "ERROR"
         Show-InfraHelp

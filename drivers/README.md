@@ -28,6 +28,11 @@ module's files, its `label`; lib/vscode_gen.py holds no debugger), `migrations`,
 2. Several APIs are several modules, each with its own type.
 3. `stack-kit mod <moduleId> <command>` runs a command the driver declares; `deploy`, `dev`, `ops`
    are the kit's verbs over every driver alike -- a driver ships no deploy, dev or manage script.
+4. A lifecycle step that runs nothing says so: a PowerShell command calls `Write-StepNotRun <line>
+   <reason>` (lib/drivers.ps1), any other writes its reason to the file `STACK_KIT_NOT_RUN` names,
+   and exits 0. The verdict then names the module as not run with that reason -- never counts it as
+   a module that ran. A test step that discovers no test fails, as pytest's and Jest's do; a module
+   with none declares it.
 
 ## Add a driver
 

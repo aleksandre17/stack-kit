@@ -1,6 +1,7 @@
 """Every lifecycle step the catalog declares (`build`, `test`, `lint`, or a host's own) is a verb
 across the modules: in manifest order, fail-fast, each recorded. A module whose driver lacks the
-step fails it -- unless the step is optional, which it skips and says."""
+step fails it -- unless the step is optional, which it skips and says. The verdict names every module
+that ran nothing, and why: a module that ran nothing is never counted as one that ran (CWE-223)."""
 from __future__ import annotations
 
 import sys
@@ -42,22 +43,42 @@ def run(step: str, a: Args) -> int:
             wanted.append(m)
         modules = [m for m in modules if m in wanted]
     optional = optional_steps(manifest)
-    ran = 0
+    ran: list[str] = []
+    not_run: list[tuple[str, str]] = []
     for mid in modules:
         typ = str(manifest["modules"][mid].get("type") or "")
         if step not in driver_commands(typ):
             if step in optional:
                 print(f"  [{mid} {step}] skipped: driver '{typ}' declares no {step}")
+                not_run.append((mid, f"driver '{typ}' declares no {step}"))
                 continue
             print(f"  [{mid} {step}] driver '{typ}' declares no {step} step")
             return 1
-        code = tools.recorded("step", step, mid, lambda: tools.driver_command(mid, step, []))
+        said: list["str | None"] = []
+
+        def act(module: str = mid) -> int:
+            code, reason = tools.driver_step(module, step, [])
+            said.append(reason)
+            return code
+
+        code = tools.recorded("step", step, mid, act, not_run=lambda: said[0] if said else None)
         if code:
             print(f"  [{mid} {step}] FAILED (exit {code})")
             return code
-        ran += 1
-    print(f"  {step} OK ({ran} module(s))")
+        if said and said[0]:
+            not_run.append((mid, said[0]))
+        else:
+            ran.append(mid)
+    print(verdict(step, ran, not_run))
     return 0
+
+
+def verdict(step: str, ran: list[str], not_run: list[tuple[str, str]]) -> str:
+    """The step's last line: what ran, and every module that ran nothing with why -- all of them named."""
+    skipped = "; ".join(f"{mid} ({why})" for mid, why in not_run)
+    if not ran:
+        return f"  {step}: NOTHING RAN" + (f" -- not run: {skipped}" if skipped else " -- no module was selected")
+    return f"  {step} OK ({len(ran)} module(s) ran" + (f"; not run: {skipped})" if skipped else ")")
 
 
 VERB = Verb("<step>", "a lifecycle step (catalogs.lifecycle: lint, build, test, ...) for every module, fail-fast",

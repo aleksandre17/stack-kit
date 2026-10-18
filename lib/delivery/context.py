@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from lib import catalogs, identity, naming, targets
+from lib.delivery.output import excerpt
 from lib.delivery.transport import DryRun, LocalTransport, RecordingTransport, SshTransport, Transport
 
 #: A test or a rehearsal hands the engine a transport by naming it: `record:<file>` (an in-memory server
@@ -67,7 +68,7 @@ class Delivery:
     def run(self, argv: list[str], *, readonly: bool = False, check: bool = True, stream: bool = False):
         r = self.transport.exec(argv, readonly=readonly, stream=stream)
         if check and r.code != 0:
-            raise DeliveryError(f"{' '.join(argv[:4])} ...: exit {r.code}: {(r.err or r.out).strip()[:400]}")
+            raise DeliveryError(f"{' '.join(argv[:4])} ...: exit {r.code}: {excerpt(r.err or r.out)}")
         return r
 
     def dry(self) -> "Delivery":

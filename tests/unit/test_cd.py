@@ -236,3 +236,27 @@ def test_ci_audits_the_dependencies_of_every_driver_that_declares_how():
     manifest["modules"]["api"]["type"] = "bare"
     mf.write_text(json.dumps(manifest), encoding="utf-8")
     assert " mod api audit" not in _job(_render(root), "api"), "a driver that declares no audit has none (an optional step)"
+
+
+def test_a_checkout_whose_state_git_cannot_read_is_never_packaged_as_clean(tmp_path, monkeypatch):
+    """CWE-636: `git status` failing is not a clean checkout -- the package refuses to name a state it
+    could not read."""
+    import subprocess as sp
+
+    from lib import package
+
+    git = ["git", "-C", str(tmp_path), "-c", "user.email=t@t", "-c", "user.name=t"]
+    sp.run([*git, "init", "-q"], check=True)
+    (tmp_path / "a.txt").write_text("a\n", encoding="utf-8")
+    sp.run([*git, "add", "-A"], check=True)
+    sp.run([*git, "commit", "-q", "-m", "a"], check=True)
+    real = sp.run
+
+    def status_fails(argv, *a, **k):
+        if "status" in argv:
+            return sp.CompletedProcess(argv, 128, "", "fatal: index file corrupt")
+        return real(argv, *a, **k)
+
+    monkeypatch.setattr(package.subprocess, "run", status_fails)
+    with pytest.raises(package.PackageError, match="git status failed"):
+        package.provenance(tmp_path)

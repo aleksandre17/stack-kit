@@ -34,7 +34,9 @@ echo "[ci] ${COMPOSE[*]} up (module=$API_MOD)..."
 
 bash "$PKG/ci/wait-health.sh" "http://127.0.0.1:${API_PORT}/health" "UP" 120
 
-if "${COMPOSE[@]}" "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" ps --format json 2>/dev/null | grep -q worker; then
+# The services are listed or the run fails: a list that could not be read must not skip the worker's check.
+services="$("${COMPOSE[@]}" "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" ps --format json)" || { echo "integration: the stack's services could not be listed" >&2; exit 1; }
+if grep -q worker <<<"$services"; then
   bash "$PKG/ci/wait-health.sh" "http://127.0.0.1:${WORKER_PORT}/actuator/health" "UP" 120
 fi
 

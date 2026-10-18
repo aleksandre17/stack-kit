@@ -45,6 +45,8 @@ class SyncResult:
         return [*self.sent, *self.deleted]
 
     def summary(self) -> str:
+        if self.way == "rsync":  # rsync mirrors the module and names no file: only what it inherits is counted
+            return f"rsync: the module mirrored (rsync names no file); {len(self.sent)} inherited file(s) sent beside it"
         return f"{self.way}: {len(self.sent)} sent, {len(self.deleted)} deleted, {self.unchanged} unchanged"
 
 

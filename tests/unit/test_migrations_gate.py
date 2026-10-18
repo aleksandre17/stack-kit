@@ -80,3 +80,12 @@ def test_migrations_beside_the_module_are_found_through_declared_paths(tmp_path)
     (elsewhere / f"V1__seed.{ext}").write_text(_data_line(declared["data"][0]), encoding="utf-8")
     manifest = {"modules": {"m": {"type": driver, "path": "m", "migrations": {"paths": ["core/db"]}}}}
     assert check(tmp_path, manifest), "a declared migrations directory was not searched"
+
+
+@pytest.mark.parametrize("driver", sorted(DECLARING))
+def test_a_declared_migrations_directory_that_is_not_there_is_named_never_skipped(tmp_path, driver):
+    """CWE-223: a mistyped `migrations.paths` checked nothing -- that is said, not passed as clean."""
+    (tmp_path / "m").mkdir()
+    manifest = {"modules": {"m": {"type": driver, "path": "m", "migrations": {"paths": ["m/Migrationz"]}}}}
+    assert check(tmp_path, manifest) == ["modules.m.migrations.paths: m/Migrationz is not a directory -- "
+                                         "no migration under it was checked"]

@@ -51,9 +51,13 @@ def check(root: Path, manifest: dict[str, Any]) -> list[str]:
         patterns = [re.compile(p) for p in declared.get("data") or []]
         files: set[Path] = set()
         for base, globs in _bases(root, cfg, declared):
-            if base.is_dir():
-                for g in globs:
-                    files.update(p for p in base.glob(g) if p.is_file())
+            if not base.is_dir():
+                if (cfg.get("migrations") or {}).get("paths"):  # a declared place not there checks nothing: said
+                    findings.append(f"modules.{mid}.migrations.paths: {base.relative_to(root).as_posix()} is not a "
+                                    f"directory -- no migration under it was checked")
+                continue
+            for g in globs:
+                files.update(p for p in base.glob(g) if p.is_file())
         for f in sorted(files):
             rel = f.relative_to(root).as_posix()
             if rel in allowed or any(fnmatch.fnmatch(f.name, e) for e in exclude):

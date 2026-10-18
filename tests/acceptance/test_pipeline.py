@@ -100,3 +100,12 @@ def test_matches_and_at_least_compare_values():
     assert _compare({"atLeast": 10}, "12") is None
     assert "at least 13" in _compare({"atLeast": 13}, "12")
     assert "a number" in _compare({"atLeast": 1}, "twelve")
+
+
+def test_a_teardown_that_fails_fails_the_run_that_otherwise_held(host):
+    """What a run started and could not stop may still be running: a held pipeline whose teardown failed is
+    never reported as held (CWE-390)."""
+    stuck = {"id": "down", "kind": "teardown", "run": _py("import sys; sys.exit(3)")}
+    ran = _validate(host, [WRITE, READ, stuck], "--stages")
+    assert ran.returncode == 1, ran.stdout + ran.stderr
+    assert "FAILED teardown down" in ran.stderr and "held, ending on an anchor" not in ran.stdout

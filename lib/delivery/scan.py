@@ -77,7 +77,7 @@ def verdict(report: dict[str, Any], p: dict[str, Any], waived: set[str], now: da
             counts[sev] += 1
         if sev in SEVERITY and SEVERITY.index(sev) >= floor and str(v.get("id")) not in waived:
             refusing.append(f"{v.get('id')} ({sev}) in {((m.get('artifact') or {}).get('name'))}")
-    why = [f"{len(refusing)} finding(s) at or above {SEVERITY[floor]}: " + ", ".join(sorted(refusing)[:10])] if refusing else []
+    why = [f"{len(refusing)} finding(s) at or above {SEVERITY[floor]}: " + ", ".join(sorted(refusing))] if refusing else []
     built = (((report.get("descriptor") or {}).get("db") or {}).get("built") or "")
     if built:
         when = datetime.fromisoformat(str(built).replace("Z", "+00:00"))
@@ -91,7 +91,11 @@ def verdict(report: dict[str, Any], p: dict[str, Any], waived: set[str], now: da
 
 def scan(ctx: Delivery, svc: list[Any], release: str) -> None:
     """Every image this release builds, judged; refused (exit 5) unless the policy holds."""
-    if not required(ctx) or not ctx.commands["engine"]:
+    if not required(ctx):
+        return
+    if not ctx.commands["engine"]:  # the policy asks, and there is no image to judge: said, never silent
+        ctx.out(f"[scan] the image scan the policy requires does not apply: runtime '{ctx.target.get('runtime')}' "
+                f"builds no image")
         return
     p = policy(ctx.manifest)
     if problems(ctx.manifest):

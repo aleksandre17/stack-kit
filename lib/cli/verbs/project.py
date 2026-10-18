@@ -134,7 +134,10 @@ def _migrations(a: Args) -> int:
     found = migrations_gate.ledger_problems(ctx.root, ctx.manifest) + migrations_gate.check(ctx.root, ctx.manifest)
     for line in found:
         print(f"  {line}")
-    print("  [migrations] " + (f"{len(found)} finding(s)" if found else "structure only, and every recorded one unchanged"))
+    recorded = (ctx.root / migrations_gate.LEDGER).is_file()
+    print("  [migrations] " + (f"{len(found)} finding(s)" if found else "structure only, and every recorded one unchanged"
+                               if recorded else f"structure only; NO LEDGER at {migrations_gate.LEDGER}, so no recorded "
+                               f"migration was checked for change (`migrations lock` records them)"))
     return 1 if found else 0
 
 
@@ -148,7 +151,9 @@ def _render(a: Args) -> int:
         errors, notices = projections.drift(ctx.root, ctx.manifest)
         for line in [*errors, *notices]:
             print(f"  {line}")
-        print(f"  [render] {len(errors)} stale projection(s)" if errors else "  [render] every rendered projection is current")
+        unrendered = f"; {len(notices)} not rendered (named above)" if notices else ""
+        print((f"  [render] {len(errors)} stale projection(s)" if errors else "  [render] every rendered projection is current")
+              + unrendered)
         return 1 if errors else 0
     for line in projections.write(ctx.root, ctx.manifest, plan=a.has("--plan")):
         print(f"  {line}")
@@ -181,6 +186,9 @@ def _scan(a: Args) -> int:
         print(f"  {line}")
     for warning in secret_scan.unfingerprinted(ctx.root, ctx.manifest):
         print(f"  [warn] {warning}")
+    if secret_scan.UNSCANNED:  # every one named: a cut list would read as fewer (CWE-222)
+        print(f"  [scan] NOT SCANNED: {len(secret_scan.UNSCANNED)} tracked file(s) the scan cannot read as text -- "
+              + ", ".join(rel for rel, _why in secret_scan.UNSCANNED))
     known = (f"; {len(secret_scan.KNOWN)} KNOWN exposure(s) the configuration catalogue tracks to their removal "
              f"(knownExposures) -- known is not clean" if secret_scan.KNOWN else "")
     print("  [scan] " + (f"{len(lines)} finding(s) -- values are never printed; allow one by path and rule with its reason "

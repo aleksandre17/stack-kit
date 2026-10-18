@@ -6,6 +6,15 @@
 
 . (Join-Path $PSScriptRoot "project.ps1")
 
+function Write-StepNotRun {
+    # A step that runs nothing says so in its own line and tells the step that called it why
+    # (the file $env:STACK_KIT_NOT_RUN names, lib/cli/tools.py driver_step): the verdict then counts
+    # the module as NOT RUN, never as one that ran (CWE-223).
+    param([Parameter(Mandatory = $true)][string]$Line, [Parameter(Mandatory = $true)][string]$Reason)
+    Write-Host $Line -ForegroundColor DarkGray
+    if ($env:STACK_KIT_NOT_RUN) { Set-Content -LiteralPath $env:STACK_KIT_NOT_RUN -Value $Reason -Encoding utf8 -NoNewline }
+}
+
 function Get-DriverRegistryPath {
     Join-Path (Get-OpsPackageRoot) "drivers\registry.json"
 }

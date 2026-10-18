@@ -24,7 +24,7 @@ if __name__ == "__main__":  # run as a file: the kit root, not lib/, is what `li
 
 from lib.identity import KIT_NAME, MANIFEST_FILENAME  # noqa: E402
 from lib.manifest_defaults import default_field  # noqa: E402
-from lib.modules import driver_capability, driver_commands, lifecycle_steps  # noqa: E402
+from lib.modules import driver_capability, driver_commands, lifecycle_steps, optional_steps  # noqa: E402
 from lib.project_context import ProjectContext  # noqa: E402
 
 DEFAULT_WORKFLOW = ".github/workflows/ci.yml"
@@ -276,9 +276,12 @@ def render(ctx: ProjectContext) -> str:
     out += ["  secrets:", "    name: 'secret scan (tree and history)'", "    runs-on: ubuntu-latest", "    timeout-minutes: 10",
             "    steps:", f"      - uses: {_uses('actions/checkout', pins)}", "        with:", "          fetch-depth: 0",
             f"      - run: {_q(f'pwsh {cli} scan secrets --history')}"]
+    optional = optional_steps(manifest)
     for mid, module in modules.items():
         typ = str(module.get("type") or "")
-        steps = [s for s in lifecycle_steps(manifest) if s in driver_commands(typ)]
+        # A required step the driver lacks is still a step: CI runs it and fails as `<step>` does here, never
+        # drops it (CWE-223). Only an optional one is left out -- as the local step skips it.
+        steps = [s for s in lifecycle_steps(manifest) if s in driver_commands(typ) or s not in optional]
         job = re.sub(r"[^A-Za-z0-9_-]", "-", mid)
         runner = (driver_capability(typ, "ci", {}) or {}).get("runsOn") or "ubuntu-latest"
         out += [f"  {job}:", f"    name: {_q(f'{mid} ({typ})')}", f"    runs-on: {runner}", "    timeout-minutes: 30"]

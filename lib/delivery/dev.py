@@ -99,10 +99,14 @@ def down(ctx: Delivery, wanted: list[str]) -> int:
         running.up(ctx, back)
         ctx.out(f"[dev] {', '.join(back)}: back to their release")
     if gone:
-        ctx.run(ctx.compose("rm", "-s", "-f", *gone), check=False)
-        for sid in gone:
-            ctx.run(ctx.engine("rm", "-f", naming.remote_container(ctx.project, ctx.environment, sid)), check=False)
-        ctx.out(f"[dev] {', '.join(gone)}: stopped (no release to return to)")
+        ctx.run(ctx.compose("rm", "-s", "-f", *gone), check=False)  # the engine's rm below is the one judged
+        left = [sid for sid in gone
+                if ctx.run(ctx.engine("rm", "-f", naming.remote_container(ctx.project, ctx.environment, sid)), check=False).code != 0]
+        stopped = [sid for sid in gone if sid not in left]
+        if stopped:
+            ctx.out(f"[dev] {', '.join(stopped)}: stopped (no release to return to)")
+        if left:
+            ctx.out(f"[dev] {', '.join(left)}: NOT removed -- the engine refused; see `stack-kit dev logs` or the engine on the target")
     return 0
 
 
@@ -139,6 +143,15 @@ def tunnel(ctx: Delivery, wanted: list[str]) -> int:
                             f"targets.{ctx.target_name}.ports.{ctx.environment}, and no dev.debugPort")
     ctx.out("[dev] tunnel " + ", ".join(f"localhost:{a} -> {ctx.target_name}:{b}" for a, b in forwards) + " (Ctrl-C stops)")
     return ctx.transport.tunnel(forwards)
+
+
+def changes(before: dict[str, tuple[int, int]], after: dict[str, tuple[int, int]], result: sync.SyncResult) -> list[str]:
+    """What a sync changed, for its reaction: the paths the sync names -- or, for rsync, which mirrors the
+    module without naming a file, every path the watcher saw added, removed or modified between its two
+    snapshots. Never a placeholder: a reaction judged on no path is judged on nothing."""
+    if result.way != "rsync":
+        return result.changed()
+    return sorted(rel for rel in before.keys() | after.keys() if before.get(rel) != after.get(rel))
 
 
 def react(ctx: Delivery, service: Service, changed: list[str]) -> str:
@@ -189,10 +202,10 @@ def watch(ctx: Delivery, wanted: list[str], *, poll: float = 0.5, stop: Callable
                         if later == now:
                             break
                         now = later
-                    seen[s.id] = now
-                    result = sync_one(ctx, s)
-                    if result.changed() or result.way == "rsync":
-                        react(ctx, s, result.changed() or sorted(set(now) ^ set(seen[s.id])) or ["*"])
+                    before, seen[s.id] = seen[s.id], now
+                    changed = changes(before, now, sync_one(ctx, s))
+                    if changed:
+                        react(ctx, s, changed)
             except TransportError as e:
                 ctx.out(f"[dev] connection lost ({e}); retrying in {backoff:.0f}s")
                 ctx.sleep(backoff)

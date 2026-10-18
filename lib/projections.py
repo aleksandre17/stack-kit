@@ -153,14 +153,12 @@ def symbolic_recipe(shipped: bytes, service: Any, tree: dict[str, Any]) -> bytes
 # ── the stack compose ────────────────────────────────────────────────────────
 
 def _context(root: Path, manifest: dict[str, Any], environment: str):
-    """A delivery context that reaches nothing (a recording transport): places and commands only."""
-    from lib.delivery.context import DeliveryError, open_delivery
+    """A delivery context that reaches nothing (a recording transport): places and commands only. One that
+    does not open raises, and its caller names the projection it could not render and why."""
+    from lib.delivery.context import open_delivery
     from lib.delivery.transport import RecordingTransport
 
-    try:
-        return open_delivery(root, manifest, environment=environment, transport=RecordingTransport(), out=lambda _l: None)
-    except (DeliveryError, ValueError):
-        return None
+    return open_delivery(root, manifest, environment=environment, transport=RecordingTransport(), out=lambda _l: None)
 
 
 def service_doc(ctx, service: Any, release: str, credentials: list[str] | None = None) -> dict[str, Any]:
@@ -227,9 +225,15 @@ def rendered(root: Path, manifest: dict[str, Any], unrenderable: list[str] | Non
             envs = catalogs.ids("environments", manifest)
         except ValueError:
             envs = []
+        from lib.delivery.context import DeliveryError
+
         for env in envs:
-            ctx = _context(root, manifest, env)
-            if ctx is None or not ctx.commands["compose"]:
+            try:
+                ctx = _context(root, manifest, env)
+            except (DeliveryError, ValueError) as e:
+                said.append(f"{env} stack: its delivery context does not open here ({e})")
+                continue
+            if not ctx.commands["compose"]:  # a runtime with no compose has no stack to render
                 continue
             try:
                 out[place(manifest, "stack", environment=env)] = header(stack_sources(manifest)).encode("utf-8") + compose(ctx)

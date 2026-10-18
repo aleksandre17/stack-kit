@@ -1,5 +1,57 @@
 # Changelog — stack-kit
 
+## 2.7.0 — 2026-10-18
+
+Nothing is lost silently (ADR-001 amendment 22). An audit for one class of defect -- information
+reduced, dropped or defaulted without saying so (CWE-222, CWE-223, CWE-390, CWE-636; OWASP A09/A10:2025)
+-- found it in the secret scan, the step verdicts, CI, delivery's messages and remote dev.
+
+### Behaviour a host may notice
+
+- `scan secrets`, `validate` and `deploy` refuse a tree git cannot list or a history git cannot read
+  (`NOT RUN`, exit 2) instead of scanning nothing and calling it clean. A tree under no version control
+  is said to be one (`validate` warns; `scan` is NOT RUN).
+- `scan secrets` reads every tracked text file whatever its size (a 2 MB limit hid large seed and dump
+  files), and names every tracked file it cannot read as text (`NOT SCANNED: N ... -- a, b`).
+- A dotnet-aspnet `test` that discovers no test **fails**, as pytest's and Jest's do; a module with
+  none declares it (`dotnet.test: ""`). The count comes from the run's TRX report and is said:
+  `103 test(s): 102 passed, 1 not executed (skipped)`.
+- Generated CI holds every required lifecycle step even when the module's driver lacks it -- CI then
+  fails the step as the local verb does, never drops it. Only an optional step is left out.
+- `infra local up -Prod` with no `.env.prod` fails as a missing file; it never reads `.env.dev` for
+  production. An absent prod overlay is said.
+- `package` refuses a checkout whose `git status` fails, instead of recording it clean.
+- A validate pipeline whose teardown fails fails (what it started may still be running).
+
+### Added
+
+- A lifecycle step's verdict names what ran and what did not: `test OK (1 module(s) ran; not run:
+  api (declared none))`; `NOTHING RAN` when none did. A driver says it ran nothing through
+  `Write-StepNotRun` or the file `STACK_KIT_NOT_RUN` names (drivers/README.md rule 4); the run record
+  carries `notRun`.
+- A failed tool's message carries the END of its output -- where compose, the engine, ssh or rsync say
+  why -- with the cut stated, and the whole output kept under the runs directory
+  (`lib/delivery/output.py`).
+- Every PowerShell script the kit ships is parsed by a test (one had shipped unparseable).
+
+### Fixed
+
+- `infra` parses again: lines orphaned by the 2.0.0 delivery rewrite made the script unrunnable.
+- Remote dev over rsync reacts to what changed: the watcher's two snapshots are compared before the
+  newer one replaces the older (a `.csproj` edit was judged as a placeholder and hot-reloaded), and the
+  summary no longer counts only the inherited files as everything rsync sent.
+- The remote index of a workspace `find` cannot fully read fails instead of reading empty (which
+  resent everything and deleted nothing).
+- The port preflight says NOT CHECKED when the engine cannot list its containers, instead of reading
+  no container as publishing nothing.
+- A refused image scan lists every refusing finding (it listed ten); `migrations` names a declared
+  `migrations.paths` directory that is not there and says when no ledger exists; `render --check` counts
+  what it could not render, and names an environment whose delivery context does not open.
+- `dev down` names a container the engine would not remove instead of reporting it stopped; the run
+  record's `gitDirty` is null when `git status` fails; a release on a runtime that runs no container
+  (static, IIS) says no health check and no image scan applied; the integration-stack CI script fails
+  when it cannot list the stack's services instead of skipping the worker's health check.
+
 ## 2.6.0 — 2026-10-18
 
 ### Added

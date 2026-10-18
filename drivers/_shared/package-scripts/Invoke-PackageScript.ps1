@@ -46,7 +46,7 @@ if ($entry.node -and $entry.node.scripts -and $entry.node.scripts.PSObject.Prope
 $script = if ($null -ne $own) { $own } else { Get-KitContextValue "driver:$($typ):packageScript:$Step" }
 $builtin = $Step -eq "audit"  # the package manager's own audit: no package.json script
 if ($null -ne $own -and $own -eq "") {
-    Write-Host "  [$ModuleId $Step] declared none (modules.$ModuleId.node.scripts.$Step = `"`")" -ForegroundColor DarkGray
+    Write-StepNotRun "  [$ModuleId $Step] declared none (modules.$ModuleId.node.scripts.$Step = `"`")" "declared none"
     exit 0
 }
 if (-not $script -and -not $builtin) {
@@ -56,7 +56,7 @@ if (-not $script -and -not $builtin) {
 $scripts = (Get-Content $packageJson -Raw -Encoding UTF8 | ConvertFrom-Json).scripts
 if (-not $builtin -and -not ($scripts -and $scripts.PSObject.Properties[$script])) {
     if ($OptionalSteps -contains $Step) {
-        Write-Host "  [$ModuleId $Step] skipped: package.json has no '$script' script" -ForegroundColor DarkGray
+        Write-StepNotRun "  [$ModuleId $Step] skipped: package.json has no '$script' script" "package.json has no '$script' script"
         exit 0
     }
     Write-Host "  [$ModuleId $Step] package.json has no '$script' script - add it, or name another in modules.$ModuleId.node.scripts.$Step (`"`" = none)" -ForegroundColor Red

@@ -21,6 +21,7 @@ from typing import Any
 from lib import naming
 from lib.delivery import consumes
 from lib.delivery.context import Delivery, DeliveryError
+from lib.delivery.output import excerpt
 
 _PUBLISHED = re.compile(r":(\d+)->")
 
@@ -68,17 +69,20 @@ def runtime(ctx: Delivery) -> list[str]:
         r = ctx.transport.exec(argv, readonly=True)
         if r.code != 0:
             raise DeliveryError(f"target {ctx.target_name}: `{' '.join(argv[:3])}` does not answer there (exit {r.code}): "
-                                f"{(r.err or r.out).strip()[:200]} -- declare the {what} invocation on the target "
+                                f"{excerpt(r.err or r.out)} -- declare the {what} invocation on the target "
                                 f"(targets.{ctx.target_name}.{what}) if it differs", 4)
         found.append(f"{what} {(r.out.strip().splitlines() or ['?'])[0]}")
     return found
 
 
-def published(ctx: Delivery) -> dict[int, str]:
-    """{host port: the compose project publishing it} across every container on the host."""
+def published(ctx: Delivery) -> dict[int, str] | None:
+    """{host port: the compose project publishing it} across every container on the host; None when the
+    engine does not list them -- unknown, never "no container publishes anything"."""
     r = ctx.transport.exec(ctx.engine("ps", "--format", '{{.Label "com.docker.compose.project"}}\t{{.Ports}}'), readonly=True)
+    if r.code != 0:
+        return None
     out: dict[int, str] = {}
-    for line in r.out.splitlines() if r.code == 0 else []:
+    for line in r.out.splitlines():
         project, _, ports = line.partition("\t")
         for p in _PUBLISHED.findall(ports):
             out.setdefault(int(p), project or "(no compose project)")
@@ -101,6 +105,9 @@ def ports(ctx: Delivery, services: list[str] | None = None) -> list[str]:
         return []
     mine = naming.remote_compose_project(ctx.project, ctx.environment)
     by_engine = published(ctx)
+    if by_engine is None:  # a port the engine publishes cannot be told from one held outside it: none is judged
+        return [f"ports: NOT CHECKED -- the container engine does not list its containers there "
+                f"(`{' '.join(ctx.engine('ps'))}`), so no declared port could be attributed"]
     held = listening(ctx)
     notices = [] if held is not None else ["ports: `ss` does not answer there; only container ports were checked"]
     for svc, ps in sorted(declared.items()):

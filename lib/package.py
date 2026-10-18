@@ -113,7 +113,11 @@ def provenance(root: Path) -> dict[str, Any]:
     sha = _git(root, "rev-parse", "--short=12", "HEAD")
     if not sha:
         raise PackageError("no commit to name the artifact by: a package is always of a commit")
-    dirty = bool(_git(root, "status", "--porcelain", "--untracked-files=no"))
+    status = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"], capture_output=True, text=True)
+    if status.returncode != 0:  # a checkout whose state cannot be read is never recorded as clean
+        raise PackageError(f"git status failed (exit {status.returncode}): {status.stderr.strip()} -- whether the "
+                           f"checkout is clean cannot be told, so no package names it")
+    dirty = bool(status.stdout.strip())
     return {"sha": sha, "commit": _git(root, "rev-parse", "HEAD"), "dirty": dirty,
             "revision": _git(root, "describe", "--tags", "--always", "--dirty") or sha,
             "id": sha + ("-dirty" if dirty else "")}

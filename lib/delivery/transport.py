@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from lib.delivery.output import excerpt
+
 
 class TransportError(RuntimeError):
     """A remote operation that failed, with what the server said."""
@@ -159,13 +161,13 @@ class SshTransport(Transport):
         except OSError as e:
             raise TransportError(f"{self.server}: ssh could not start: {e}") from e
         if ran.returncode == 255:
-            raise TransportError(f"{self.server}: unreachable: {ran.stderr.decode('utf-8', 'replace').strip()[:300]}")
+            raise TransportError(f"{self.server}: unreachable: {excerpt(ran.stderr.decode('utf-8', 'replace'))}")
         return Result(ran.returncode, ran.stdout.decode("utf-8", "replace"), ran.stderr.decode("utf-8", "replace"), ran.stdout)
 
     def _ok(self, script: str, data: bytes | None = None) -> Result:
         r = self._ssh(script, data)
         if r.code != 0:
-            raise TransportError(f"{self.server}: {script.splitlines()[0][:120]}: {r.err.strip()[:300]}")
+            raise TransportError(f"{self.server}: {script.splitlines()[0][:120]}: {excerpt(r.err)}")
         return r
 
     def mkdir(self, path: str) -> None:
@@ -202,9 +204,12 @@ class SshTransport(Transport):
         self._ok(f"mkdir -p {shlex.quote(path)} && tar -xf - -C {shlex.quote(path)}", data)
 
     def index(self, path: str) -> dict[str, tuple[int, int]]:
-        r = self._ssh(f"cd {shlex.quote(path)} 2>/dev/null && find . -type f -printf '%P\\t%s\\t%T@\\n'")
+        # A directory not there yet holds nothing (the first sync); one `find` cannot read fully is a failure,
+        # never an empty index -- that would resend everything and delete nothing, silently.
+        q = shlex.quote(path)
+        r = self._ok(f"[ -d {q} ] || exit 0; cd {q} && find . -type f -printf '%P\\t%s\\t%T@\\n'")
         out = {}
-        for line in r.out.splitlines() if r.code == 0 else []:
+        for line in r.out.splitlines():
             rel, size, mtime = line.rsplit("\t", 2)
             out[rel] = (int(size), int(float(mtime)))
         return out
@@ -216,7 +221,7 @@ class SshTransport(Transport):
                 f"{local_dir.as_posix()}/", f"{self.server}:{path}/"]
         ran = subprocess.run(argv, capture_output=True, text=True)
         if ran.returncode != 0:
-            raise TransportError(f"{self.server}: rsync to {path}: {ran.stderr.strip()[:300]}")
+            raise TransportError(f"{self.server}: rsync to {path}: {excerpt(ran.stderr)}")
 
     def move(self, src: str, dst: str) -> None:
         self._ok(f"mkdir -p {shlex.quote(posixpath.dirname(dst))} && mv -T {shlex.quote(src)} {shlex.quote(dst)}")

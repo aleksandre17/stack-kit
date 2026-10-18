@@ -205,6 +205,9 @@ def release(ctx: Delivery, module_id: str, archive: Path | None) -> int:
         gone = prune(ctx, s)
         if gone:
             ctx.out(f"[release] {s.id}: pruned {', '.join(gone)} (keep {keep_of(s, ctx.target)})")
+    if not ctx.commands["compose"]:  # a runtime with no container serves the files as they are: nothing ran to judge
+        ctx.out(f"[release] runtime '{ctx.target.get('runtime')}' runs no container: no health check and no image "
+                f"scan applied to {rid}")
     ctx.out(f"[release] {module_id} {rid} is current in {ctx.environment}")
     return 0
 

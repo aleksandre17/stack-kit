@@ -45,6 +45,11 @@ def _host(tmp_path: Path, modules: dict) -> Path:
     for section in ("stack", "stackDeploy", "cli", "vscode"):
         manifest.pop(section, None)
     mf.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    # A host is a repository: what it tracks is what a secret scan reads and what a release records. Its
+    # local env files stay untracked by the ignore file the kit scaffolds into every host's config.
+    shutil.copyfile(PKG / "scaffold" / "ops" / "config" / ".gitignore", root / "ops" / "config" / ".gitignore")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
     return root
 
 
@@ -91,7 +96,7 @@ def test_a_lint_the_package_lacks_is_skipped_and_said(spa_host):
 def test_build_runs_every_module_and_records_each_step(spa_host):
     ran = _cli(spa_host, "build")
     assert ran.returncode == 0, ran.stdout + ran.stderr
-    assert "built web" in ran.stdout and "built admin" in ran.stdout and "build OK (2 module(s))" in ran.stdout
+    assert "built web" in ran.stdout and "built admin" in ran.stdout and "build OK (2 module(s) ran)" in ran.stdout
     steps = [r for r in _records(spa_host) if r["kind"] == "step" and r["step"] == "build"]
     assert {r["module"] for r in steps} >= {"web", "admin"} and all(r["exit"] == 0 for r in steps)
     assert all(r["startedAt"] <= r["endedAt"] and "gitSha" in r for r in steps)
@@ -233,10 +238,13 @@ def test_a_host_whose_every_target_is_pending_builds_tests_and_runs_but_never_de
     manifest["deploy"] = {"targets": "ops/deploy/targets.json"}
     mf.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    for step in ("build", "test"):
+    # The api module declares no tests (`"test": ""`): it is named as not run, never counted as tested.
+    verdicts = {"build": f"build OK ({len(modules)} module(s) ran)",
+                "test": "test OK (1 module(s) ran; not run: api (declared none))" if "api" in modules else "test OK (1 module(s) ran)"}
+    for step, said in verdicts.items():
         ran = _cli(root, step)
         assert ran.returncode == 0, ran.stdout + ran.stderr
-        assert f"{step} OK ({len(modules)} module(s))" in ran.stdout and "pending" not in ran.stdout + ran.stderr
+        assert said in ran.stdout and "pending" not in ran.stdout + ran.stderr, ran.stdout
     ran = _cli(root, "mod", "web", "run")
     assert ran.returncode == 0 and "started" in ran.stdout, ran.stdout + ran.stderr
 

@@ -1216,3 +1216,35 @@ mirror; only the nearest of each name is sent, and that limit is written here).
 **Owed.** Proven against the recorded and the local transport; a real host's dev container building a
 project whose versions live above it is the adopting host's take of this release.
 
+## Amendment 22 — nothing is lost silently (2026-10-18, owner-delegated)
+
+**Context.** An audit for one class of defect -- information reduced, dropped or defaulted without
+saying so, so a reader believes they saw everything or that something passed -- found it across the
+kit: a secret scan that read a failed `git ls-files` as an empty tree and called it clean, a test
+verdict that counted a module running no test as tested, generated CI that dropped a required step,
+error messages cut at 300 characters with the cause past the cut, and a watcher that judged a change
+on a placeholder. The class has standard names: CWE-222 (truncation), CWE-223 (omission), CWE-390
+(error detected without action), CWE-636 (failing open); OWASP Top 10:2025 A09 and A10.
+
+**Decision.**
+1. *A read the verdict depends on that fails is a verdict that did not happen*: NOT RUN, with its
+   cause, never clean. A tree under no version control is told apart by the filesystem (a `.git`
+   above it, or `GIT_DIR`), not by git's translated message, and said to be one.
+2. *What a step did not do is counted as such*: a driver that runs nothing says why through one
+   contract (`Write-StepNotRun`, the file `STACK_KIT_NOT_RUN` names), and the verdict names every
+   such module; a test step that discovers no test fails unless the module declares it has none.
+3. *A shortened message keeps the end and says the cut*: the tail of a tool's output is where it says
+   why; the whole output is kept under the runs directory and the message names it.
+4. *An unknown is recorded as unknown*: `null`, `NOT CHECKED`, `NOT SCANNED` -- never `false`, empty
+   or clean.
+
+**Rejected.** A reserved exit code for "ran nothing" (exit 5 is pytest's and unittest's, but any npm
+script may exit 5 for its own reason, and the verdict would misread it); falling back to walking the
+disk when git cannot list the tree (it would scan ignored `.env` files and invent findings); keeping
+the scan's size limit for some file types (any text can carry a secret; a binary is recognised by
+its first 4 KiB, not by its size); keeping the head of a long error (compose, docker and ssh print
+progress first and the cause last).
+
+**Owed.** The node and java-boot drivers' test counts are not yet read (Maven runs `-q`; surefire's
+reports are the equivalent of TRX); agent-kit holds the same rule as a doctrine MUST.
+

@@ -211,14 +211,11 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
     except (ModelError, ValueError) as e:
         errs.append(f"delivery: {e}")
 
-    try:
-        from lib.config_gen import check_module_drift, config_gen_modules_with_datastores
+    from lib.config_gen import check_module_drift, config_gen_modules_with_datastores
 
-        for mid in config_gen_modules_with_datastores(ctx):
-            for issue in check_module_drift(ctx, mid):
-                errs.append(f"config-gen: {issue}")
-    except ImportError:
-        pass
+    for mid in config_gen_modules_with_datastores(ctx):
+        for issue in check_module_drift(ctx, mid):
+            errs.append(f"config-gen: {issue}")
 
     return errs, warnings
 
@@ -314,8 +311,16 @@ def validate_manifest(
     errs.extend(f"security: {s}" for s in pattern_errors)
     warnings.extend(f"security: {s}" for s in pattern_warnings)
     if not pattern_errors:
+        try:
+            leaks = secret_scan.tree(ctx.root, ctx.manifest)
+        except secret_scan.NotARepository as e:
+            leaks = []
+            warnings.append(f"security: the secret scan did NOT RUN -- {e}")
+        except secret_scan.ScanError as e:
+            leaks = []
+            errs.append(f"security: the secret scan did NOT RUN -- {e}")
         errs.extend(f"security: {f} -- a credential-shaped value is tracked (`scan secrets`; values are never printed)"
-                    for f in secret_scan.tree(ctx.root, ctx.manifest))
+                    for f in leaks)
         if secret_scan.KNOWN:
             warnings.append(f"security: {len(secret_scan.KNOWN)} KNOWN exposure(s) the configuration catalogue tracks "
                             f"to their removal (knownExposures) -- known is not clean: rotate, then remove")

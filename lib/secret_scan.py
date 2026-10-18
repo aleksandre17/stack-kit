@@ -29,6 +29,7 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
+import os
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -59,7 +60,34 @@ BINARY_MAGIC = (b"MZ", b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa", b"PK\x0
 
 
 class ScanError(ValueError):
-    """A declared pattern document the scan cannot believe: missing, malformed, or uncalibrated."""
+    """A scan that cannot be believed: a declared pattern document missing, malformed or uncalibrated, or a
+    tree or history git could not read. It is NOT RUN, never clean (CWE-636: a failure never fails open)."""
+
+
+#: How much of a file is read to tell text from binary: a NUL in it, with no UTF-16 mark, is binary.
+BINARY_PROBE = 4096
+
+
+def binary(data: bytes) -> bool:
+    """A file the scan cannot read as text -- named as not scanned, never counted clean (CWE-223)."""
+    return not data.startswith((b"\xff\xfe", b"\xfe\xff")) and b"\0" in data[:BINARY_PROBE]
+
+
+class NotARepository(ScanError):
+    """A tree under no version control: nothing is tracked, so there is nothing a scan of the tracked files
+    reads -- a stated fact, never a clean verdict."""
+
+
+def _git(root: Path, argv: list[str], what: str) -> bytes:
+    """The output of one git read the scan depends on; a failed one is a scan that did not happen. A tree with
+    no repository above it is told apart by the filesystem, not by git's (translated) message."""
+    ran = subprocess.run(["git", "-C", str(root), *argv], capture_output=True)
+    if ran.returncode != 0:
+        if not os.environ.get("GIT_DIR") and not any((d / ".git").exists() for d in (root.resolve(), *root.resolve().parents)):
+            raise NotARepository(f"{root} is not under version control -- nothing is tracked, so nothing was scanned")
+        said = ran.stderr.decode("utf-8", "replace").strip() or "no message"
+        raise ScanError(f"`{what}` failed (exit {ran.returncode}: {said}) -- nothing was scanned, so nothing is clean")
+    return ran.stdout
 
 
 @dataclass(frozen=True)
@@ -231,7 +259,7 @@ def scan_path(path: str, data: bytes, known: set[str] | None = None, active: lis
         found.append(Finding(path, 0, "tooling-binary"))
     if data.startswith((b"\xff\xfe", b"\xfe\xff")):  # UTF-16 with its mark -- what Windows tools often write
         text = data.decode("utf-16", "replace")
-    elif b"\0" in data[:4096]:
+    elif binary(data):
         return found
     else:
         text = data.decode("utf-8", "replace")
@@ -376,13 +404,19 @@ def policy(manifest: dict[str, Any]) -> tuple[list[dict[str, Any]], set[str]]:
 def tree(root: Path, manifest: dict[str, Any]) -> list[Finding]:
     allow, known = policy(manifest)
     active = rules(root, manifest)
-    out = subprocess.run(["git", "-C", str(root), "ls-files", "-z"], capture_output=True)
-    files = [p for p in out.stdout.decode("utf-8", "replace").split("\0") if p] if out.returncode == 0 else []
+    files = [p for p in _git(root, ["ls-files", "-z"], "git ls-files").decode("utf-8", "replace").split("\0") if p]
     found: list[Finding] = []
+    UNSCANNED.clear()
     for rel in files:
         p = root / rel
-        if p.is_file() and p.stat().st_size < 2_000_000:
-            found += scan_path(rel, p.read_bytes(), known, active)
+        if not p.is_file():  # tracked, deleted in the working tree: no bytes here to leak
+            continue
+        with p.open("rb") as fh:  # no size limit hides a secret; a binary file is not read past its probe
+            head = fh.read(BINARY_PROBE)
+            data = head if binary(head) else head + fh.read()
+        found += scan_path(rel, data, known, active)
+        if binary(data):
+            UNSCANNED.append((rel, "binary: a NUL byte in its first 4 KiB and no UTF-16 mark"))
     lines: dict[str, list[str]] = {}
 
     def text_of(f: Finding) -> str:
@@ -412,9 +446,8 @@ def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
     a known exposure never hides a new secret added beside it (ADR-001 amendment 20)."""
     allow, known = policy(manifest)
     active = rules(root, manifest)
-    ran = subprocess.run(["git", "-C", str(root), "-c", "core.quotepath=off", "log", "--all", "-p", "--no-color",
-                          "--unified=0", "--text", "--no-textconv", "--no-ext-diff", "--format=commit %H"],
-                         capture_output=True)
+    log = _git(root, ["-c", "core.quotepath=off", "log", "--all", "-p", "--no-color", "--unified=0", "--text",
+                      "--no-textconv", "--no-ext-diff", "--format=commit %H"], "git log --all -p")
     found: list[tuple[Finding, str]] = []
     commit, path, at = "", "", 0
     shown: dict[tuple[str, str], str] = {}
@@ -427,7 +460,7 @@ def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
         return shown[(at_commit, rel)]
 
     held_specimens: dict[tuple[str, str], set[str]] = {}
-    for raw in ran.stdout.decode("utf-8", "replace").split("\n"):
+    for raw in log.decode("utf-8", "replace").split("\n"):
         raw = raw.rstrip("\r")
         if raw.startswith("commit "):
             commit = raw[7:19]
@@ -472,6 +505,8 @@ def history(root: Path, manifest: dict[str, Any]) -> list[Finding]:
 
 #: The findings the last scan read as KNOWN exposures -- tracked by the catalogue to their removal.
 KNOWN: list[Finding] = []
+#: The tracked files the last tree scan could not read as text, each with why -- named, never counted clean.
+UNSCANNED: list[tuple[str, str]] = []
 
 
 def report(findings: Iterable[Finding]) -> list[str]:

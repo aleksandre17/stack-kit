@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -111,7 +112,7 @@ def argv_of(script: Path, operands: list[str], declared: str = "") -> list[str]:
     return out
 
 
-def driver_command(module_id: str, command: str, operands: list[str]) -> int:
+def driver_command(module_id: str, command: str, operands: list[str], extra_env: dict[str, str] | None = None) -> int:
     """One command a module's driver declares, run by its runtime, in its own process."""
     from lib.modules import driver_command_runtimes, driver_commands
     from lib.project_context import load_manifest
@@ -125,8 +126,19 @@ def driver_command(module_id: str, command: str, operands: list[str]) -> int:
         return 1
     argv = argv_of(commands[command], operands, driver_command_runtimes(typ).get(command, ""))
     env = child_env({identity.env_name("MODULE_ID"): module_id, identity.env_name("COMMAND"): command,
-                     identity.env_name("PROJECT_ROOT"): str(root)})
+                     identity.env_name("PROJECT_ROOT"): str(root), **(extra_env or {})})
     return subprocess.run(argv, env=env, cwd=str(root)).returncode
+
+
+def driver_step(module_id: str, command: str, operands: list[str]) -> tuple[int, str | None]:
+    """A lifecycle step's exit code, and why it ran nothing when its driver says so: a driver that runs
+    nothing writes its reason to the file `<prefix>_NOT_RUN` names (`Write-StepNotRun`), so the verdict
+    counts it as NOT RUN -- never as a module that ran (CWE-223)."""
+    with tempfile.TemporaryDirectory(prefix="stack-kit-step-") as held:
+        receipt = Path(held) / "not-run"
+        code = driver_command(module_id, command, operands, {identity.env_name("NOT_RUN"): str(receipt)})
+        reason = receipt.read_text(encoding="utf-8-sig").strip() if receipt.is_file() else ""
+    return code, (reason or None) if code == 0 else None
 
 
 # ── the run record (DORA): one JSON line per step that ran, never failing the step ──
@@ -137,22 +149,22 @@ def _git(root: Path, *args: str) -> str:
 
 
 def runs_file(root: Path) -> Path:
-    d = root / identity.RUNS_DIR
-    d.mkdir(parents=True, exist_ok=True)
-    ignore = root / identity.RUNS_DIR.split("/")[0] / ".gitignore"
-    if not ignore.is_file():
-        ignore.write_text("*\n", encoding="utf-8")
-    return d / "runs.jsonl"
+    from lib.runs import runs_dir
+
+    return runs_dir(root) / "runs.jsonl"
 
 
 def recorded(kind: str, step: str, module: str, action: Callable[[], int], environment: str = "",
-             target: str = "") -> int:
+             target: str = "", not_run: Callable[[], "str | None"] = lambda: None) -> int:
     try:
         root = project_root()
     except FileNotFoundError:
         return action()
     sha = _git(root, "rev-parse", "HEAD") or None
-    dirty = bool(_git(root, "status", "--porcelain", "--untracked-files=no")) if sha else None
+    # Unknown is recorded as unknown (null), never as clean: a status git could not read is not a clean one.
+    status = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+                            capture_output=True, text=True) if sha else None
+    dirty = bool(status.stdout.strip()) if status is not None and status.returncode == 0 else None
     started = datetime.now(timezone.utc)
     t0 = time.monotonic()
     code = 1
@@ -162,7 +174,8 @@ def recorded(kind: str, step: str, module: str, action: Callable[[], int], envir
         ended = datetime.now(timezone.utc)
         record = {"schema": 1, "kind": kind, "step": step, "module": module, "environment": environment or None,
                   "target": target or None, "startedAt": started.isoformat(), "endedAt": ended.isoformat(),
-                  "durationMs": int((time.monotonic() - t0) * 1000), "exit": code, "gitSha": sha, "gitDirty": dirty}
+                  "durationMs": int((time.monotonic() - t0) * 1000), "exit": code, "notRun": not_run(),
+                  "gitSha": sha, "gitDirty": dirty}
         try:
             with runs_file(root).open("a", encoding="utf-8") as f:
                 f.write(json.dumps(record) + "\n")

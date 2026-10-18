@@ -76,13 +76,13 @@ def test_a_python_command_s_exit_code_is_the_steps(host):
 
 def test_the_lifecycle_verb_runs_a_python_driver_across_modules(host):
     ran = _cli(host, "build")
-    assert ran.returncode == 0 and "python build" in ran.stdout and "build OK (1 module(s))" in ran.stdout, ran.stdout + ran.stderr
+    assert ran.returncode == 0 and "python build" in ran.stdout and "build OK (1 module(s) ran)" in ran.stdout, ran.stdout + ran.stderr
 
 
 def test_a_host_declared_step_is_a_verb_and_runs_under_a_host_declared_runtime(host):
     ran = _cli(host, "typecheck")
     assert ran.returncode == 0, ran.stdout + ran.stderr
-    assert "python typecheck" in ran.stdout and "typecheck OK (1 module(s))" in ran.stdout
+    assert "python typecheck" in ran.stdout and "typecheck OK (1 module(s) ran)" in ran.stdout
 
 
 def test_a_host_declared_environment_is_one_a_host_run_reads(host):

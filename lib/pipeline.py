@@ -94,6 +94,7 @@ def run(root: Path, stages: list[dict[str, Any]], out=sys.stdout) -> int:
     working = [s for s in stages if s["kind"] != "teardown"]
     teardown = [s for s in stages if s["kind"] == "teardown"]
     failed: str | None = None
+    untorn: list[str] = []
     try:
         for n, stage in enumerate(working, 1):
             label = f"[stage {n}/{len(working)}] {stage['id']} ({stage['kind']})"
@@ -124,10 +125,15 @@ def run(root: Path, stages: list[dict[str, Any]], out=sys.stdout) -> int:
                 done = _run(root, stage, capture=False)
                 if done.returncode != 0:
                     print(f"  teardown '{stage['id']}' exited {done.returncode}", file=sys.stderr)
+                    untorn.append(stage["id"])
             except (OSError, subprocess.TimeoutExpired) as e:
                 print(f"  teardown '{stage['id']}' could not run -- {e}", file=sys.stderr)
+                untorn.append(stage["id"])
     if failed:
         print(f"FAILED {failed}", file=sys.stderr)
+        return 1
+    if untorn:  # what a run started and could not stop is still running: never a held validation
+        print(f"FAILED teardown {', '.join(untorn)} -- what those stages started may still be running", file=sys.stderr)
         return 1
     print(f"[validate] {len(working)} stage(s) held, ending on an anchor", file=out)
     return 0

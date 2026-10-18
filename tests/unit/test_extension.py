@@ -169,3 +169,21 @@ def test_a_malformed_registry_is_refused_by_name_never_read_as_empty(tmp_path, t
     path.write_text(text, encoding="utf-8")
     with pytest.raises(DriverRegistryError, match=why):
         _read_registry(path)
+
+
+def test_a_required_step_the_driver_lacks_is_a_ci_step_that_fails_never_one_dropped(tmp_path, monkeypatch):
+    """CWE-223: CI holds every required step, as the local step does -- a driver without `test` fails it
+    there by its own words, and only an optional step it lacks is left out."""
+    registry = {"py-svc": {"label": "a service", "roles": ["api"], "commands": {"build": "b.py"}}}
+    root = _host(tmp_path, catalogs={"lifecycle": [TYPECHECK]}, drivers={"registry": "ops/drivers/registry.json"})
+    (root / "ops" / "drivers" / "py-svc").mkdir(parents=True)
+    (root / "ops" / "drivers" / "py-svc" / "b.py").write_text("", encoding="utf-8")
+    (root / "ops" / "drivers" / "registry.json").write_text(json.dumps(registry), encoding="utf-8")
+    manifest = _manifest(root)
+    manifest["modules"] = {"bare": {"type": "py-svc", "role": "api", "path": "apps/bare", "secretsModule": "bare"}}
+    (root / "apps" / "bare").mkdir(parents=True, exist_ok=True)
+    (root / identity.MANIFEST_FILENAME).write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setenv(identity.env_name("PROJECT_ROOT"), str(root))
+    job = ci_gen.render(ProjectContext.discover(root)).split("\n  bare:\n")[1]
+    assert "mod bare build" in job and "mod bare test" in job
+    assert "mod bare typecheck" not in job

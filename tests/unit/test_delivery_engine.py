@@ -727,3 +727,16 @@ def test_an_automatic_rollback_never_returns_to_a_release_that_cannot_run(projec
     edge = running.find(ctx, ["edge"])[0]
     assert running.current_release(ctx, edge) != first.name[len("edge-"):-len(".tgz")]
     assert any("not rolled back to" in line and "committed key" in line for line in said)
+
+
+def test_a_release_on_a_runtime_that_runs_no_container_says_nothing_was_judged(project, tmp_path):
+    """CWE-223: a runtime with no compose (static files, IIS) runs no health check and no image scan --
+    the release says so beside `is current`, never lets `current` read as checked."""
+    archive = packaged(project)
+    ctx = ctx_for(project, server(tmp_path))
+    ctx.commands = {**ctx.commands, "compose": []}
+    said = []
+    ctx.out = said.append
+    assert release.release(ctx, "edge", archive) == 0
+    assert any("runs no container: no health check and no image scan applied" in line for line in said), said
+    assert said[-1].endswith("is current in staging")
