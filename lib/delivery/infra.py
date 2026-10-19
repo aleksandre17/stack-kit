@@ -54,6 +54,11 @@ def act(ctx: Delivery, action: str) -> int:
         for rel in sync(ctx):
             ctx.out(f"[infra] wrote {posixpath.join(ctx.places.of('infra'), rel)}")
     if action == "up":
+        # The environment's network has ONE owner, and it is the environment -- not this stack and not
+        # the generated app stack, both of which declare it `external` and only join it. Made here when
+        # it is not there; a network that is there is left as it is, whoever made it and whatever it
+        # carries. A compose that owned it instead would refuse every network it had not labelled
+        # itself, which is every network on a target that was deployed before its infra came up.
         net = naming.remote_network(ctx.project, ctx.environment)
         if ctx.transport.exec(ctx.engine("network", "inspect", net), readonly=True).code != 0:
             ctx.run(ctx.engine("network", "create", net))

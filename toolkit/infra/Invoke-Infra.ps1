@@ -82,10 +82,34 @@ function Resolve-InfraComposeFileArgs {
     return $files.ToArray()
 }
 
+function Assert-InfraNetwork {
+    <#
+        The environment's network is the environment's: here, this machine's, named by the resolver so
+        no second place invents it. The infra compose and the generated stack compose both JOIN it as
+        external, so whichever is started first must find it there. Making it is idempotent; a network
+        that exists is left exactly as it is, whoever made it.
+    #>
+    $network = @(Invoke-KitResolver -Arguments @('local-network'))[0]
+    if (-not $env:STACK_KIT_NETWORK) { $env:STACK_KIT_NETWORK = $network }
+    $engine = @(Invoke-KitResolver -Arguments @('engine-command'))
+    if (-not $engine) {
+        Write-InfraLog "this machine's runtime declares no engine, so the network cannot be made" "ERROR"
+        exit 1
+    }
+    $existing = @($engine | Select-Object -Skip 1) + @('network', 'inspect', $env:STACK_KIT_NETWORK)
+    & $engine[0] @existing *> $null
+    if ($LASTEXITCODE -eq 0) { return }
+    Write-InfraLog "network $($env:STACK_KIT_NETWORK) does not exist yet - creating it"
+    $create = @($engine | Select-Object -Skip 1) + @('network', 'create', $env:STACK_KIT_NETWORK)
+    & $engine[0] @create
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
 function Invoke-InfraLocalCompose {
     param([string]$ComposeAction)
     $envFile = Assert-InfraEnvFile
     $composeArgs = Resolve-InfraComposeFileArgs -IsProd $Prod
+    if ($ComposeAction -like 'up*') { Assert-InfraNetwork }
     Push-Location $InfraComposeDir
     try {
         # This machine's compose invocation is the runtime catalog's (the entry flagged `local`).

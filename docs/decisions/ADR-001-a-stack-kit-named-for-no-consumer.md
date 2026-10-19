@@ -1248,3 +1248,30 @@ progress first and the cause last).
 **Owed.** The node and java-boot drivers' test counts are not yet read (Maven runs `-q`; surefire's
 reports are the equivalent of TRX); agent-kit holds the same rule as a doctrine MUST.
 
+## Amendment 23 — the environment's network has one owner (2026-10-19, owner-delegated)
+
+**Context.** `infra remote up` could not start the infra stack on a target that had ever been
+deployed to. The delivery engine makes the environment's network itself (`docker network create
+{project}-{env}`) so that the generated stack compose, which declares that network `external`, finds
+it; the scaffolded infra compose declared the *same* network as its own. Compose will not adopt a
+network it did not label, and says so in one line about a label, never about ownership. The kit held
+both positions at once: external on the stack side, owned on the infra side.
+
+**Decision.** The environment's network belongs to the ENVIRONMENT. The delivery engine makes it,
+idempotently, before any compose that joins it; every compose -- the infra stack's and the generated
+app stack's -- declares it `external` and only joins. On this machine the same rule holds, with the
+local stack's network name answered by the resolver (`local-network`) rather than defaulted in a
+template, and `infra local up` making it when it is not there. The infra template asks for the name
+with `:?` and no default, because a network name nobody declared is two different networks waiting to
+happen, not a convenience.
+
+**Rejected.** Making the CLI write compose's own labels onto the network (couples the kit to compose's
+internal label scheme, which is not a contract); letting the infra compose own the network and dropping
+the CLI's creation (every host whose network already exists -- that is, every deployed host -- would
+have to delete a network its running containers are attached to); giving the infra stack a second
+network of its own and joining the environment's as external beside it (correct, but it moves every
+shipped service fragment onto two networks for no gain the shared one does not already give); leaving
+the `app-net` default in place (the default silently produces a network no target ever uses).
+
+**Owed.** Not proven on a real host inside this kit's suite -- the recorded transport is what the
+tests hold; the host that found the defect verifies it on its own target.

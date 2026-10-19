@@ -5,7 +5,12 @@ name: ${INFRA_COMPOSE_PROJECT:-app-infra}   # on a target the CLI's -p {project}
 
 networks:
   infra-net:
-    name: ${STACK_KIT_NETWORK:-app-net}   # on a target: the environment's network, {project}-{env}
+    # The environment's network is the ENVIRONMENT's, not this stack's: `infra up` makes it (remotely
+    # {project}-{env}, locally {project}-net) and every compose that joins it -- this one and the
+    # generated stack -- declares it external. A compose that declared it its own could not adopt a
+    # network it had not labelled, and the stack would not start on a target that already had one.
+    external: true
+    name: ${STACK_KIT_NETWORK:?set STACK_KIT_NETWORK to the environment's network (infra up sets it)}
 
 volumes:
   postgres_data:

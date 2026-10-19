@@ -1,5 +1,32 @@
 # Changelog — stack-kit
 
+## 2.7.1 — 2026-10-19
+
+The environment's network has one owner (ADR-001 amendment 23).
+
+### Fixed
+
+- `infra remote up` starts on a target whose network already exists. The CLI makes the environment's
+  network before compose runs, while the scaffolded `ops/compose/infra/docker-compose.base.yml`
+  declared that same network as compose's own -- so compose refused to adopt it (`network
+  {project}-{env} was found but has incorrect label com.docker.compose.network set to ""`) and the
+  infra stack could not start on any host whose stack had been deployed first. The generated stack
+  compose already declared it `external`; the two halves of the kit now agree.
+
+### Behaviour a host may notice
+
+- The scaffolded infra base joins the environment's network as `external` and asks for its name with
+  `${STACK_KIT_NETWORK:?...}` rather than defaulting to `app-net`: a name nobody declared is now a
+  clear refusal instead of a second, silently different network. `infra remote sync` has always
+  written that value; `infra local up` now sets it from the resolver and makes the network when it is
+  not there, as the remote path does.
+- A host takes it with a three-way merge of that template (`extend`), then `validate`.
+
+### Added
+
+- Resolver verbs `engine-command` (this machine's container engine invocation) and `local-network`
+  (the network this machine's stack and infra share), so no second place invents either.
+
 ## 2.7.0 — 2026-10-18
 
 Nothing is lost silently (ADR-001 amendment 22). An audit for one class of defect -- information

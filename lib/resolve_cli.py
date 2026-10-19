@@ -17,6 +17,8 @@
     resolve_cli.py target                    (the selected target's name; empty when none is declared)
     resolve_cli.py compose-project [<environment>]
     resolve_cli.py compose-command           (this machine's compose invocation, one argument per line)
+    resolve_cli.py engine-command            (this machine's container engine invocation, one per line)
+    resolve_cli.py local-network             (the network this machine's stack and infra share)
     resolve_cli.py driver-command <module|alias> <command>
     resolve_cli.py stack-health              (module<TAB>url<TAB>expect per line; expect '-' = status only)
     resolve_cli.py stack-endpoints | compose-names | compose-service <module>
@@ -143,7 +145,7 @@ PATH_VERBS = {"env-files"}
 VERBS = {"context", "notice", "slugify", "alias", "env-files", "env-value", "run-env", "project-slug",
          "infra-tunnel-forwards", "infra-compose-files", "infra-compose-args", "infra-sync-paths", "infra-services",
          "driver-types", "driver-command", "stack-health", "stack-endpoints", "compose-names", "compose-service",
-         "compose-command", "ssh-args", "target", "compose-project"}
+         "compose-command", "engine-command", "local-network", "ssh-args", "target", "compose-project"}
 
 
 def _answer(r, verb: str, args: list[str]) -> list[str] | None:
@@ -162,10 +164,14 @@ def _answer(r, verb: str, args: list[str]) -> list[str] | None:
         return [r.compose_project(args[0] if args else "")]
     if verb == "project-slug" and not args:
         return [r.project_slug()]
-    if verb == "compose-command" and not args:
+    if verb in ("compose-command", "engine-command") and not args:
         from lib import targets
 
-        return targets.local_commands(r.manifest)["compose"]
+        return targets.local_commands(r.manifest)[verb.split("-", 1)[0]]
+    if verb == "local-network" and not args:
+        from lib import naming
+
+        return [naming.local_network(r.manifest, r.root)]
     if verb == "infra-tunnel-forwards" and not args:
         return ["\t".join((f["local"], f["remote"], f["service"], f["env"])) for f in r.infra_tunnel_forwards()]
     lists = {"infra-compose-files": r.infra_compose_files, "infra-compose-args": r.infra_compose_args,
