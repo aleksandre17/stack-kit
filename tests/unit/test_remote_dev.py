@@ -231,6 +231,90 @@ def test_rsync_keeps_inherited_files_out_of_its_delete_and_sends_them_beside(pro
     assert t.read(f"{WS}/Shared.props") == b"near"
 
 
+def _dotnet_references(project: Path, *, outside: bool = False) -> None:
+    registry = project / "drivers" / "registry.json"
+    driver = json.loads(registry.read_text(encoding="utf-8"))
+    driver["fixture-svc"]["dev"]["projectReferences"] = {
+        "projectField": "project", "projectGlob": "*.csproj", "item": "ProjectReference"}
+    registry.write_text(json.dumps(driver), encoding="utf-8")
+    api = project / "apps" / "edge" / "Api.csproj"
+    reference = "../../core/Core.csproj" if not outside else "../../../outside/Outside.csproj"
+    _touch(api, f'<Project><ItemGroup><ProjectReference Include="{reference}" /></ItemGroup></Project>')
+    core = project / "core" / "Core.csproj"
+    if not outside:
+        _touch(core, '<Project><ItemGroup><ProjectReference Include="../shared/Shared.csproj" /></ItemGroup></Project>')
+        _touch(project / "shared" / "Shared.csproj", "<Project />")
+
+
+def test_project_references_keep_their_relative_paths_and_sync_transitively(project, tmp_path):
+    _dotnet_references(project)
+    _inherits(project, ["Directory.Build.props"])
+    _touch(project / "Directory.Build.props", "<Project />")
+    ctx, edge = ctx_for(project, server(tmp_path), "dev"), None
+    edge = _edge(ctx)
+    tree = dev.workspace(ctx, edge)
+    assert tree.working_dir == "apps/edge"
+    assert set(tree.sources) == {"apps/edge", "core", "shared"}
+    assert set(tree.above) == {"Directory.Build.props"}
+    remote = tmp_path / "remote"
+    t = LocalTransport(remote, confine=f"{ROOT}/shop/dev")
+    result = sync.sync(t, project / "apps" / "edge", WS, sync.excludes(edge, project / "apps" / "edge"),
+                       sources=tree.sources, above=tree.above)
+    root = remote / WS.lstrip("/")
+    assert (root / "apps" / "edge" / "Api.csproj").is_file()
+    assert (root / "core" / "Core.csproj").is_file() and (root / "shared" / "Shared.csproj").is_file()
+    assert (root / "Directory.Build.props").is_file() and "core/Core.csproj" not in result.deleted
+    _touch(project / "shared" / "Shared.cs", "changed", bump=20)
+    next_result = sync.sync(t, project / "apps" / "edge", WS, sync.excludes(edge, project / "apps" / "edge"),
+                            sources=tree.sources, above=tree.above)
+    assert next_result.sent == ["shared/Shared.cs"]
+    assert dev.up(ctx, ["edge"]) == 0
+    compose = json.loads(ctx.transport.read(f"{ROOT}/shop/dev/stack/compose.yml"))
+    assert compose["services"]["edge"]["working_dir"] == "/workspace/apps/edge"
+
+
+def test_project_reference_outside_the_project_root_is_refused(project, tmp_path):
+    _dotnet_references(project, outside=True)
+    ctx = ctx_for(project, server(tmp_path), "dev")
+    with pytest.raises(Exception, match="escapes the project root"):
+        dev.workspace(ctx, _edge(ctx))
+
+
+def test_rsync_syncs_each_referenced_project_at_its_workspace_path(project, tmp_path):
+    from lib.delivery.transport import RecordingTransport, Result
+
+    class Rsyncing(RecordingTransport):
+        has_rsync = True
+
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        def exec(self, argv, cwd="", env=None, stream=False, readonly=False):
+            return Result(0, "rsync 3", "") if argv[:2] == ["rsync", "--version"] else super().exec(argv, cwd, env, stream, readonly)
+
+        def rsync(self, local_dir, path, excludes):
+            self.calls.append((local_dir, path, excludes))
+
+    _dotnet_references(project)
+    ctx, edge = ctx_for(project, server(tmp_path), "dev"), None
+    edge = _edge(ctx)
+    tree, transport = dev.workspace(ctx, edge), Rsyncing()
+    sync.sync(transport, project / "apps" / "edge", WS, sync.excludes(edge, project / "apps" / "edge"),
+              sources=tree.sources, above=tree.above)
+    assert {path for _source, path, _excludes in transport.calls} == {f"{WS}/apps/edge", f"{WS}/core", f"{WS}/shared"}
+
+
+def test_no_project_reference_keeps_the_existing_workspace_layout(project, tmp_path):
+    ctx, edge = ctx_for(project, server(tmp_path), "dev"), None
+    edge = _edge(ctx)
+    tree = dev.workspace(ctx, edge)
+    assert tree.working_dir == "" and tree.sources == {"": project / "apps" / "edge"}
+    assert dev.up(ctx, ["edge"]) == 0
+    compose = json.loads(ctx.transport.read(f"{ROOT}/shop/dev/stack/compose.yml"))
+    assert compose["services"]["edge"]["working_dir"] == "/workspace"
+
+
 def test_an_rsync_sync_reacts_to_the_paths_the_watcher_saw_change():
     """rsync names no file it moved: the reaction is judged on what changed between the watcher's two
     snapshots -- a build file edited is a rebuild, never a hot-reload judged on a placeholder."""

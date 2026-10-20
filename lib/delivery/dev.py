@@ -15,6 +15,8 @@ environment's one compose file (the unit's state says `workspace`), caches are n
 from __future__ import annotations
 
 import time
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -33,6 +35,70 @@ def _require_workspace(ctx: Delivery) -> None:
 
 def module_dir(ctx: Delivery, service: Service) -> Path:
     return ctx.root / str(ctx.manifest["modules"][service.module]["path"])
+
+
+@dataclass(frozen=True)
+class Workspace:
+    """The local trees and container directory of one remote-dev workspace."""
+    sources: dict[str, Path]
+    above: dict[str, Path]
+    working_dir: str = ""
+
+
+def _project_file(ctx: Delivery, service: Service, module: Path, spec: dict) -> Path:
+    field = str(spec.get("projectField") or "")
+    value = ctx.manifest["modules"][service.module]
+    for part in field.split("."):
+        value = value.get(part) if isinstance(value, dict) else None
+    declared = str(value or ".")
+    path = module / declared
+    pattern = str(spec.get("projectGlob") or "")
+    if path.suffix.lower() == Path(pattern).suffix.lower():
+        candidates = [path]
+    else:
+        candidates = sorted(path.glob(pattern)) if path.is_dir() else []
+    if len(candidates) != 1 or not candidates[0].is_file():
+        raise DeliveryError(f"{service.id}: remote dev needs exactly one project at modules.{service.module}.{field}")
+    return candidates[0].resolve()
+
+
+def _project_references(project: Path, root: Path, spec: dict) -> list[Path]:
+    try:
+        doc = ET.parse(project)
+    except ET.ParseError as e:
+        raise DeliveryError(f"{project}: cannot read declared project-reference items: {e}") from e
+    refs: list[Path] = []
+    for item in doc.iter():
+        if item.tag.rsplit("}", 1)[-1] != spec.get("item") or not item.get("Include"):
+            continue
+        target = (project.parent / item.attrib["Include"]).resolve()
+        if not target.is_relative_to(root):
+            raise DeliveryError(f"{project}: ProjectReference '{item.attrib['Include']}' escapes the project root")
+        if not target.is_file():
+            raise DeliveryError(f"{project}: ProjectReference '{item.attrib['Include']}' is not a project file")
+        refs.append(target)
+    return refs
+
+
+def workspace(ctx: Delivery, service: Service) -> Workspace:
+    """Keep a referenced .NET project at exactly the relative path MSBuild reads."""
+    module = module_dir(ctx, service).resolve()
+    spec = service.dev.get("projectReferences")
+    if not isinstance(spec, dict):
+        return Workspace({"": module}, inherited(ctx, service))
+    root = ctx.root.resolve()
+    todo, seen = [_project_file(ctx, service, module, spec)], set()
+    while todo:
+        project = todo.pop()
+        if project in seen:
+            continue
+        seen.add(project)
+        todo.extend(_project_references(project, root, spec))
+    if len(seen) == 1:
+        return Workspace({"": module}, inherited(ctx, service))
+    sources = {directory.relative_to(root).as_posix(): directory for directory in {module, *(p.parent for p in seen)}}
+    above = {path.relative_to(root).as_posix(): path for path in sync.inherited(service, module, root).values()}
+    return Workspace(sources, above, module.relative_to(root).as_posix())
 
 
 def _cache(ctx: Delivery, service: Service) -> Path:
@@ -54,8 +120,9 @@ def inherited(ctx: Delivery, service: Service) -> dict[str, Path]:
 def sync_one(ctx: Delivery, service: Service, *, full: bool = False) -> sync.SyncResult:
     src = module_dir(ctx, service)
     ws = ctx.places.of("workspace", service)
+    tree = workspace(ctx, service)
     result = sync.sync(ctx.transport, src, ws, sync.excludes(service, src), cache=_cache(ctx, service), full=full,
-                       above=inherited(ctx, service))
+                       above=tree.above, sources=tree.sources)
     ctx.out(f"[dev] {service.id}: {result.summary()} -> {ws}")
     return result
 
@@ -69,9 +136,10 @@ def up(ctx: Delivery, wanted: list[str]) -> int:
         unit = ctx.places.unit(s)
         for kind in ("logs", "runtime", "workspace"):
             ctx.transport.mkdir(unit[kind])
+        tree = workspace(ctx, s)
         sync_one(ctx, s, full=True)
         running.place_files(ctx, s)
-        running.set_mode(ctx, s, "workspace")
+        running.set_mode(ctx, s, "workspace", working_dir=tree.working_dir)
     running.regenerate(ctx)
     running.up(ctx, [s.id for s in svc])
     failed = [] if ctx.plan else running.wait_healthy(ctx, svc)
@@ -174,8 +242,8 @@ def watch(ctx: Delivery, wanted: list[str], *, poll: float = 0.5, stop: Callable
     svc = dev_services(ctx, wanted)
     srcs = {s.id: module_dir(ctx, s) for s in svc}
     pats = {s.id: sync.excludes(s, srcs[s.id]) for s in svc}
-    above = {s.id: inherited(ctx, s) for s in svc}
-    seen = {s.id: sync.snapshot(srcs[s.id], pats[s.id], above[s.id]) for s in svc}
+    trees = {s.id: workspace(ctx, s) for s in svc}
+    seen = {s.id: sync.snapshot(srcs[s.id], pats[s.id], trees[s.id].above, trees[s.id].sources) for s in svc}
     for s in svc:
         sync_one(ctx, s)
     ctx.out(f"[dev] watching {', '.join(s.id for s in svc)} (Ctrl-C stops)")
@@ -192,19 +260,25 @@ def watch(ctx: Delivery, wanted: list[str], *, poll: float = 0.5, stop: Callable
                     pending_full, backoff = False, 1.0
                     ctx.out("[dev] reconnected; full sync done")
                 for s in svc:
-                    now = sync.snapshot(srcs[s.id], pats[s.id], above[s.id])
+                    tree = workspace(ctx, s)
+                    now = sync.snapshot(srcs[s.id], pats[s.id], tree.above, tree.sources)
                     if now == seen[s.id]:
                         continue
                     debounce = float(s.dev.get("debounceMs") or 800) / 1000.0
                     while True:  # settle: a burst of saves is one change
                         ctx.sleep(debounce)
-                        later = sync.snapshot(srcs[s.id], pats[s.id], above[s.id])
+                        tree = workspace(ctx, s)
+                        later = sync.snapshot(srcs[s.id], pats[s.id], tree.above, tree.sources)
                         if later == now:
                             break
                         now = later
                     before, seen[s.id] = seen[s.id], now
                     changed = changes(before, now, sync_one(ctx, s))
                     if changed:
+                        if tree.working_dir != trees[s.id].working_dir:
+                            running.set_mode(ctx, s, "workspace", working_dir=tree.working_dir)
+                            running.regenerate(ctx)
+                        trees[s.id] = tree
                         react(ctx, s, changed)
             except TransportError as e:
                 ctx.out(f"[dev] connection lost ({e}); retrying in {backoff:.0f}s")

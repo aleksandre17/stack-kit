@@ -796,6 +796,11 @@
         "NuGet.config",
         "nuget.config"
       ],
+      "projectReferences": {
+        "projectField": "dotnet.project",
+        "projectGlob": "*.csproj",
+        "item": "ProjectReference"
+      },
       "reactions": [
         {
           "globs": [

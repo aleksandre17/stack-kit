@@ -27,6 +27,7 @@ class State:
     """What a unit runs now: a release (its `current`), its workspace (remote dev), or neither."""
     release: str | None = None
     workspace: bool = False
+    workspace_dir: str = ""
 
     @property
     def running(self) -> bool:
@@ -66,7 +67,8 @@ def service_document(service: Service, *, project: str, environment: str, target
         dev = service.dev
         if not dev.get("image") or not dev.get("command"):
             raise StackError(f"service {service.id}: remote dev needs the driver's or module's `dev.image` and `dev.command`")
-        doc.update({"image": dev["image"], "working_dir": "/workspace", "command": dev["command"]})
+        workdir = "/workspace" + ("/" + state.workspace_dir if state.workspace_dir else "")
+        doc.update({"image": dev["image"], "working_dir": workdir, "command": dev["command"]})
         doc["labels"]["stack-kit.mode"] = "workspace"
         volumes.append(f"{unit['workspace']}:/workspace")
         for name, mount in sorted((dev.get("caches") or {}).items()):

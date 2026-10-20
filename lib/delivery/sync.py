@@ -26,6 +26,7 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
+import posixpath
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -106,20 +107,22 @@ def inherited(service: Service, module_dir: Path, root: Path) -> dict[str, Path]
 
 
 def local_index(module_dir: Path, patterns: list[str],
-                above: dict[str, Path] | None = None) -> dict[str, tuple[int, int, Path]]:
+                above: dict[str, Path] | None = None,
+                sources: dict[str, Path] | None = None) -> dict[str, tuple[int, int, Path]]:
     out: dict[str, tuple[int, int, Path]] = {}
     for rel, p in (above or {}).items():
         if not excluded(rel, patterns):
             st = p.stat()
             out[rel] = (st.st_size, int(st.st_mtime), p)
-    for p in sorted(module_dir.rglob("*")):
-        if not p.is_file():
-            continue
-        rel = p.relative_to(module_dir).as_posix()
-        if excluded(rel, patterns):
-            continue
-        st = p.stat()
-        out[rel] = (st.st_size, int(st.st_mtime), p)
+    for prefix, source in (sources or {"": module_dir}).items():
+        for p in sorted(source.rglob("*")):
+            if not p.is_file():
+                continue
+            rel = posixpath.join(prefix, p.relative_to(source).as_posix()) if prefix else p.relative_to(source).as_posix()
+            if excluded(rel, patterns):
+                continue
+            st = p.stat()
+            out[rel] = (st.st_size, int(st.st_mtime), p)
     return out
 
 
@@ -133,25 +136,38 @@ def remote_has_rsync(transport: Transport) -> bool:
 
 def sync(transport: Transport, module_dir: Path, workspace: str, patterns: list[str], *,
          cache: Path | None = None, full: bool = False, prefer_rsync: bool = True,
-         above: dict[str, Path] | None = None) -> SyncResult:
+         above: dict[str, Path] | None = None, sources: dict[str, Path] | None = None) -> SyncResult:
     """The workspace made equal to the module's source and what it inherits from above, minus the
     excludes."""
     transport.mkdir(workspace)
     above = {rel: p for rel, p in (above or {}).items() if not excluded(rel, patterns)}
+    sources = sources or {"": module_dir}
+    multi_source = sources != {"": module_dir}
     if prefer_rsync and remote_has_rsync(transport):
         # rsync mirrors the module directory with --delete: the inherited files are kept out of its
         # reach, then sent beside it.
-        transport.rsync(module_dir, workspace, [*patterns, *(f"/{rel}" for rel in above)])
+        for prefix, source in sources.items():
+            remote = posixpath.join(workspace, prefix) if prefix else workspace
+            excludes = list(patterns)
+            if not prefix:
+                excludes += [f"/{rel}" for rel in above]
+            transport.rsync(source, remote, excludes)
         if above:
             transport.untar(workspace, tar_of(above))
-        return SyncResult("rsync", sent=sorted(above))
+        if not multi_source:
+            return SyncResult("rsync", sent=sorted(above))
+        mine = local_index(module_dir, patterns, above, sources)
+        gone = sorted(rel for rel in transport.index(workspace) if rel not in mine and not excluded(rel, patterns))
+        if gone:
+            transport.remove_many(workspace, gone)
+        return SyncResult("rsync", sent=sorted(above), deleted=gone)
     known: dict[str, str] = {}
     if cache is not None and cache.is_file() and not full:
         try:
             known = json.loads(cache.read_text(encoding="utf-8"))
         except ValueError:
             known = {}
-    mine = local_index(module_dir, patterns, above)
+    mine = local_index(module_dir, patterns, above, sources)
     theirs = transport.index(workspace)
     result = SyncResult("index")
     send: dict[str, Path] = {}
@@ -180,9 +196,9 @@ def sync(transport: Transport, module_dir: Path, workspace: str, patterns: list[
 
 
 def snapshot(module_dir: Path, patterns: list[str],
-             above: dict[str, Path] | None = None) -> dict[str, tuple[int, int]]:
+             above: dict[str, Path] | None = None, sources: dict[str, Path] | None = None) -> dict[str, tuple[int, int]]:
     """What a watcher compares between polls: the module's files and the ones it inherits."""
-    return {rel: (size, mtime) for rel, (size, mtime, _p) in local_index(module_dir, patterns, above).items()}
+    return {rel: (size, mtime) for rel, (size, mtime, _p) in local_index(module_dir, patterns, above, sources).items()}
 
 
 SEVERITY = {"hot-reload": 0, "restart": 1, "rebuild": 2}

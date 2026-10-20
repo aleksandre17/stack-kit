@@ -32,7 +32,7 @@ SERVICE_FIELDS = ("template", "dockerfile", "serverConfig", "webRoot", "image", 
                   "allowBaked", "generatedSecrets")
 #: The fields a remote-dev declaration may carry -- driver `dev`, module `dev` -- a later level winning.
 DEV_FIELDS = ("image", "command", "build", "port", "debugPort", "caches", "excludes", "reactions", "watch",
-              "environment", "debounceMs")
+              "environment", "debounceMs", "projectReferences")
 
 
 class ModelError(ValueError):

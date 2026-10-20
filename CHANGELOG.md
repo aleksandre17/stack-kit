@@ -1,5 +1,23 @@
 # Changelog — stack-kit
 
+## 2.7.2 — 2026-10-20
+
+### Fixed
+
+- Remote dev for `dotnet-aspnet` now follows a module project's direct and transitive MSBuild
+  `ProjectReference` items. When a reference leaves the module directory, the workspace mirrors the
+  selected project directories at their paths relative to the host root and starts the container in
+  the module's mirrored directory. A referenced source edit reaches the next sync; both rsync and the
+  index fallback retain the same exclusion and workspace-confinement rules. A reference outside the
+  host root is refused before any sync.
+
+### Behaviour a host may notice
+
+- A .NET module with a project outside its module directory must have one resolvable project file
+  (`modules.<id>.dotnet.project`, or one `*.csproj` at its module root). A malformed, missing, or
+  out-of-root `ProjectReference` now stops remote dev clearly rather than starting a workspace in
+  which MSBuild cannot resolve the graph.
+
 ## 2.7.1 — 2026-10-19
 
 The environment's network has one owner (ADR-001 amendment 23).

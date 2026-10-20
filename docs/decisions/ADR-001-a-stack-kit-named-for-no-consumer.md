@@ -1275,3 +1275,30 @@ the `app-net` default in place (the default silently produces a network no targe
 
 **Owed.** Not proven on a real host inside this kit's suite -- the recorded transport is what the
 tests hold; the host that found the defect verifies it on its own target.
+
+## Amendment 24 — remote dev preserves a .NET project's referenced graph (2026-10-20, owner-delegated)
+
+**Context.** Amendment 21 brought the build files found above a module into remote dev, but it still
+synced the module directory alone. A .NET project may correctly put a referenced project beside that
+directory (`../core/Core.csproj`); its local build works while the remote workspace lacks the sibling.
+Copying the referenced project into the module workspace changes the relative path MSBuild resolves,
+so it only moves the failure.
+
+**Decision.** The `dotnet-aspnet` driver follows the selected module project's `ProjectReference`
+items transitively. Each target is resolved relative to the project that names it and must be a file
+inside the host project root; an escaping, missing or malformed target refuses remote dev clearly.
+When no reference leaves the module, the workspace and `/workspace` working directory remain exactly
+as before. Otherwise the workspace contains just the module and referenced project directories at
+their paths relative to the host root, and the container starts in the module's corresponding path.
+Inherited build files retain their actual project-root-relative locations. The rsync and index sync
+routes apply the one exclusion list to every selected directory and delete only inside the workspace.
+The watcher indexes all selected directories, so a referenced-project edit reaches the next sync.
+
+**Rejected.** Syncing the entire project root (ships unrelated modules and their neighbours); copying
+referenced projects under the module (breaks MSBuild's relative paths); following an out-of-root
+reference (makes one module's remote dev write outside its declared workspace); and handling only
+the first reference (a common shared project is itself allowed to reference another project).
+
+**Owed.** Unit tests hold direct and transitive references, the refusal boundary, both workspace
+layouts, inherited build files and the index route. A host's remote dev container is still the proof
+that its chosen SDK and package graph start on its target.

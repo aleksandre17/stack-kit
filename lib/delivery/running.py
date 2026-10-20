@@ -68,7 +68,8 @@ def states(ctx: Delivery, override: dict[str, stack.State] | None = None) -> dic
     out = {}
     for s in services(ctx):
         out[s.id] = stack.State(release=current_release(ctx, s),
-                                workspace=(modes.get(s.id) or {}).get("mode") == "workspace")
+                                workspace=(modes.get(s.id) or {}).get("mode") == "workspace",
+                                workspace_dir=str((modes.get(s.id) or {}).get("workingDir") or ""))
     out.update(override or {})
     return out
 
@@ -248,10 +249,10 @@ def wait_healthy(ctx: Delivery, svc: list[Service]) -> list[str]:
     return failed
 
 
-def set_mode(ctx: Delivery, service: Service, mode: str | None) -> None:
+def set_mode(ctx: Delivery, service: Service, mode: str | None, *, working_dir: str = "") -> None:
     modes = read_state_file(ctx)
     if mode:
-        modes[service.id] = {"mode": mode}
+        modes[service.id] = {"mode": mode, **({"workingDir": working_dir} if working_dir else {})}
     else:
         modes.pop(service.id, None)
     write_if_changed(ctx, ctx.places.of("stackState"), (json.dumps(modes, indent=1, sort_keys=True) + "\n").encode("utf-8"))
