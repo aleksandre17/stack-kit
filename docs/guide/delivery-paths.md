@@ -60,6 +60,7 @@ flowchart LR
 |---|---|---|---|
 | java-boot | Gradle `build -x test`, Maven `package` without tests | the build tool's tests | `build/`, `.gradle/`, `target/` |
 | dotnet-aspnet | `dotnet build` of the solution or project | `dotnet test` of `dotnet.test` | `bin/`, `obj/` |
+| dotnet-library | the same scripts as dotnet-aspnet (`drivers/_shared/dotnet/`) | the same | `bin/`, `obj/` |
 | node-api | `build` script | `test` script | `node_modules/`, `dist/` |
 | node-vite | `build` script | `test` script | `node_modules/`, `dist/` |
 | node-spa | `build` script | `test` script | `node_modules/`, `dist/`, `.angular/` |
@@ -92,6 +93,9 @@ flowchart LR
   them, even when the module has a `Dockerfile.dev`: `compose-gen` prints `skip modules.<m> (<driver>)
   has no local dev service: its driver declares no compose template for role <role> ...` and goes on.
   Use path 1 or path 5.
+- **dotnet-library** is a class library: path 1 only (build, test, lint, audit). It declares no run,
+  package, container, dev or delivery, so no other path has it: `package`/`deploy` name it as no
+  deployable module, `mod <m> run` as no command of its driver.
 
 ## 3. A release: `package`, then `deploy`
 

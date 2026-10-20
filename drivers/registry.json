@@ -645,11 +645,11 @@
     ],
     "commands": {
       "package": "ps1/package.ps1",
-      "check": "ps1/check.ps1",
-      "build": "ps1/build.ps1",
-      "test": "ps1/test.ps1",
-      "lint": "ps1/lint.ps1",
-      "audit": "ps1/audit.ps1"
+      "check": "../_shared/dotnet/check.ps1",
+      "build": "../_shared/dotnet/build.ps1",
+      "test": "../_shared/dotnet/test.ps1",
+      "lint": "../_shared/dotnet/lint.ps1",
+      "audit": "../_shared/dotnet/audit.ps1"
     },
     "hybrid": {
       "script": "ps1/hybrid.ps1"
@@ -813,6 +813,47 @@
             "nuget.config"
           ],
           "do": "restart"
+        }
+      ]
+    },
+    "outputs": [
+      "bin/",
+      "obj/"
+    ]
+  },
+  "dotnet-library": {
+    "label": ".NET class library - dotnet build / dotnet test of a library and its test project (no run, package or release)",
+    "roles": [
+      "other"
+    ],
+    "commands": {
+      "check": "../_shared/dotnet/check.ps1",
+      "build": "../_shared/dotnet/build.ps1",
+      "test": "../_shared/dotnet/test.ps1",
+      "lint": "../_shared/dotnet/lint.ps1",
+      "audit": "../_shared/dotnet/audit.ps1"
+    },
+    "delivery": {},
+    "migrations": {
+      "globs": [
+        "**/Migrations/*.cs"
+      ],
+      "exclude": [
+        "**/Migrations/*.Designer.cs",
+        "**/Migrations/*ModelSnapshot.cs"
+      ],
+      "data": [
+        "\\.(InsertData|UpdateData|DeleteData)\\s*\\(",
+        "(?i)\\.Sql\\s*\\(\\s*@?\\$?\\\"\\s*(insert\\s+into|update\\s+\\S+\\s+set|delete\\s+from)"
+      ]
+    },
+    "ci": {
+      "setup": [
+        {
+          "uses": "actions/setup-dotnet",
+          "with": {
+            "dotnet-version": "{toolchain.version|8.0.x}"
+          }
         }
       ]
     },

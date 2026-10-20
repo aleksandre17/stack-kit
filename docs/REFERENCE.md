@@ -98,13 +98,14 @@ stack; `opsModules` its registry rows).
 | Driver | Package | Release runs | Remote dev |
 |---|---|---|---|
 | `dotnet-aspnet` | `dotnet publish` into `{out}` | `container/Dockerfile` on the ASP.NET runtime | `dotnet watch` in the SDK image |
+| `dotnet-library` | none: a class library is built and tested, never packaged (not deployable) | none | none |
 | `java-boot` | `build`, the boot jar | `container/Dockerfile` on a JRE | `bootRun` in a JDK image; Java sources `rebuild` |
 | `node-api` | `build`, `dist/**` + manifest + lockfile | `container/Dockerfile`, production dependencies | the `dev` script |
 | `node-spa`, `node-vite` | `build`, `dist/**` | an image built from the shared recipe (`drivers/_shared/static/Dockerfile`): pinned unprivileged nginx serving `serve` (SPA routes to `index.html`), its rendered `server.conf` COPYed in | the `start` / `dev` script |
 
 Adding a driver: copy `drivers/_template/`, declare it in `drivers/registry.json` (or the host's own
 registry), give it a `container` recipe and a `dev`; nothing else changes. Per-driver detail:
-[dotnet-aspnet](../drivers/dotnet-aspnet/README.md), [java-boot](../drivers/java-boot/README.md),
+[dotnet-aspnet](../drivers/dotnet-aspnet/README.md), [dotnet-library](../drivers/dotnet-library/README.md), [java-boot](../drivers/java-boot/README.md),
 [node-api](../drivers/node-api/README.md), [node-spa](../drivers/node-spa/README.md),
 [node-vite](../drivers/node-vite/README.md), [drivers/README.md](../drivers/README.md).
 

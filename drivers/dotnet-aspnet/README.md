@@ -13,6 +13,9 @@ Runtime: PowerShell (Windows PowerShell 5.1+ or pwsh).
 | `deploy` (`deliver release`) | the kit's release: `container/Dockerfile` runs the published assembly (`{dotnet.project}` stem) on the ASP.NET runtime of the module's `toolchain.version`, internal port 8080 |
 | `dev up` (`deliver remote-dev`) | `dotnet watch run` in the SDK image, the source synced into the workspace, NuGet's cache a named volume; a project file change restarts it |
 
+`build`, `test`, `lint`, `audit` and `check` are the .NET family's shared scripts
+(`drivers/_shared/dotnet/`), the same a `dotnet-library` module runs.
+
 ASP.NET Core reads configuration from environment variables with `__` as the section separator,
 so `ConnectionStrings__DefaultConnection=...` in `.env.dev` reaches the app without being written
 into a tracked `appsettings.*.json`.

@@ -18,7 +18,7 @@ for ($i = 0; $i -lt $Rest.Count; $i++) {
         default            { throw "dotnet-aspnet package: unknown argument '$a' (supported: -AllowDirty, -Configuration, -Output)" }
     }
 }
-. (Join-Path $PSScriptRoot "..\_init.ps1")
+. (Join-Path $PSScriptRoot "..\..\_shared\dotnet\_init.ps1")
 
 $moduleId = $env:STACK_KIT_MODULE_ID
 $projectRoot = $env:STACK_KIT_PROJECT_ROOT

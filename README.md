@@ -47,7 +47,7 @@ Vendoring at another path, launchers for cmd.exe and bash, and prerequisites:
 ## Features
 
 - `stack-kit.json` — modules, roles (`ui`, `api`, `worker`), paths, CI, adapters
-- Drivers: `java-boot` (Spring/Gradle), `node-vite` (Vite), `node-spa` (any SPA by its package.json scripts: Angular CLI, Vite, React, Vue), `node-api` (Node service), `dotnet-aspnet` (ASP.NET Core); the registry is `drivers/registry.json`
+- Drivers: `java-boot` (Spring/Gradle), `node-vite` (Vite), `node-spa` (any SPA by its package.json scripts: Angular CLI, Vite, React, Vue), `node-api` (Node service), `dotnet-aspnet` (ASP.NET Core), `dotnet-library` (a .NET class library, built and tested, never deployed); the registry is `drivers/registry.json`
 - Lifecycle per module: `build`, `test`, `lint` through its driver; `stack-kit build|test|lint` across them; a run record per step (`.stack-kit/runs/`)
 - `stack-kit validate` · `migrate` · `vscode-gen` · `stack` · remote deploy / `dev watch`
 - N-module CLI: `stack-kit mod <moduleId> …`

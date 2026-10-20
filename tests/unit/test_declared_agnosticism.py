@@ -15,7 +15,7 @@ import pytest
 
 from lib.config_gen import DEFAULT_MANAGEMENT_ENDPOINTS, _management_endpoints
 from lib.identity import MANIFEST_FILENAME, manifest_filenames
-from lib.modules import driver_default_role, driver_registry
+from lib.modules import driver_commands, driver_default_role, driver_registry
 from lib.project_context import ProjectContext
 from lib.vscode_gen import build_tasks_json
 from conftest import PKG
@@ -85,11 +85,16 @@ def test_legacy_manifest_names_are_declared_not_improvised() -> None:
 
 
 def test_every_driver_declares_a_role_and_launch_kind() -> None:
+    # A driver whose modules run (a host run or a delivery rung) declares its launch as data; one whose
+    # modules never run (a library) declares none -- a launch of something nothing runs would be a lie.
     for driver_id, entry in driver_registry().items():
         assert entry.get("roles"), f"{driver_id} declares no roles"
         assert driver_default_role(driver_id), f"{driver_id} role is not a known role"
         launch = (entry.get("vscode") or {}).get("launch")
-        assert isinstance(launch, dict), f"{driver_id} declares no launch data ({launch!r})"
+        if "run" in driver_commands(driver_id) or entry.get("delivery"):
+            assert isinstance(launch, dict), f"{driver_id} declares no launch data ({launch!r})"
+        else:
+            assert launch is None, f"{driver_id} runs nothing yet declares a launch ({launch!r})"
 
 
 def test_declared_watch_tasks_reach_a_real_driver_command() -> None:

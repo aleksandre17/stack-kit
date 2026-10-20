@@ -186,6 +186,72 @@ def test_a_dotnet_module_builds_its_project_and_declares_its_tests(tmp_path):
     assert ran.returncode == 0 and "declared none" in ran.stdout, ran.stdout + ran.stderr
 
 
+TEST_PACKAGES = ("microsoft.net.test.sdk", "xunit", "xunit.runner.visualstudio")
+
+
+def _nuget_cache() -> Path:
+    return Path(os.environ.get("NUGET_PACKAGES") or Path.home() / ".nuget" / "packages")
+
+
+def _cached_test_packages() -> dict[str, str] | None:
+    """{package: version} of the xUnit test stack in this machine's NuGet cache, else None: the test
+    project below restores from that cache alone, so it runs offline and never fetches."""
+    found = {}
+    for name in TEST_PACKAGES:
+        versions = sorted((p.name for p in (_nuget_cache() / name).glob("*") if (p / f"{name}.{p.name}.nupkg").is_file()),
+                          key=lambda v: [int(x) if x.isdigit() else 0 for x in v.split(".")])
+        if not versions:
+            return None
+        found[name] = versions[-1]
+    return found
+
+
+@pytest.mark.skipif(_dotnet_major() is None or _cached_test_packages() is None,
+                    reason="no dotnet SDK, or no xUnit test stack in the NuGet cache, on this machine")
+def test_a_dotnet_library_is_a_module_built_and_tested_on_its_own_and_never_run_or_packaged(tmp_path):
+    major, packages = _dotnet_major(), _cached_test_packages()
+
+    def library(root: Path, mid: str) -> dict:
+        d = root / "fx" / mid
+        d.mkdir(parents=True)
+        (d / "Lib.csproj").write_text(CLASSLIB.format(v=major), encoding="utf-8")
+        (d / "Lib.cs").write_text("namespace Lib; public static class Answer { public const int Value = 42; }\n",
+                                  encoding="utf-8")
+        t = root / "fx" / "tests" / mid
+        t.mkdir(parents=True)
+        refs = "".join(f'<PackageReference Include="{n}" Version="{v}" />' for n, v in packages.items())
+        (t / "Lib.Tests.csproj").write_text(
+            f'<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net{major}.0</TargetFramework>'
+            f'<IsPackable>false</IsPackable></PropertyGroup><ItemGroup>{refs}</ItemGroup>'
+            f'<ItemGroup><ProjectReference Include="../../{mid}/Lib.csproj" /></ItemGroup></Project>\n', encoding="utf-8")
+        (t / "AnswerTests.cs").write_text(
+            "namespace Lib.Tests;\npublic class AnswerTests { [Xunit.Fact] public void Is42() => "
+            "Xunit.Assert.Equal(42, Lib.Answer.Value); }\n", encoding="utf-8")
+        (root / "fx" / "nuget.config").write_text(  # this machine's cache is the only source: no network
+            f'<?xml version="1.0" encoding="utf-8"?><configuration><packageSources><clear />'
+            f'<add key="cache" value="{_nuget_cache()}" /></packageSources></configuration>\n', encoding="utf-8")
+        return {"type": "dotnet-library", "role": "other", "path": f"fx/{mid}", "secretsModule": mid,
+                "dotnet": {"configuration": "Debug", "test": f"../tests/{mid}/Lib.Tests.csproj"}}
+
+    root = _host(tmp_path, {"core": library})
+    ran = _cli(root, "build")
+    assert ran.returncode == 0 and "build OK (1 module(s) ran)" in ran.stdout, ran.stdout + ran.stderr
+    assert (root / "fx" / "core" / "bin" / "Debug").is_dir()
+    ran = _cli(root, "test")
+    assert ran.returncode == 0, ran.stdout + ran.stderr
+    assert "[core test] 1 test(s): 1 passed, 0 not executed (skipped)" in ran.stdout, ran.stdout
+    # Its pre-flight asks nothing of a process or an archive: no secrets, no .env.dev, no publishExpect.
+    ran = _cli(root, "mod", "core", "check")
+    assert ran.returncode == 0 and "All required checks passed (0 warnings)" in ran.stdout, ran.stdout + ran.stderr
+    # What a library is not: nothing runs it, nothing packages it.
+    ran = _cli(root, "mod", "core", "run")
+    assert ran.returncode == 1 and "Unknown subcommand: run" in ran.stdout, ran.stdout + ran.stderr
+    assert "  Valid: audit | build | check | lint | test" in ran.stdout.splitlines(), ran.stdout  # no `deliver` rung
+    ran = _cli(root, "package", "core")
+    assert ran.returncode == 1 and "'core' is no deployable module" in ran.stdout + ran.stderr, ran.stdout + ran.stderr
+    assert not list((root / identity.RUNS_DIR.split("/")[0]).glob("artifacts/core-*"))
+
+
 def test_package_builds_once_and_leaves_one_archive_per_commit(tmp_path):
     def module(root: Path, mid: str) -> dict:
         d = root / "fx" / mid

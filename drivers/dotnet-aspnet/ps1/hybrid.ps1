@@ -4,7 +4,7 @@
 # so secrets reach the app without being written into appsettings files.
 # In scope from the caller: $ModuleId, $modPath, $root.
 
-. (Join-Path $PSScriptRoot "_project.ps1")
+. (Join-Path $PSScriptRoot "..\..\_shared\dotnet\_project.ps1")
 
 $project = Resolve-DotnetProjectFile -ModuleId $ModuleId -ModPath $modPath
 $runArgs = @("run", "--project", $project)

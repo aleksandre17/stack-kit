@@ -1,6 +1,7 @@
 # Module drivers
 
-**Driver type** = a toolchain (`java-boot`, `node-vite`, `node-spa`, `node-api`, `dotnet-aspnet`).
+**Driver type** = a toolchain (`java-boot`, `node-vite`, `node-spa`, `node-api`, `dotnet-aspnet`,
+`dotnet-library`).
 **Module id** = the host's key in `stack-kit.json`. **Role** (`api`, `ui`, `worker`, ...) is the
 module's; its server **tier** is the role's (`config/catalogs/roles.json`).
 
@@ -8,7 +9,7 @@ module's; its server **tier** is the role's (`config/catalogs/roles.json`).
 drivers/
   registry.json          # every driver's declaration (registry.schema.json)
   <type>/                # its scripts (lifecycle steps, the host run's launch step) and container/ recipes
-  _shared/               # runners a driver family shares (package-scripts)
+  _shared/               # runners a driver family shares (package-scripts, dotnet)
   _template/             # copy when adding a type
 ```
 

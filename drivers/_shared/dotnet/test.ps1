@@ -1,10 +1,10 @@
-# dotnet-aspnet - test: `dotnet test` of the module's tests (dotnet.test: a test project or
+# .NET driver family - test: `dotnet test` of the module's tests (dotnet.test: a test project or
 # solution, module-relative), else its solution or project. `"test": ""` declares the module has
 # none, said and counted as not run. Operands pass through to dotnet.
 #
 # A run that discovers no test fails, as pytest's and Jest's do: a target holding no test is not a
 # tested module (CWE-223). The count is read from the TRX report every `dotnet test` can write.
-. (Join-Path $PSScriptRoot "..\_init.ps1")
+. (Join-Path $PSScriptRoot "_init.ps1")
 
 $target = Resolve-DotnetModuleTarget -ModuleId $env:STACK_KIT_MODULE_ID -ModPath $OpsModuleRoot -Field "test"
 if (-not $target) {

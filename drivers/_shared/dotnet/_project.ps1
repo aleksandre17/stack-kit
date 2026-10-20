@@ -1,4 +1,4 @@
-# dotnet-aspnet - resolve the module's project file and declared options.
+# .NET driver family - resolve the module's project file and declared options.
 # Everything is read from modules.<id>.dotnet in the project manifest; nothing is assumed
 # about a project name, a solution layout or a hosting product.
 

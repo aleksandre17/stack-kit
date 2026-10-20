@@ -1,5 +1,27 @@
 # Changelog — stack-kit
 
+## Unreleased
+
+### Added
+
+- A `dotnet-library` driver: a .NET class library declared as a module of its own (role `other`).
+  `build`, `test`, `lint`, `audit` and `check` run it, and `stack-kit build|test|lint|audit` include
+  it; `test` runs its `dotnet.test` project and reports `[<module> test] N test(s): ...` as an API's
+  does. It declares no `hybrid`, `package`, `container`, `dev`, delivery rung (`delivery: {}`), `vscode`,
+  `compose` or `detect`, so it is never run, packaged, released, composed or drafted: `package`/`deploy` name it
+  as no deployable module, `mod <m> run` as no command of its driver, and CI builds and tests it
+  without a package step. The standalone form of java-boot's `opsModules.shared` library row.
+
+### Changed
+
+- The .NET family's lifecycle scripts have one home, `drivers/_shared/dotnet/` (`_init`, `_project`,
+  `build`, `test`, `lint`, `audit`, `check`); `dotnet-aspnet` declares them there and keeps its own
+  `package` and `hybrid`. `check` asks for secrets and `.env.dev` only of a module its driver runs
+  (`run`), and for `publishExpect` only of one it packages (`package`) -- unchanged for `dotnet-aspnet`.
+- A driver whose modules run (a host run or a delivery rung) declares its VS Code launch as data; one
+  whose modules never run declares none (tests/unit/test_declared_agnosticism.py says both).
+- `mod <m> <unknown>` lists `deliver <rungs>` only when the module's driver declares a rung.
+
 ## 2.7.2 — 2026-10-20
 
 ### Fixed

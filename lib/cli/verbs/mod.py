@@ -85,7 +85,11 @@ def _run(a: Args) -> int:
         from lib.modules import driver_delivery
 
         print(f"  Unknown subcommand: {sub} (module {module}, type {typ})")
-        print(f"  Valid: {' | '.join(sorted(commands))} | deliver <{'|'.join(driver_delivery(typ))}>")
+        valid = sorted(commands)
+        rungs = "|".join(driver_delivery(typ))
+        if rungs:  # a driver that delivers nothing (a library) offers no `deliver`
+            valid.append(f"deliver <{rungs}>")
+        print(f"  Valid: {' | '.join(valid)}")
         return 1
     return tools.driver_command(module, sub, rest)
 
