@@ -1,5 +1,8 @@
 """SshTransport.remove_many: a workspace with many files gone is removed through stdin, never one huge command line."""
+import shutil
 import subprocess
+
+import pytest
 
 from lib.delivery.transport import SshTransport
 
@@ -37,3 +40,21 @@ def test_a_name_with_spaces_or_quotes_reaches_rm_whole(monkeypatch):
     t.remove_many("/srv/ws", ["a b/c'd.txt"])
 
     assert seen["input"] == "/srv/ws/a b/c'd.txt".encode("utf-8")
+
+
+@pytest.mark.skipif(shutil.which("bash") is None or shutil.which("xargs") is None, reason="needs bash and xargs")
+def test_the_real_xargs_removes_exactly_the_listed_files_whatever_their_names(tmp_path, monkeypatch):
+    # The remote command run for real (review P3-1): what remove_many sends on stdin, through bash -c 'xargs -0 rm -f --'.
+    names = ["-rf", "a b", "c'd", "ქართული", "plain.txt"]
+    for n in names + ["kept.txt"]:
+        (tmp_path / n).write_text("x", encoding="utf-8")
+    real_run = subprocess.run
+    seen = {}
+    monkeypatch.setattr(subprocess, "run", lambda argv, input=None, capture_output=False: seen.update(input=input) or _Ran())
+    base = tmp_path.as_posix()
+    SshTransport("user@host", [], confine=base).remove_many(base, names + ["missing.txt"])
+
+    ran = real_run(["bash", "-c", "xargs -0 rm -f --"], input=seen["input"], capture_output=True)
+
+    assert ran.returncode == 0
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["kept.txt"]

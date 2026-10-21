@@ -1,6 +1,6 @@
 # Changelog — stack-kit
 
-## 2.9.1 — unreleased
+## 2.9.1 — 2026-10-22
 
 ### Fixed
 
