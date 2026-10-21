@@ -17,7 +17,7 @@ The kit holds ops machinery only. Application code, real env values and secrets 
 | Tool | Needed for | Notes |
 |---|---|---|
 | Python 3.10+ | every command | The CLI is Python (`cli/stack_kit.py` -> `lib/cli/`); the launchers only find it (`py -3`, `python3`, `python`). |
-| PowerShell 7+ (`pwsh`) | PowerShell driver scripts (`dotnet-aspnet`, the package-script runner, the host run), `init`, local `dev up --mode`, `infra local` | Any OS; on Windows, Windows PowerShell 5.1 also runs them (every non-ASCII script carries a BOM). |
+| PowerShell 7+ (`pwsh`) | PowerShell driver scripts (`dotnet-aspnet`, `dotnet-library`, the package-script runner, the host run), `init`, local `dev up --mode`, `infra local` | Any OS; on Windows, Windows PowerShell 5.1 also runs them (every non-ASCII script carries a BOM). |
 | Bash | a driver command written in bash, `init` on a machine without PowerShell | On Windows: Git for Windows (`%ProgramFiles%\Git\bin\bash.exe`). |
 | OpenSSH (ssh, tar) | every remote verb: `deploy`, `release`, `ops`, `dev`, `targets --init/--verify`, `layout migrate`, `infra remote`, tunnels | rsync is used for a remote-dev sync when both ends have it, else the kit's own index + tar stream; a key under `ops/config/ssh/` or the agent ([ADOPT.md#configuration](ADOPT.md#configuration)). |
 | Docker + compose | the local stack (`stack`, `dev up --mode docker`, `infra local`) and, on a target, every release | The compose invocation is declared (`config/catalogs/targetRuntimes.json`, a target's `compose`): a host with only the standalone binary declares `["docker-compose"]`. |

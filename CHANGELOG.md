@@ -1,6 +1,6 @@
 # Changelog — stack-kit
 
-## Unreleased
+## 2.8.0 — 2026-10-21
 
 ### Added
 

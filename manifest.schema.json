@@ -317,7 +317,7 @@
           },
           "dotnet": {
             "type": "object",
-            "description": "dotnet-aspnet driver options (all optional)",
+            "description": "dotnet-aspnet and dotnet-library driver options (all optional)",
             "properties": {
               "project": { "type": "string", "description": "Project file relative to the module path; default: the single *.csproj there" },
               "solution": { "type": "string", "description": "Solution relative to the module path: what build and lint act on (default: the project)" },

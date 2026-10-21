@@ -30,6 +30,12 @@ no package step). `build`, `test`, `lint` and `audit` across the modules include
 declare `detect`: a class library is declared by its host, never drafted from a tree (every test
 project and helper assembly is one).
 
+## Migrations
+
+Like `dotnet-aspnet`, it declares EF Core migrations (`**/Migrations/*.cs`, without designer and
+snapshot files) as its migration files, since a data-access library often holds them; a library
+without EF migrations matches none.
+
 ## Manifest
 
 ```json

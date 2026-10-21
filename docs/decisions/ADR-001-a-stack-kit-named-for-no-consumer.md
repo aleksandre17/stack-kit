@@ -1302,3 +1302,31 @@ the first reference (a common shared project is itself allowed to reference anot
 **Owed.** Unit tests hold direct and transitive references, the refusal boundary, both workspace
 layouts, inherited build files and the index route. A host's remote dev container is still the proof
 that its chosen SDK and package graph start on its target.
+
+## Amendment 25 — a class library is a module of its own, and a driver that never runs declares nothing that runs (2026-10-21, owner-delegated)
+
+**Context.** A host's .NET domain core sat inside its API's build and test project: its rules were
+proven only through the service that references it, and an architecture test holding its dependency
+rule ran among the API's integration tests. The kit had a driver only for a .NET module that runs.
+java-boot already models the same thing as the `opsModules.shared` row inside a Gradle build; .NET has
+no such enclosing build to hang it on.
+
+**Decision.** A `dotnet-library` driver: a class library is declared as a module (role `other`) with
+`build`, `test`, `lint`, `audit` and `check`, and with no `hybrid`, `package`, `container`, `dev`,
+delivery rung, `vscode`, `compose` or `detect`. Every verb that needs one of those refuses the module by
+name, CI builds and tests it without a package step, and compose generates no service for it. The .NET
+lifecycle scripts move to one home, `drivers/_shared/dotnet/`, declared by both .NET drivers; `check`
+asks for secrets and `.env.dev` only of a module its driver runs, and for `publishExpect` only of one it
+packages. The agnosticism test now holds both directions: a driver that runs declares its launch as
+data, and one that never runs declares none.
+
+**Rejected.** Declaring the library as a `dotnet-aspnet` module with its run and package removed (a
+service type with holes, and every hole a place a verb could trip); a `library: true` flag on
+`dotnet-aspnet` (a second driver hidden in a boolean, with each verb asking it); copying the scripts
+into a second driver directory (two homes for one lifecycle); and leaving the library to its service's
+tests (its rules stay unproven on their own, which is the gap).
+
+**Owed.** `validate` still requires `secretsModule` and warns about a missing secrets directory for a
+module that has no secrets; the `mod` hint's two branches lack a unit test that runs without dotnet;
+and the acceptance test's offline package probe checks only the top-level packages. All three are
+follow-ups, not part of this release.

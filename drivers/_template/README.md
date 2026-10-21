@@ -36,4 +36,4 @@ deploy, dev or manage script.
 "modules": { "my-service": { "type": "<your-type>", "role": "api", "path": "my-service", "secretsModule": "my-service" } }
 ```
 
-Then `stack-kit validate` and `stack-kit deploy my-service --plan`. Reference implementations: `dotnet-aspnet/`, `java-boot/`.
+Then `stack-kit validate` and `stack-kit deploy my-service --plan`. Reference implementations: `dotnet-aspnet/`, `java-boot/`; a module that is never run: `dotnet-library/`.
