@@ -1,6 +1,6 @@
 # Changelog — stack-kit
 
-## 2.9.0 — unreleased
+## 2.9.0 — 2026-10-21
 
 ### Added
 
@@ -20,6 +20,8 @@
   health check answers `Healthy`, not `UP`; a `dotnet-aspnet` api's CI probe formerly grepped `UP`).
   The release recipe's probe was already status-only. A driver that declares no `health` (java-boot,
   every other) keeps the role's `urlPath` and `healthExpect` exactly.
+- An existing `dotnet-aspnet` api that already declares `container.healthPath` is now probed by CI health
+  and the stack endpoints at that path, not at the role's `/health`.
 
 ## 2.8.0 — 2026-10-21
 

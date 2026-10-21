@@ -40,7 +40,9 @@ module's files, its `label`; lib/vscode_gen.py holds no debugger), `migrations`,
 1. Copy `drivers/_template/` -> `drivers/<type>/` (or declare it in the host's own registry,
    `drivers.registry`, beside its folder -- the kit untouched).
 2. Declare it in the registry: `label`, `roles`, `commands`, `package`, `container` (with its
-   recipe under `container/`), `dev`, `delivery` (`release: {via: release}`, `remote-dev: {via: dev}`).
+   recipe under `container/`), `dev`, `delivery` (`release: {via: release}`, `remote-dev: {via: dev}`),
+   and `health` when its modules answer a probe by HTTP status rather than a body holding `UP`
+   (`expect: "status"`, `pathRequired: [roles]` -- the roles that must declare `container.healthPath`).
 3. Point a module at it (`"type": "<type>"`); `stack-kit validate`, `stack-kit deploy <module> --plan`.
 
 ## Resolution
