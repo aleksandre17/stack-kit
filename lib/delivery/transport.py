@@ -230,7 +230,10 @@ class SshTransport(Transport):
         self._ok(f"rm -rf -- {shlex.quote(path)}")
 
     def _remove_many(self, paths: list[str]) -> None:
-        self._ok("rm -f -- " + " ".join(shlex.quote(p) for p in paths))
+        # The list goes through stdin, NUL-separated, never on the command line: a command line has a length limit
+        # (Windows 32 767 characters -- WinError 206 on a workspace with many files gone), and NUL is the one byte no
+        # path can hold, so no name splits or escapes. Each path was already held inside the workspace by remove_many.
+        self._ok("xargs -0 rm -f --", data=b"\0".join(p.encode("utf-8") for p in paths))
 
     def interactive(self, argv: list[str]) -> int:
         return subprocess.run(["ssh", "-t", *self.args, self.server, *(shlex.quote(a) for a in argv)]).returncode

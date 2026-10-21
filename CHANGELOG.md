@@ -1,5 +1,13 @@
 # Changelog — stack-kit
 
+## 2.9.1 — unreleased
+
+### Fixed
+
+- `dev sync` over SSH no longer fails on a workspace with many files gone (`[WinError 206] The filename or extension
+  is too long` on Windows): the paths to remove go to `xargs -0 rm -f --` through stdin, NUL-separated, instead of
+  one command line past the system's length limit. Each path is still confined to the workspace first.
+
 ## 2.9.0 — 2026-10-21
 
 ### Added
