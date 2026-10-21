@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from lib import envfile
+from lib.modules import module_health_path
 from lib.project_context import ProjectContext
 
 def load_stack_catalog(path: Path) -> dict[str, Any]:
@@ -122,7 +123,7 @@ def stack_endpoint_lines(
             module_id=module_id,
             role=role,
             port=port,
-            url_path=str(role_cfg.get("urlPath") or "/"),
+            url_path=module_health_path(ctx.manifest, module_id) or str(role_cfg.get("urlPath") or "/"),
         )
         rows.append((sort_key, module_id, line))
 

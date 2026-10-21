@@ -1,5 +1,26 @@
 # Changelog — stack-kit
 
+## 2.9.0 — unreleased
+
+### Added
+
+- `dotnet-aspnet` serves `role: worker` as well as `role: api`: a .NET process that polls or consumes and
+  answers `/health` (an ASP.NET host with a hosted service) is a module of its own. The same scripts,
+  the same container recipe (internal port 8080), `run`, `hybrid`, `dev up`, `package` and `deploy`
+  serve it; its port comes from the role's `portEnv` (`WORKER_PORT`, default 8091), as Java's does.
+- A driver declares how its modules answer a health probe: registry `health` (`expect: "status"`,
+  `pathRequired: [roles]`). `validate` refuses a module of a role listed there that declares no
+  `container.healthPath`, naming the module and the rule; `dotnet-aspnet` lists `worker`.
+
+### Changed
+
+- Health of a module whose driver declares `health.expect: status` is the HTTP status (2xx), never a
+  body holding `UP`: CI health (`ci_health`) and the stack endpoints ask the module's
+  `container.healthPath` before the role's default path, and CI health expects no body (an ASP.NET
+  health check answers `Healthy`, not `UP`; a `dotnet-aspnet` api's CI probe formerly grepped `UP`).
+  The release recipe's probe was already status-only. A driver that declares no `health` (java-boot,
+  every other) keeps the role's `urlPath` and `healthExpect` exactly.
+
 ## 2.8.0 — 2026-10-21
 
 ### Added

@@ -30,7 +30,7 @@ def _manifest(path: str = "src/api", dotnet: dict | None = None) -> dict:
 class TestRegistryEntry:
     def test_registered_as_powershell_api_driver(self) -> None:
         entry = driver_registry()[DRIVER]
-        assert entry["roles"] == ["api"]
+        assert entry["roles"] == ["api", "worker"]
         assert "runtime" not in entry  # a command runs by its script's runtime (config/runtimes.json)
         assert all(str(c).endswith(".ps1") for c in entry["commands"].values())
         assert entry["delivery"]["release"] == {"via": "release"}

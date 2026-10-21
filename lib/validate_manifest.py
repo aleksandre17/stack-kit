@@ -137,6 +137,10 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
         typ = cfg.get("type")
         if typ and typ not in registry:
             errs.append(f"modules.{mid}.type: unknown driver '{typ}'")
+        required = (registry.get(str(typ)) or {}).get("health", {}).get("pathRequired") or []
+        if cfg.get("role") in required and not (isinstance(cfg.get("container"), dict) and cfg["container"].get("healthPath")):
+            errs.append(f"modules.{mid}: {typ} with role {cfg['role']} must declare container.healthPath -- its driver's "
+                        f"default health path for that role is not the one its host answers (registry health.pathRequired)")
         rel = cfg.get("path")
         if rel and not (root / str(rel)).is_dir():
             warnings.append(f"modules.{mid}.path: directory missing ({rel})")

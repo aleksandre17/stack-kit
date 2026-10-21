@@ -53,6 +53,15 @@
         },
         "additionalProperties": false
       },
+      "health": {
+        "type": "object",
+        "description": "How the driver's modules answer a health probe (ADR-001 amendment 26): `expect` `status` -- a 2xx answers, the body is never read (the default, a role's `healthExpect`, stands where this is absent); `pathRequired` -- the roles whose module must declare `container.healthPath`, the role's default path being another runtime's",
+        "properties": {
+          "expect": { "enum": ["status"] },
+          "pathRequired": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        },
+        "additionalProperties": false
+      },
       "delivery": { "type": "object", "additionalProperties": { "type": "object" } },
       "operands": { "type": "object", "additionalProperties": { "type": "object" } },
       "ci": {

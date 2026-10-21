@@ -1330,3 +1330,30 @@ tests (its rules stay unproven on their own, which is the gap).
 module that has no secrets; the `mod` hint's two branches lack a unit test that runs without dotnet;
 and the acceptance test's offline package probe checks only the top-level packages. All three are
 follow-ups, not part of this release.
+
+## Amendment 26 — a .NET worker is a module of `dotnet-aspnet`, and a driver declares how its health is judged (2026-10-21, owner-delegated)
+
+**Context.** A host's attendance-evidence poller is its own .NET process: an ASP.NET host with a hosted
+service, answering `/health` (liveness) and `/health/ready`. The kit could not declare it:
+`dotnet-aspnet` admitted `api` only, and the `worker` role's defaults in the stack catalog
+(`/actuator/health`, a body holding `UP`) are Spring's. ASP.NET health checks answer 200 `Healthy` or
+503 `Unhealthy`, so no body ever holds `UP`.
+
+**Decision.** `dotnet-aspnet` lists `worker` among its roles: the same artifact, scripts, recipe and
+rungs, a different role. The registry gains `health` (`expect: "status"`, `pathRequired: [roles]`),
+read by interpreters, never matched on a driver's name: `validate` refuses a module of a listed role
+with no `container.healthPath` (`dotnet-aspnet` lists `worker`: its role default is Spring's);
+CI health and the stack endpoints ask the module's declared path and judge the status alone where the
+driver declares `expect: status`. The role's default stands for a driver that declares none, so
+java-boot is byte-for-byte unchanged. A worker's port is the role's `portEnv` (`WORKER_PORT`, 8091);
+the container's internal port stays the driver's 8080.
+
+**Rejected.** A second driver for the worker (every script copied for a different role); naming
+`dotnet-aspnet` in `validate` or `ci_health` (a driver named where a capability is asked); changing the
+role catalog's worker default (Java's); requiring `healthPath` of every `dotnet-aspnet` module (breaks
+existing api manifests that rely on the default); matching `Healthy` in the body (ties a probe to one
+framework's wording).
+
+**Owed.** `dotnet-aspnet` declares no `compose.templates`, so a worker, like the api, has no local
+compose service and no compose health check; if one is declared later, its healthcheck must read
+`health.expect`. The remote-dev service declares no health probe for either role.

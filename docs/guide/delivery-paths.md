@@ -138,7 +138,7 @@ sequenceDiagram
 | driver | artifacts in `<service>/` (registry `package.artifacts`) | recipe (driver `container.template`) |
 |---|---|---|
 | java-boot | the boot jar (`build/libs/*.jar`, `target/*.jar`, also one module deep; `*-plain.jar` excluded) | `eclipse-temurin:<v>-jre`, user uid 10001, `java -jar /app/app.jar` |
-| dotnet-aspnet | the `dotnet publish` output (`{out}` = `.stack-kit/artifacts/<m>/`) | `mcr.microsoft.com/dotnet/aspnet:<v>`, `USER app` (uid 1654), `dotnet <project>.dll` |
+| dotnet-aspnet | the `dotnet publish` output (`{out}` = `.stack-kit/artifacts/<m>/`) | `mcr.microsoft.com/dotnet/aspnet:<v>`, `USER app` (uid 1654), `dotnet <project>.dll`; serves `api` and `worker` alike -- its probe is the status of `container.healthPath` (2xx), a worker declares it |
 | node-api | `dist/**` plus `package.json` and the lockfile | `node:<v>-alpine`: a production-only install (`--prod` / `--omit=dev`), then `USER node`, `npm start` |
 | node-vite, node-spa | `dist/**` + `server.conf` (the rendered `spa.conf`) | `nginxinc/nginx-unprivileged:1.27-alpine`, `USER nginx`, `/healthz` |
 

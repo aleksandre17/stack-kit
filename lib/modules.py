@@ -192,6 +192,25 @@ def driver_capability(driver_id: str, key: str, default: Any = None) -> Any:
     return default if value is None else value
 
 
+def driver_health(driver_type: str) -> dict[str, Any]:
+    """How the driver's modules answer a health probe, as the registry DECLARES it (`health`):
+    `expect` -- `status` (a 2xx answers; the body is never read) -- and `pathRequired`, the roles whose
+    module must name the path its host answers (`container.healthPath`) because the role's default
+    path is another runtime's. A driver that declares none keeps the role's catalog default."""
+    value = driver_capability(driver_type, "health", {})
+    return value if isinstance(value, dict) else {}
+
+
+def module_health_path(manifest: dict[str, Any], module_id: str) -> str:
+    """The health path a module's own declaration names, where its driver declares `health`
+    ("" else: the role's default stands)."""
+    cfg = _modules(manifest).get(module_id) or {}
+    if not driver_health(str(cfg.get("type") or "")):
+        return ""
+    own = cfg.get("container")
+    return str(own.get("healthPath") or "") if isinstance(own, dict) else ""
+
+
 def driver_default_role(driver_id: str) -> str:
     """First role the driver DECLARES it serves — never a name hardcoded here."""
     entry = driver_registry().get(str(driver_id)) or {}

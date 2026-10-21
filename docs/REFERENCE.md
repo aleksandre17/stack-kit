@@ -92,12 +92,12 @@ under `{root}/{project}`, refused otherwise (`lib/targets/layout.py`).
 `commands` (script, or `{script, runtime}`), `packageScripts`, `hybrid.script`, `package`
 `{command, args, artifacts}` (`{out}`: the staging directory), `container` (above), `dev` (above),
 `outputs` (what its toolchain writes, gitignore-style, relative to the module; validate refuses a tracked match, a module adds its own in `modules.<id>.outputs`), `delivery` (rung -> `{via}` a kit verb, `{command, args}`,
-or `{pending}`), `ci.setup`, `detect`, `vscode` (`launch` as data, `values`, `label`, `optional`), `migrations`, `compose` (the local
+or `{pending}`), `health` (`expect: status`, `pathRequired`: the roles whose module declares `container.healthPath`), `ci.setup`, `detect`, `vscode` (`launch` as data, `values`, `label`, `optional`), `migrations`, `compose` (the local
 stack; `opsModules` its registry rows).
 
 | Driver | Package | Release runs | Remote dev |
 |---|---|---|---|
-| `dotnet-aspnet` | `dotnet publish` into `{out}` | `container/Dockerfile` on the ASP.NET runtime | `dotnet watch` in the SDK image |
+| `dotnet-aspnet` (api, worker) | `dotnet publish` into `{out}` | `container/Dockerfile` on the ASP.NET runtime | `dotnet watch` in the SDK image |
 | `dotnet-library` | none: a class library is built and tested, never packaged (not deployable) | none | none |
 | `java-boot` | `build`, the boot jar | `container/Dockerfile` on a JRE | `bootRun` in a JDK image; Java sources `rebuild` |
 | `node-api` | `build`, `dist/**` + manifest + lockfile | `container/Dockerfile`, production dependencies | the `dev` script |

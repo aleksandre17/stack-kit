@@ -568,7 +568,7 @@ driver's detection holds for; a host adds its own with `extend driver <name>`.
 
 | driver | for | roles | recognised by | built by | writes |
 |---|---|---|---|---|---|
-| `dotnet-aspnet` | ASP.NET Core - dotnet run / dotnet publish artifact (Windows or cross-platform host) | api | `*.csproj` | - | `bin/`, `obj/` |
+| `dotnet-aspnet` | ASP.NET Core - dotnet run / dotnet publish artifact (Windows or cross-platform host) | api, worker | `*.csproj` | - | `bin/`, `obj/` |
 | `dotnet-library` | .NET class library - dotnet build / dotnet test of a library and its test project (no run, package or release) | other | - | - | `bin/`, `obj/` |
 | `java-boot` | JVM — Spring Boot, built by Gradle or Maven (JAR deploy) | api, worker | `build.gradle`, `build.gradle.kts`, `settings.gradle`, `settings.gradle.kts`, `pom.xml`, `*/build.gradle`, `*/build.gradle.kts`, `*/pom.xml` | maven, gradle | `build/`, `.gradle/`, `target/` |
 | `node-api` | Node — HTTP service (pnpm build + dockerized deploy, Fastify/Express/Nest) | api | `package.json` | - | `node_modules/`, `dist/` |

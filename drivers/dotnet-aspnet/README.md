@@ -62,6 +62,31 @@ lists it) and never reads a value back.
 All `dotnet.*` keys are optional. Without `project`, the module path must contain exactly one
 `*.csproj`.
 
+## Worker role and health
+
+The driver serves `role: worker` as well as `role: api`: a .NET process that polls or consumes and
+answers HTTP health (an ASP.NET host with a hosted service) is the same artifact -- the same scripts,
+`container/Dockerfile` (internal port 8080), `run`, `hybrid`, `dev up`, `package` and `deploy`. A
+worker's port comes from the role's `portEnv` (`WORKER_PORT`, default 8091).
+
+Health is the HTTP **status** (2xx), never a body containing `UP`: ASP.NET health checks answer 200
+`Healthy` or 503 `Unhealthy`. The driver declares it (`health.expect: status`), so the release image's
+probe, CI health and the stack endpoints agree. A worker's default health path would be Spring's
+(`/actuator/health`), so the driver declares `health.pathRequired: ["worker"]`: `validate` refuses a
+worker with no `container.healthPath`.
+
+```json
+"modules": {
+  "evidence": {
+    "type": "dotnet-aspnet",
+    "role": "worker",
+    "path": "backend/evidence",
+    "secretsModule": "evidence",
+    "container": { "healthPath": "/health/ready" }
+  }
+}
+```
+
 ## Not declared (yet)
 
 - Windows/IIS delivery — the `iis` target runtime is pending;

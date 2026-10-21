@@ -641,8 +641,15 @@
   "dotnet-aspnet": {
     "label": "ASP.NET Core - dotnet run / dotnet publish artifact (Windows or cross-platform host)",
     "roles": [
-      "api"
+      "api",
+      "worker"
     ],
+    "health": {
+      "expect": "status",
+      "pathRequired": [
+        "worker"
+      ]
+    },
     "commands": {
       "package": "ps1/package.ps1",
       "check": "../_shared/dotnet/check.ps1",

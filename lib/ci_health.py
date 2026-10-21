@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from lib.modules import driver_health, module_driver_type, module_health_path
 from lib.project_context import ProjectContext
 from lib.stack_endpoints import (
     load_stack_catalog,
@@ -34,8 +35,10 @@ def _stack_module_filter(ctx: ProjectContext) -> set[str] | None:
     return None
 
 
-def _health_expect(role_cfg: dict[str, Any]) -> str:
+def _health_expect(role_cfg: dict[str, Any], driver_type: str = "") -> str:
     if role_cfg.get("ciHealth") is False:
+        return ""
+    if driver_health(driver_type).get("expect") == "status":  # the driver's own judgement wins over the role's
         return ""
     expect = role_cfg.get("healthExpect")
     if expect is None:
@@ -75,7 +78,7 @@ def stack_health_targets(
             continue
         if role_cfg.get("ciHealth") is False:
             continue
-        expect = _health_expect(role_cfg)
+        expect = _health_expect(role_cfg, module_driver_type(ctx.manifest, module_id))
         secrets_folder = ctx.secrets_module_folder(module_id)
         port = resolve_module_port(
             role=role,
@@ -85,7 +88,7 @@ def stack_health_targets(
         )
         if not port:
             continue
-        url_path = str(role_cfg.get("urlPath") or "/health")
+        url_path = module_health_path(ctx.manifest, module_id) or str(role_cfg.get("urlPath") or "/health")
         path = url_path if url_path.startswith("/") else f"/{url_path}"
         if path == "/":
             url = f"http://{host}:{port}"
